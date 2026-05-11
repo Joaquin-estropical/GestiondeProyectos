@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { Folder, ListTodo, Percent, Users, UserPlus, Plus } from 'lucide-react';
+import { Folder, ListTodo, Percent, Users, UserPlus, Plus, Pencil } from 'lucide-react';
 import { useAreas, useProjects, useTasks } from '@/hooks/useSupabase';
 import { getMember, fmtDate, dueColor } from '@/lib/mock-data';
 import { Avatar } from '@/components/shared/Avatar';
@@ -10,7 +10,7 @@ import { useAppStore } from '@/stores/app';
 export default function AreaView() {
   const { areaId } = useParams<{ areaId: string }>();
   const navigate   = useNavigate();
-  const { openTask } = useAppStore();
+  const { openTask, openNewProject, openNewArea } = useAppStore();
 
   const id = areaId ?? '';
 
@@ -37,8 +37,9 @@ export default function AreaView() {
         subtitle={`${projects.length} proyectos activos · ${open} tareas abiertas`}
         right={
           <div className="row gap-8">
+            <button className="btn btn-ghost btn-md" onClick={() => openNewArea(a.id)}><Pencil size={14} /> Editar</button>
             <button className="btn btn-secondary btn-md"><UserPlus size={14} /> Invitar</button>
-            <button className="btn btn-primary btn-md"><Plus size={14} /> Nuevo proyecto</button>
+            <button className="btn btn-primary btn-md" onClick={() => openNewProject(a.id)}><Plus size={14} /> Nuevo proyecto</button>
           </div>
         }
       />

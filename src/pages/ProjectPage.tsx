@@ -3,9 +3,9 @@ import { useParams } from 'react-router-dom';
 import { List, Kanban, GanttChart, Calendar, Table, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, Clock } from 'lucide-react';
 import { useProjects, useTasks } from '@/hooks/useSupabase';
 import { getMember, STATUS_ORDER, STATUS_LABELS, MONTHS_ES, TODAY, fmtDate, dueColor } from '@/lib/mock-data';
+import { useAppStore } from '@/stores/app';
 import { Avatar } from '@/components/shared/Avatar';
 import { StatusPill, PriorityPill, AreaPill } from '@/components/shared/Badges';
-import { useAppStore } from '@/stores/app';
 import type { Task, TaskStatus } from '@/types';
 
 // ─── Project Header ───
@@ -58,7 +58,8 @@ function ProjectHeader({ project, view, setView }: { project: NonNullable<Return
 }
 
 // ─── Project List ───
-function ProjectList({ tasks, openTask }: { tasks: Task[]; openTask: (id: string) => void }) {
+function ProjectList({ tasks, openTask, projectId }: { tasks: Task[]; openTask: (id: string) => void; projectId: string }) {
+  const { openNewTask } = useAppStore();
   const grouped = STATUS_ORDER.map(s => ({ status: s as TaskStatus, tasks: tasks.filter(t => t.status === s) })).filter(g => g.tasks.length > 0);
 
   const dotColor = (s: string) =>
@@ -115,7 +116,7 @@ function ProjectList({ tasks, openTask }: { tasks: Task[]; openTask: (id: string
           ))}
         </tbody>
       </table>
-      <div style={{ padding: '14px 12px', color: 'var(--text-3)', fontSize: 13, cursor: 'pointer' }} className="row gap-8 items-center">
+      <div style={{ padding: '14px 12px', color: 'var(--text-3)', fontSize: 13, cursor: 'pointer' }} className="row gap-8 items-center" onClick={() => openNewTask(projectId)}>
         <Plus size={14} /> Agregar tarea
       </div>
     </div>
@@ -341,10 +342,10 @@ export default function ProjectPage() {
     <div style={{ height: '100%', overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
       <ProjectHeader project={project} view={view} setView={setView} />
       <div style={{ flex: 1 }}>
-        {view === 'list'   && <ProjectList   tasks={tasks} openTask={openTask} />}
+        {view === 'list'   && <ProjectList   tasks={tasks} openTask={openTask} projectId={id} />}
         {view === 'kanban' && <ProjectKanban tasks={tasks} openTask={openTask} />}
         {view === 'gantt'  && <ProjectGantt  project={project} tasks={tasks} openTask={openTask} />}
-        {view === 'table'  && <ProjectList   tasks={tasks} openTask={openTask} />}
+        {view === 'table'  && <ProjectList   tasks={tasks} openTask={openTask} projectId={id} />}
         {view === 'cal'    && (
           <div style={{ padding: 32 }}>
             <div className="empty">

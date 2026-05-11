@@ -3,11 +3,11 @@ import type { Area, Member, Project, Task, ActivityItem, InboxItem } from '@/typ
 export const TODAY = '2026-03-10'
 
 export const AREAS: Area[] = [
-  { id: 'outlet', name: 'Outlet Centro',        color: '#14B8A6', icon: 'Store',     slug: 'outlet-centro' },
-  { id: 'norte',  name: 'Sucursal Norte',       color: '#3B82F6', icon: 'Store',     slug: 'sucursal-norte' },
-  { id: 'corp',   name: 'Edificio Corporativo', color: '#6366F1', icon: 'Building2', slug: 'corporativo' },
-  { id: 'bodega', name: 'Bodega Sur',           color: '#F59E0B', icon: 'Warehouse',  slug: 'bodega-sur' },
-  { id: 'plaza',  name: 'Outlet Plaza',         color: '#EC4899', icon: 'Store',     slug: 'outlet-plaza' },
+  { id: 'outlet', name: 'Outlet Centro',        color: '#14B8A6', icon: 'store',     slug: 'outlet-centro',  type: 'outlet',   description: null },
+  { id: 'norte',  name: 'Sucursal Norte',       color: '#3B82F6', icon: 'map-pin',   slug: 'sucursal-norte', type: 'sucursal', description: null },
+  { id: 'corp',   name: 'Edificio Corporativo', color: '#6366F1', icon: 'building-2',slug: 'corporativo',    type: 'edificio', description: null },
+  { id: 'bodega', name: 'Bodega Sur',           color: '#F59E0B', icon: 'warehouse', slug: 'bodega-sur',     type: 'bodega',   description: null },
+  { id: 'plaza',  name: 'Outlet Plaza',         color: '#EC4899', icon: 'store',     slug: 'outlet-plaza',   type: 'outlet',   description: null },
 ]
 
 export const TEAM: Member[] = [
@@ -29,25 +29,28 @@ export const PROJECTS: Project[] = [
   { id: 'p8', name: 'Apertura Plaza',       area: 'plaza',   due: '2026-06-01', progress: 12, count: 8  },
 ]
 
+const T = (o: Omit<Task, 'description' | 'start_date' | 'tags'>): Task =>
+  ({ ...o, description: null, start_date: null, tags: [] })
+
 export const TASKS: Task[] = [
-  { id: 't1',  code: 'OT-1847', title: 'Cotizar proveedores de iluminación LED',        project: 'p1', area: 'outlet', assignee: 'and', due: '2026-03-12', priority: 'alta', status: 'curso',  time: '02:14', comments: 4, subtasks: { done: 2, total: 5 } },
-  { id: 't2',  code: 'OT-1848', title: 'Revisar permisos municipales obra mayor',       project: 'p1', area: 'outlet', assignee: 'car', due: '2026-03-15', priority: 'alta', status: 'pend',   time: '00:00', comments: 1, subtasks: { done: 0, total: 3 } },
-  { id: 't3',  code: 'OT-1849', title: 'Coordinar visita arquitecto martes',            project: 'p1', area: 'outlet', assignee: 'joa', due: '2026-03-08', priority: 'urg',  status: 'curso',  time: '01:32', comments: 7, subtasks: { done: 1, total: 2 } },
-  { id: 't4',  code: 'OT-1850', title: 'Aprobar paleta de colores zona ventas',         project: 'p1', area: 'outlet', assignee: 'sof', due: '2026-03-18', priority: 'med',  status: 'pend',   time: '00:00', comments: 2, subtasks: { done: 0, total: 0 } },
-  { id: 't5',  code: 'OT-1851', title: 'Negociar contrato pintura interiores',          project: 'p1', area: 'outlet', assignee: 'and', due: '2026-03-20', priority: 'med',  status: 'rev',    time: '03:21', comments: 5, subtasks: { done: 3, total: 4 } },
-  { id: 't6',  code: 'OT-1852', title: 'Solicitar planos eléctricos al ingeniero',      project: 'p1', area: 'outlet', assignee: 'car', due: '2026-03-25', priority: 'alta', status: 'block',  time: '00:45', comments: 3, subtasks: { done: 0, total: 2 } },
-  { id: 't7',  code: 'OT-1853', title: 'Instalar nuevo sistema de seguridad',           project: 'p1', area: 'outlet', assignee: 'car', due: '2026-02-28', priority: 'med',  status: 'done',   time: '06:12', comments: 8, subtasks: { done: 5, total: 5 } },
-  { id: 't8',  code: 'OT-1854', title: 'Capacitar personal nuevo turno tarde',          project: 'p7', area: 'bodega', assignee: 'and', due: '2026-03-05', priority: 'baja', status: 'done',   time: '04:12', comments: 2, subtasks: { done: 4, total: 4 } },
-  { id: 't9',  code: 'OT-1855', title: 'Conciliar inventario físico vs sistema',        project: 'p2', area: 'outlet', assignee: 'die', due: '2026-03-12', priority: 'alta', status: 'curso',  time: '01:48', comments: 3, subtasks: { done: 1, total: 6 } },
-  { id: 't10', code: 'OT-1856', title: 'Auditoría protocolos seguridad bodega',         project: 'p4', area: 'corp',   assignee: 'car', due: '2026-03-30', priority: 'alta', status: 'curso',  time: '00:35', comments: 1, subtasks: { done: 0, total: 4 } },
-  { id: 't11', code: 'OT-1857', title: 'Migración datos POS sucursal norte',            project: 'p5', area: 'corp',   assignee: 'die', due: '2026-04-10', priority: 'urg',  status: 'curso',  time: '04:58', comments: 6, subtasks: { done: 2, total: 8 } },
-  { id: 't12', code: 'OT-1858', title: 'Revisar layout góndolas zona este',             project: 'p3', area: 'norte',  assignee: 'sof', due: '2026-03-14', priority: 'med',  status: 'rev',    time: '02:02', comments: 4, subtasks: { done: 2, total: 3 } },
-  { id: 't13', code: 'OT-1859', title: 'Coordinar entrega mobiliario marca',            project: 'p3', area: 'norte',  assignee: 'and', due: '2026-03-09', priority: 'alta', status: 'pend',   time: '00:00', comments: 2, subtasks: { done: 0, total: 0 } },
-  { id: 't14', code: 'OT-1860', title: 'Definir KPIs apertura sucursal',               project: 'p3', area: 'norte',  assignee: 'joa', due: '2026-03-10', priority: 'med',  status: 'curso',  time: '00:52', comments: 1, subtasks: { done: 0, total: 0 } },
-  { id: 't15', code: 'OT-1861', title: 'Cotizar señalética interior y exterior',        project: 'p3', area: 'norte',  assignee: 'sof', due: '2026-03-18', priority: 'med',  status: 'pend',   time: '00:00', comments: 0, subtasks: { done: 0, total: 0 } },
-  { id: 't16', code: 'OT-1862', title: 'Revisar inventario sistema POS',               project: 'p6', area: 'bodega', assignee: 'die', due: '2026-03-11', priority: 'alta', status: 'curso',  time: '02:31', comments: 3, subtasks: { done: 1, total: 4 } },
-  { id: 't17', code: 'OT-1863', title: 'Backup completo base de datos POS',            project: 'p5', area: 'corp',   assignee: 'die', due: '2026-03-10', priority: 'urg',  status: 'rev',    time: '01:14', comments: 2, subtasks: { done: 1, total: 1 } },
-  { id: 't18', code: 'OT-1864', title: 'Validar plan emergencia bodega',               project: 'p4', area: 'corp',   assignee: 'car', due: '2026-03-16', priority: 'med',  status: 'pend',   time: '00:00', comments: 1, subtasks: { done: 0, total: 0 } },
+  T({ id: 't1',  code: 'OT-1847', title: 'Cotizar proveedores de iluminación LED',        project: 'p1', area: 'outlet', assignee: 'and', due: '2026-03-12', priority: 'alta', status: 'curso',  time: '02:14', comments: 4, subtasks: { done: 2, total: 5 } }),
+  T({ id: 't2',  code: 'OT-1848', title: 'Revisar permisos municipales obra mayor',       project: 'p1', area: 'outlet', assignee: 'car', due: '2026-03-15', priority: 'alta', status: 'pend',   time: '00:00', comments: 1, subtasks: { done: 0, total: 3 } }),
+  T({ id: 't3',  code: 'OT-1849', title: 'Coordinar visita arquitecto martes',            project: 'p1', area: 'outlet', assignee: 'joa', due: '2026-03-08', priority: 'urg',  status: 'curso',  time: '01:32', comments: 7, subtasks: { done: 1, total: 2 } }),
+  T({ id: 't4',  code: 'OT-1850', title: 'Aprobar paleta de colores zona ventas',         project: 'p1', area: 'outlet', assignee: 'sof', due: '2026-03-18', priority: 'med',  status: 'pend',   time: '00:00', comments: 2, subtasks: { done: 0, total: 0 } }),
+  T({ id: 't5',  code: 'OT-1851', title: 'Negociar contrato pintura interiores',          project: 'p1', area: 'outlet', assignee: 'and', due: '2026-03-20', priority: 'med',  status: 'rev',    time: '03:21', comments: 5, subtasks: { done: 3, total: 4 } }),
+  T({ id: 't6',  code: 'OT-1852', title: 'Solicitar planos eléctricos al ingeniero',      project: 'p1', area: 'outlet', assignee: 'car', due: '2026-03-25', priority: 'alta', status: 'block',  time: '00:45', comments: 3, subtasks: { done: 0, total: 2 } }),
+  T({ id: 't7',  code: 'OT-1853', title: 'Instalar nuevo sistema de seguridad',           project: 'p1', area: 'outlet', assignee: 'car', due: '2026-02-28', priority: 'med',  status: 'done',   time: '06:12', comments: 8, subtasks: { done: 5, total: 5 } }),
+  T({ id: 't8',  code: 'OT-1854', title: 'Capacitar personal nuevo turno tarde',          project: 'p7', area: 'bodega', assignee: 'and', due: '2026-03-05', priority: 'baja', status: 'done',   time: '04:12', comments: 2, subtasks: { done: 4, total: 4 } }),
+  T({ id: 't9',  code: 'OT-1855', title: 'Conciliar inventario físico vs sistema',        project: 'p2', area: 'outlet', assignee: 'die', due: '2026-03-12', priority: 'alta', status: 'curso',  time: '01:48', comments: 3, subtasks: { done: 1, total: 6 } }),
+  T({ id: 't10', code: 'OT-1856', title: 'Auditoría protocolos seguridad bodega',         project: 'p4', area: 'corp',   assignee: 'car', due: '2026-03-30', priority: 'alta', status: 'curso',  time: '00:35', comments: 1, subtasks: { done: 0, total: 4 } }),
+  T({ id: 't11', code: 'OT-1857', title: 'Migración datos POS sucursal norte',            project: 'p5', area: 'corp',   assignee: 'die', due: '2026-04-10', priority: 'urg',  status: 'curso',  time: '04:58', comments: 6, subtasks: { done: 2, total: 8 } }),
+  T({ id: 't12', code: 'OT-1858', title: 'Revisar layout góndolas zona este',             project: 'p3', area: 'norte',  assignee: 'sof', due: '2026-03-14', priority: 'med',  status: 'rev',    time: '02:02', comments: 4, subtasks: { done: 2, total: 3 } }),
+  T({ id: 't13', code: 'OT-1859', title: 'Coordinar entrega mobiliario marca',            project: 'p3', area: 'norte',  assignee: 'and', due: '2026-03-09', priority: 'alta', status: 'pend',   time: '00:00', comments: 2, subtasks: { done: 0, total: 0 } }),
+  T({ id: 't14', code: 'OT-1860', title: 'Definir KPIs apertura sucursal',               project: 'p3', area: 'norte',  assignee: 'joa', due: '2026-03-10', priority: 'med',  status: 'curso',  time: '00:52', comments: 1, subtasks: { done: 0, total: 0 } }),
+  T({ id: 't15', code: 'OT-1861', title: 'Cotizar señalética interior y exterior',        project: 'p3', area: 'norte',  assignee: 'sof', due: '2026-03-18', priority: 'med',  status: 'pend',   time: '00:00', comments: 0, subtasks: { done: 0, total: 0 } }),
+  T({ id: 't16', code: 'OT-1862', title: 'Revisar inventario sistema POS',               project: 'p6', area: 'bodega', assignee: 'die', due: '2026-03-11', priority: 'alta', status: 'curso',  time: '02:31', comments: 3, subtasks: { done: 1, total: 4 } }),
+  T({ id: 't17', code: 'OT-1863', title: 'Backup completo base de datos POS',            project: 'p5', area: 'corp',   assignee: 'die', due: '2026-03-10', priority: 'urg',  status: 'rev',    time: '01:14', comments: 2, subtasks: { done: 1, total: 1 } }),
+  T({ id: 't18', code: 'OT-1864', title: 'Validar plan emergencia bodega',               project: 'p4', area: 'corp',   assignee: 'car', due: '2026-03-16', priority: 'med',  status: 'pend',   time: '00:00', comments: 1, subtasks: { done: 0, total: 0 } }),
 ]
 
 export const ACTIVITY: ActivityItem[] = [

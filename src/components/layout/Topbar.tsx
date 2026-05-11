@@ -1,11 +1,11 @@
 import { useLocation } from 'react-router-dom'
 import { Search, ChevronRight, Sparkles, Plus, Globe, Menu } from 'lucide-react'
-import { AREAS, PROJECTS, TEAM } from '@/lib/mock-data'
 import { Avatar } from '@/components/shared/Avatar'
 import { useAppStore } from '@/stores/app'
 
 function useBreadcrumb(): string[] {
   const { pathname } = useLocation()
+  const { areas, projects } = useAppStore()
   if (pathname === '/') return ['Inicio']
   if (pathname === '/mi-dia') return ['Mi día']
   if (pathname === '/calendario') return ['Calendario global']
@@ -16,14 +16,14 @@ function useBreadcrumb(): string[] {
   if (pathname === '/empty-states') return ['Empty states']
   if (pathname.startsWith('/area/')) {
     const id = pathname.split('/')[2]
-    const a = AREAS.find((x) => x.id === id)
+    const a  = areas.find((x) => x.id === id)
     return ['Áreas', a?.name ?? id]
   }
   if (pathname.startsWith('/proyecto/')) {
     const id = pathname.split('/')[2]
-    const p = PROJECTS.find((x) => x.id === id)
+    const p  = projects.find((x) => x.id === id)
     if (p) {
-      const a = AREAS.find((x) => x.id === p.area)
+      const a = areas.find((x) => x.id === p.area)
       return [a?.name ?? p.area, p.name]
     }
   }
@@ -34,10 +34,11 @@ interface TopbarProps {
   onBurger: () => void
 }
 
+const TEAM_NAMES = ['Joaquín Rivera', 'Andrea Mendoza', 'Carlos Rojas', 'Sofía Vargas']
+
 export function Topbar({ onBurger }: TopbarProps) {
   const crumbs = useBreadcrumb()
-  const { setCmdK, setShowLanding } = useAppStore()
-  const teamNames = TEAM.slice(0, 4).map((m) => m.name)
+  const { setCmdK, setShowLanding, openNewTask } = useAppStore()
 
   return (
     <header className="app-topbar">
@@ -70,11 +71,11 @@ export function Topbar({ onBurger }: TopbarProps) {
           <Sparkles size={13} color="var(--teal)" /> Asistente IA
         </button>
         <span className="avatar-stack" style={{ marginLeft: 4, display: 'inline-flex' }}>
-          {teamNames.map((name) => (
+          {TEAM_NAMES.map((name) => (
             <Avatar key={name} name={name} size={24} style={{ border: '1.5px solid var(--bg)' }} />
           ))}
         </span>
-        <button className="btn btn-primary btn-sm">
+        <button className="btn btn-primary btn-sm" onClick={() => openNewTask()}>
           <Plus size={13} /> Nuevo
         </button>
       </div>

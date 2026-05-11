@@ -5,7 +5,7 @@ import {
   ChevronDown, ChevronRight, Plus, PanelLeftClose, PanelLeftOpen,
   CheckSquare, LayoutTemplate,
 } from 'lucide-react'
-import { AREAS, PROJECTS } from '@/lib/mock-data'
+import { useAppStore } from '@/stores/app'
 import { Avatar } from '@/components/shared/Avatar'
 
 const WS_ITEMS = [
@@ -17,18 +17,16 @@ const WS_ITEMS = [
   { id: 'reports',   label: 'Reportes',          Icon: BarChart3, path: '/reportes'     },
 ]
 
-
 interface SidebarProps {
   collapsed: boolean
   onToggleCollapse: () => void
 }
 
 export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({
-    outlet: true, norte: true, corp: false, bodega: true, plaza: false,
-  })
+  const navigate    = useNavigate()
+  const location    = useLocation()
+  const { areas, projects, openNewArea, openNewProject } = useAppStore()
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
   const isActive = (path: string) =>
     path === '/' ? location.pathname === '/' : location.pathname.startsWith(path)
@@ -71,33 +69,52 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
 
         {!collapsed && <div className="sb-section">Áreas</div>}
 
-        {AREAS.map((a) => {
-          const projects = PROJECTS.filter((p) => p.area === a.id)
-          const isOpen = expanded[a.id]
+        {areas.map((a) => {
+          const areaProjects = projects.filter((p) => p.area === a.id)
+          const isOpen  = expanded[a.id] ?? true
           const areaPath = `/area/${a.id}`
 
           return (
             <div key={a.id}>
               <div
                 className={`sb-item${isActive(areaPath) ? ' active' : ''}`}
-                onClick={() => { toggle(a.id); navigate(areaPath) }}
+                style={{ paddingRight: 4 }}
                 title={collapsed ? a.name : ''}
               >
                 {!collapsed && (
-                  <span style={{ display: 'inline-flex', pointerEvents: 'none' }}>
+                  <span
+                    style={{ display: 'inline-flex', cursor: 'pointer', padding: '2px 2px 2px 0' }}
+                    onClick={(e) => { e.stopPropagation(); toggle(a.id) }}
+                  >
                     {isOpen
                       ? <ChevronDown size={12} color="var(--text-3)" />
                       : <ChevronRight size={12} color="var(--text-3)" />}
                   </span>
                 )}
-                <span className="sb-area-dot" style={{ background: a.color }} />
-                {!collapsed && <span>{a.name}</span>}
-                {!collapsed && <span className="sb-count">{projects.length}</span>}
+                <span
+                  className="sb-area-dot"
+                  style={{ background: a.color }}
+                  onClick={() => navigate(areaPath)}
+                />
+                {!collapsed && (
+                  <span style={{ flex: 1, cursor: 'pointer' }} onClick={() => navigate(areaPath)}>{a.name}</span>
+                )}
+                {!collapsed && (
+                  <span
+                    className="btn btn-ghost btn-icon"
+                    style={{ width: 18, height: 18, flexShrink: 0, opacity: 0.4 }}
+                    title={`Nuevo proyecto en ${a.name}`}
+                    onClick={(e) => { e.stopPropagation(); openNewProject(a.id) }}
+                  >
+                    <Plus size={11} />
+                  </span>
+                )}
+                {!collapsed && <span className="sb-count">{areaProjects.length}</span>}
               </div>
 
               {!collapsed && isOpen && (
                 <div className="sb-sub">
-                  {projects.map((p) => {
+                  {areaProjects.map((p) => {
                     const projPath = `/proyecto/${p.id}`
                     return (
                       <div
@@ -117,7 +134,11 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         })}
 
         {!collapsed && (
-          <div className="sb-item" style={{ color: 'var(--text-3)', marginTop: 4 }}>
+          <div
+            className="sb-item"
+            style={{ color: 'var(--text-3)', marginTop: 4 }}
+            onClick={() => openNewArea()}
+          >
             <Plus size={12} /><span>Nueva área</span>
           </div>
         )}

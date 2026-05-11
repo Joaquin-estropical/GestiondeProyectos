@@ -9,7 +9,7 @@ import { useAppStore } from '@/stores/app';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { openTask } = useAppStore();
+  const { openTask, openNewTask } = useAppStore();
 
   const { data: areas    = [] } = useAreas();
   const { data: projects = [] } = useProjects();
@@ -47,7 +47,7 @@ export default function Dashboard() {
         right={
           <div className="row gap-8">
             <button className="btn btn-secondary btn-md"><Filter size={14} /> Filtros</button>
-            <button className="btn btn-primary btn-md"><Plus size={14} /> Nueva tarea</button>
+            <button className="btn btn-primary btn-md" onClick={() => openNewTask()}><Plus size={14} /> Nueva tarea</button>
           </div>
         }
       />
