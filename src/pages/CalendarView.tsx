@@ -1,35 +1,55 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { AREAS, TEAM, TASKS, TODAY, DAYS_ES, fmtDate, getMember } from '@/lib/mock-data';
+import { DAYS_ES, getMember } from '@/lib/mock-data';
+import { useAreas, useTasks, useMembers } from '@/hooks/useSupabase';
 import { Avatar } from '@/components/shared/Avatar';
 import { StatusPill, AreaPill } from '@/components/shared/Badges';
 import { PageHead } from '@/components/shared/PageHead';
 import { useAppStore } from '@/stores/app';
-import { getArea } from '@/lib/mock-data';
+import type { Task } from '@/types';
+
+const MONTHS_FULL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 export default function CalendarView() {
   const { openTask } = useAppStore();
-  const [sel, setSel] = useState('2026-03-10');
-  const [filtAreas, setFiltAreas] = useState<string[]>(AREAS.map(a => a.id));
-  const [filtPeople, setFiltPeople] = useState<string[]>(TEAM.map(m => m.id));
+  const today = new Date();
+  const [year,  setYear]  = useState(today.getFullYear());
+  const [month, setMonth] = useState(today.getMonth());
+  const [sel,   setSel]   = useState(today.toISOString().slice(0, 10));
+
+  const { data: areas   = [] } = useAreas();
+  const { data: tasks   = [] } = useTasks();
+  const { data: members = [] } = useMembers();
+
+  const [filtAreas,  setFiltAreas]  = useState<string[] | null>(null);
+  const [filtPeople, setFiltPeople] = useState<string[] | null>(null);
+
+  const activeAreas  = filtAreas  ?? areas.map(a => a.id);
+  const activePeople = filtPeople ?? members.map(m => m.id);
 
   const toggleArea = (id: string) =>
-    setFiltAreas(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
+    setFiltAreas(prev => {
+      const cur = prev ?? areas.map(a => a.id);
+      return cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id];
+    });
   const togglePerson = (id: string) =>
-    setFiltPeople(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
+    setFiltPeople(prev => {
+      const cur = prev ?? members.map(m => m.id);
+      return cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id];
+    });
 
-  // Build days for March 2026 grid (Mon-first)
-  const monthStart = new Date('2026-03-01T12:00:00');
+  // Build calendar grid
+  const monthStart   = new Date(year, month, 1);
   const startWeekday = (monthStart.getDay() + 6) % 7;
-  const daysInMonth = 31;
-  const cells: { date: Date; muted: boolean }[] = [];
+  const daysInMonth  = new Date(year, month + 1, 0).getDate();
 
+  const cells: { date: Date; muted: boolean }[] = [];
   for (let i = 0; i < startWeekday; i++) {
     const d = new Date(monthStart);
     d.setDate(d.getDate() - (startWeekday - i));
     cells.push({ date: d, muted: true });
   }
-  for (let i = 1; i <= daysInMonth; i++) cells.push({ date: new Date(2026, 2, i, 12), muted: false });
+  for (let i = 1; i <= daysInMonth; i++) cells.push({ date: new Date(year, month, i, 12), muted: false });
   while (cells.length % 7 !== 0 || cells.length < 35) {
     const last = cells[cells.length - 1].date;
     const d = new Date(last);
@@ -38,75 +58,84 @@ export default function CalendarView() {
     if (cells.length >= 42) break;
   }
 
-  const isoOf = (d: Date) => d.toISOString().slice(0, 10);
-  const filteredTasks = TASKS.filter(t => filtAreas.includes(t.area) && filtPeople.includes(t.assignee));
-  const taskByDay: Record<string, typeof TASKS> = {};
-  filteredTasks.forEach(t => { (taskByDay[t.due] = taskByDay[t.due] || []).push(t); });
+  const isoOf    = (d: Date) => d.toISOString().slice(0, 10);
+  const todayIso = today.toISOString().slice(0, 10);
+
+  const filtered: Task[] = tasks.filter(t => activeAreas.includes(t.area) && activePeople.includes(t.assignee));
+  const taskByDay: Record<string, Task[]> = {};
+  filtered.forEach(t => { (taskByDay[t.due] = taskByDay[t.due] || []).push(t); });
 
   const dayTasks = taskByDay[sel] || [];
+
+  const prev = () => { if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1); };
+  const next = () => { if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1); };
+  const goToday = () => { setYear(today.getFullYear()); setMonth(today.getMonth()); setSel(todayIso); };
+
+  const areaColor = (id: string) => areas.find(a => a.id === id)?.color ?? 'var(--text-3)';
 
   return (
     <>
       <PageHead
         title="Calendario global"
-        subtitle="Marzo 2026 · todas las áreas"
+        subtitle={`${MONTHS_FULL[month]} ${year} · ${filtered.filter(t => t.status !== 'done').length} tareas abiertas`}
         right={
           <div className="row gap-8">
-            <button className="btn btn-secondary btn-sm"><ChevronLeft size={14} /></button>
-            <button className="btn btn-secondary btn-sm">Hoy</button>
-            <button className="btn btn-secondary btn-sm"><ChevronRight size={14} /></button>
-            <div className="tabs" style={{ marginLeft: 8 }}>
-              <span className="tab active">Mes</span>
-              <span className="tab">Semana</span>
-              <span className="tab">Día</span>
-            </div>
+            <button className="btn btn-secondary btn-sm" onClick={prev}><ChevronLeft size={14} /></button>
+            <button className="btn btn-secondary btn-sm" onClick={goToday}>Hoy</button>
+            <button className="btn btn-secondary btn-sm" onClick={next}><ChevronRight size={14} /></button>
           </div>
         }
       />
-      <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr 320px', height: 'calc(100% - 89px)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr 300px', height: 'calc(100% - 89px)' }}>
+
         {/* Filters */}
-        <aside style={{ borderRight: '1px solid var(--border)', padding: '20px', overflowY: 'auto' }}>
-          <div className="micro mb-12">Áreas</div>
-          <div className="col gap-8 mb-24">
-            {AREAS.map(a => (
-              <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, cursor: 'pointer' }}>
+        <aside style={{ borderRight: '1px solid var(--border)', padding: '16px', overflowY: 'auto' }}>
+          <div className="micro mb-10">Áreas</div>
+          <div className="col gap-6 mb-20">
+            {areas.map(a => (
+              <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer', padding: '3px 0' }}>
                 <input
                   type="checkbox"
-                  checked={filtAreas.includes(a.id)}
+                  checked={activeAreas.includes(a.id)}
                   onChange={() => toggleArea(a.id)}
-                  style={{ accentColor: a.color, width: 14, height: 14 }}
+                  style={{ accentColor: a.color, width: 13, height: 13, flexShrink: 0 }}
                 />
-                <span className="sb-area-dot" style={{ background: a.color }}></span>
-                <span style={{ flex: 1, color: filtAreas.includes(a.id) ? 'var(--text-1)' : 'var(--text-3)' }}>{a.name}</span>
+                <span style={{ width: 8, height: 8, borderRadius: 2, background: a.color, flexShrink: 0 }}></span>
+                <span style={{ flex: 1, color: activeAreas.includes(a.id) ? 'var(--text-1)' : 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
+                <span className="mono" style={{ fontSize: 10.5, color: 'var(--text-3)' }}>
+                  {taskByDay ? Object.values(taskByDay).flat().filter(t => t.area === a.id && t.status !== 'done').length : 0}
+                </span>
               </label>
             ))}
+            {areas.length === 0 && <div className="text-3 f-xs">Sin áreas</div>}
           </div>
-          <div className="micro mb-12">Personas</div>
-          <div className="col gap-8">
-            {TEAM.map(m => (
-              <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, cursor: 'pointer' }}>
+          <div className="micro mb-10">Personas</div>
+          <div className="col gap-6">
+            {members.map(m => (
+              <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer', padding: '3px 0' }}>
                 <input
                   type="checkbox"
-                  checked={filtPeople.includes(m.id)}
+                  checked={activePeople.includes(m.id)}
                   onChange={() => togglePerson(m.id)}
-                  style={{ accentColor: 'var(--teal)', width: 14, height: 14 }}
+                  style={{ accentColor: 'var(--teal)', width: 13, height: 13, flexShrink: 0 }}
                 />
-                <Avatar name={m.name} size={20} />
-                <span style={{ flex: 1, color: filtPeople.includes(m.id) ? 'var(--text-1)' : 'var(--text-3)' }}>{m.short}</span>
+                <Avatar name={m.name} size={18} />
+                <span style={{ flex: 1, color: activePeople.includes(m.id) ? 'var(--text-1)' : 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name.split(' ')[0]} {m.name.split(' ')[1]?.[0]}.</span>
               </label>
             ))}
+            {members.length === 0 && <div className="text-3 f-xs">Sin miembros</div>}
           </div>
         </aside>
 
         {/* Calendar grid */}
-        <div style={{ overflowY: 'auto' }}>
-          <div className="cal-grid">
+        <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+          <div className="cal-grid" style={{ flex: 1 }}>
             {DAYS_ES.map(d => <div key={d} className="cal-wkh">{d}</div>)}
             {cells.map((c, i) => {
-              const iso = isoOf(c.date);
-              const isToday = iso === TODAY;
-              const isSel = iso === sel;
-              const events = taskByDay[iso] || [];
+              const iso    = isoOf(c.date);
+              const isToday = iso === todayIso;
+              const isSel   = iso === sel;
+              const evts    = taskByDay[iso] || [];
               return (
                 <div
                   key={i}
@@ -114,15 +143,18 @@ export default function CalendarView() {
                   onClick={() => setSel(iso)}
                 >
                   <span className="num">{c.date.getDate()}</span>
-                  {events.slice(0, 3).map(t => {
-                    const a = getArea(t.area)!;
-                    return (
-                      <div key={t.id} className="cal-event" style={{ background: a.color + '20' }}>
-                        <span className="dot" style={{ background: a.color }}></span>{t.title}
-                      </div>
-                    );
-                  })}
-                  {events.length > 3 && <div className="micro" style={{ paddingLeft: 4 }}>+{events.length - 3} más</div>}
+                  {evts.slice(0, 3).map(t => (
+                    <div
+                      key={t.id}
+                      className="cal-event"
+                      style={{ background: areaColor(t.area) + '22', color: 'var(--text-1)' }}
+                      onClick={e => { e.stopPropagation(); openTask(t.id); }}
+                    >
+                      <span className="dot" style={{ background: areaColor(t.area) }}></span>
+                      {t.title}
+                    </div>
+                  ))}
+                  {evts.length > 3 && <div className="micro" style={{ paddingLeft: 4, color: 'var(--text-3)' }}>+{evts.length - 3} más</div>}
                 </div>
               );
             })}
@@ -130,28 +162,33 @@ export default function CalendarView() {
         </div>
 
         {/* Day detail */}
-        <aside style={{ borderLeft: '1px solid var(--border)', padding: '20px', overflowY: 'auto' }}>
-          <div className="micro mb-8">Detalle del día</div>
-          <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-.01em' }} className="mono">{fmtDate(sel)} 2026</div>
-          <div className="text-2 f-sm mt-4">{dayTasks.length} tareas con vencimiento</div>
-          <div className="mt-20 col gap-8">
+        <aside style={{ borderLeft: '1px solid var(--border)', padding: '16px', overflowY: 'auto' }}>
+          <div className="micro mb-6">Detalle del día</div>
+          <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-.01em', marginBottom: 4 }}>
+            {sel ? new Date(sel + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }) : '—'}
+          </div>
+          <div className="text-2 f-sm mb-16">{dayTasks.length} tareas con vencimiento</div>
+          <div className="col gap-8">
             {dayTasks.length === 0 && (
-              <div className="text-3 f-sm" style={{ padding: '18px 0' }}>Sin tareas en este día.</div>
+              <div style={{ padding: '20px 0', color: 'var(--text-3)', fontSize: 13, textAlign: 'center' }}>Sin tareas este día.</div>
             )}
-            {dayTasks.map(t => (
-              <div key={t.id} className="card card-pad" style={{ padding: 12, cursor: 'pointer' }} onClick={() => openTask(t.id)}>
-                <div className="row gap-8 items-center" style={{ marginBottom: 8 }}>
-                  <AreaPill areaId={t.area} mini />
-                  <span className="micro mono" style={{ marginLeft: 'auto' }}>{t.code}</span>
+            {dayTasks.map(t => {
+              const member = members.find(m => m.id === t.assignee) ?? getMember(t.assignee);
+              return (
+                <div key={t.id} className="card" style={{ padding: 12, cursor: 'pointer' }} onClick={() => openTask(t.id)}>
+                  <div className="row gap-8 items-center mb-8">
+                    <AreaPill areaId={t.area} mini />
+                    <span className="micro mono" style={{ marginLeft: 'auto' }}>{t.code}</span>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.4, marginBottom: 10 }}>{t.title}</div>
+                  <div className="row gap-8 items-center">
+                    <Avatar name={member?.name ?? '?'} size={20} />
+                    <span className="f-xs text-2" style={{ flex: 1 }}>{member?.name?.split(' ')[0]}</span>
+                    <StatusPill status={t.status} />
+                  </div>
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.4 }}>{t.title}</div>
-                <div className="row gap-8 items-center mt-12">
-                  <Avatar name={getMember(t.assignee)?.name ?? ''} size={20} />
-                  <span className="f-xs text-2">{getMember(t.assignee)?.short}</span>
-                  <span style={{ marginLeft: 'auto' }}><StatusPill status={t.status} /></span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </aside>
       </div>

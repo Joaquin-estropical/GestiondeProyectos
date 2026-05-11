@@ -1,6 +1,5 @@
 import { useLocation } from 'react-router-dom'
-import { Search, ChevronRight, Sparkles, Plus, Globe, Menu } from 'lucide-react'
-import { Avatar } from '@/components/shared/Avatar'
+import { Search, ChevronRight, Sparkles, Plus, Menu } from 'lucide-react'
 import { useAppStore } from '@/stores/app'
 
 function useBreadcrumb(): string[] {
@@ -34,11 +33,9 @@ interface TopbarProps {
   onBurger: () => void
 }
 
-const TEAM_NAMES = ['Joaquín Rivera', 'Andrea Mendoza', 'Carlos Rojas', 'Sofía Vargas']
-
 export function Topbar({ onBurger }: TopbarProps) {
   const crumbs = useBreadcrumb()
-  const { setCmdK, setShowLanding, openNewTask } = useAppStore()
+  const { setCmdK, openNewTask } = useAppStore()
 
   return (
     <header className="app-topbar">
@@ -64,17 +61,9 @@ export function Topbar({ onBurger }: TopbarProps) {
       </div>
 
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setShowLanding(true)} title="Ver landing pública">
-          <Globe size={13} />
-        </button>
         <button className="btn btn-secondary btn-sm">
           <Sparkles size={13} color="var(--teal)" /> Asistente IA
         </button>
-        <span className="avatar-stack" style={{ marginLeft: 4, display: 'inline-flex' }}>
-          {TEAM_NAMES.map((name) => (
-            <Avatar key={name} name={name} size={24} style={{ border: '1.5px solid var(--bg)' }} />
-          ))}
-        </span>
         <button className="btn btn-primary btn-sm" onClick={() => openNewTask()}>
           <Plus size={13} /> Nuevo
         </button>

@@ -5,6 +5,7 @@ import type { LucideProps } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { useProjects, useTasks, useAreas } from '@/hooks/useSupabase';
 import { useAppStore } from '@/stores/app';
+import { supabase } from '@/lib/supabase';
 
 interface CmdKProps {
   onClose: () => void;
@@ -21,8 +22,13 @@ interface CmdItem {
 
 export function CmdK({ onClose }: CmdKProps) {
   const navigate = useNavigate();
-  const { openTask } = useAppStore();
+  const { openTask, openNewTask, openNewProject, openNewArea } = useAppStore();
   const [q, setQ] = useState('');
+  const [members, setMembers] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    supabase.from('members').select('id,name').then(({ data }) => { if (data) setMembers(data); });
+  }, []);
 
   const { data: projects = [] } = useProjects();
   const { data: tasks    = [] } = useTasks();
@@ -51,7 +57,14 @@ export function CmdK({ onClose }: CmdKProps) {
       k: p.name.toLowerCase(),
     }));
 
-    const taskItems: CmdItem[] = tasks.slice(0, 10).map(t => ({
+    const memberItems: CmdItem[] = members.map(m => ({
+      kind: 'Persona',
+      label: m.name,
+      Icon: CheckSquare,
+      k: m.name.toLowerCase(),
+    }));
+
+    const taskItems: CmdItem[] = tasks.map(t => ({
       kind: 'Tarea',
       label: t.title,
       Icon: CheckSquare,
@@ -61,15 +74,15 @@ export function CmdK({ onClose }: CmdKProps) {
     }));
 
     const actions: CmdItem[] = [
-      { kind: 'Crear', label: 'Nueva tarea',             Icon: Plus,         k: 'nueva tarea' },
-      { kind: 'Crear', label: 'Nuevo proyecto',          Icon: FolderPlus,   k: 'nuevo proyecto' },
-      { kind: 'Crear', label: 'Nueva área',              Icon: MapPin,       k: 'nueva area' },
+      { kind: 'Crear', label: 'Nueva tarea',             Icon: Plus,         go: () => { openNewTask(); onClose(); },    k: 'nueva tarea' },
+      { kind: 'Crear', label: 'Nuevo proyecto',          Icon: FolderPlus,   go: () => { openNewProject(); onClose(); }, k: 'nuevo proyecto' },
+      { kind: 'Crear', label: 'Nueva área',              Icon: MapPin,       go: () => { openNewArea(); onClose(); },    k: 'nueva area' },
       { kind: 'IA',    label: 'Resumen del día',         Icon: Sparkles,     k: 'resumen ia' },
       { kind: 'IA',    label: 'Detector de bloqueos',    Icon: OctagonAlert, k: 'bloqueos' },
       { kind: 'IA',    label: 'Generar reporte semanal', Icon: FileBarChart, k: 'reporte ia' },
     ];
 
-    const all = [...navItems, ...proj, ...taskItems, ...actions];
+    const all = [...navItems, ...proj, ...taskItems, ...memberItems, ...actions];
     const filtered = Q ? all.filter(x => x.k.includes(Q) || x.label.toLowerCase().includes(Q)) : all;
 
     const byKind: Record<string, CmdItem[]> = {};
@@ -95,7 +108,7 @@ export function CmdK({ onClose }: CmdKProps) {
 
   return (
     <>
-      <div className="modal-bd" onClick={onClose}></div>
+      <div className="cmdk-bd" onClick={onClose}></div>
       <div className="cmdk">
         <div className="cmdk-search">
           <Search size={14} color="var(--text-2)" />

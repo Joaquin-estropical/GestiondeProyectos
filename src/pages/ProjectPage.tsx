@@ -1,8 +1,8 @@
-import { useState, useReducer } from 'react';
+import { useState, useReducer, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { List, Kanban, GanttChart, Calendar, Table, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, Clock } from 'lucide-react';
+import { List, Kanban, GanttChart, Calendar, Table, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useProjects, useTasks } from '@/hooks/useSupabase';
-import { getMember, STATUS_ORDER, STATUS_LABELS, MONTHS_ES, TODAY, fmtDate, dueColor } from '@/lib/mock-data';
+import { getMember, STATUS_ORDER, STATUS_LABELS, MONTHS_ES, fmtDate, dueColor } from '@/lib/mock-data';
 import { useAppStore } from '@/stores/app';
 import { Avatar } from '@/components/shared/Avatar';
 import { StatusPill, PriorityPill, AreaPill } from '@/components/shared/Badges';
@@ -36,16 +36,16 @@ function ProjectHeader({ project, view, setView }: { project: NonNullable<Return
         <span><CheckSquare size={12} /> {project.progress}% completado</span>
       </div>
       <div className="row gap-12 items-center mt-20" style={{ borderBottom: '1px solid var(--border)' }}>
-        <div className="tabs" style={{ background: 'transparent', border: 0, padding: 0, gap: 0 }}>
+        <div style={{ display: 'flex', gap: 0 }}>
           {views.map(v => (
-            <span
+            <button
               key={v.id}
               onClick={() => setView(v.id)}
               className={`tab ${view === v.id ? 'active' : ''}`}
-              style={{ borderRadius: 0, borderBottom: view === v.id ? '2px solid var(--teal)' : '2px solid transparent', padding: '8px 12px', color: view === v.id ? 'var(--text-1)' : 'var(--text-2)', background: 'transparent' }}
+              style={{ borderRadius: 0, padding: '8px 12px', color: view === v.id ? 'var(--text-1)' : 'var(--text-2)', background: 'transparent', border: 0, borderBottom: view === v.id ? '2px solid var(--teal)' : '2px solid transparent' }}
             >
               <v.Icon size={13} /> {v.label}
-            </span>
+            </button>
           ))}
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, paddingBottom: 8 }}>
@@ -214,46 +214,71 @@ function ProjectKanban({ tasks, openTask }: { tasks: Task[]; openTask: (id: stri
 
 // ─── Project Gantt ───
 function ProjectGantt({ project, tasks, openTask }: { project: NonNullable<ReturnType<typeof useProjects>['data']>[0]; tasks: Task[]; openTask: (id: string) => void }) {
-  const start    = new Date('2026-02-20T12:00:00');
-  const end      = new Date('2026-04-05T12:00:00');
-  const totalDays = Math.round((end.getTime() - start.getTime()) / 86400000);
-  const colW     = 26;
-  const totalW   = totalDays * colW;
+  const colW = 26;
+
+  // Derive time range from actual task due dates
+  const allDates = tasks.map(t => new Date(t.due + 'T12:00:00').getTime());
+  const minDate  = allDates.length ? new Date(Math.min(...allDates)) : new Date();
+  const maxDate  = allDates.length ? new Date(Math.max(...allDates)) : new Date();
+  minDate.setDate(minDate.getDate() - 14);
+  maxDate.setDate(maxDate.getDate() + 14);
+  const totalDays = Math.max(Math.round((maxDate.getTime() - minDate.getTime()) / 86400000), 30);
+  const totalW    = totalDays * colW;
 
   const [offsets, setOffsets] = useState<Record<string, number>>({});
+  const [dragging, setDragging] = useState<string | null>(null);
 
   const taskBars = tasks.map((t, i) => {
     const dueD = new Date(t.due + 'T12:00:00');
-    const len  = 4 + (i % 5) * 2;
-    const ts   = new Date(dueD);
-    ts.setDate(dueD.getDate() - len);
+    const len  = t.start_date
+      ? Math.max(1, Math.round((dueD.getTime() - new Date(t.start_date + 'T12:00:00').getTime()) / 86400000))
+      : 4 + (i % 5) * 2;
+    const ts = t.start_date ? new Date(t.start_date + 'T12:00:00') : new Date(dueD.getTime() - len * 86400000);
     return { t, start: ts, end: dueD, len };
   });
 
-  const xOf    = (d: Date) => Math.round((d.getTime() - start.getTime()) / 86400000) * colW;
-  const todayX = xOf(new Date(TODAY + 'T12:00:00')) + colW / 2;
+  const xOf    = useCallback((d: Date) => Math.round((d.getTime() - minDate.getTime()) / 86400000) * colW, [minDate, colW]);
+  const todayX = xOf(new Date()) + colW / 2;
   const dueX   = xOf(new Date(project.due + 'T12:00:00'));
 
-  const weeks: { x: number; label: string }[] = [];
+  const weeks: { label: string }[] = [];
   for (let i = 0; i < totalDays; i += 7) {
-    const d = new Date(start);
-    d.setDate(start.getDate() + i);
-    weeks.push({ x: i * colW, label: `${d.getDate()} ${MONTHS_ES[d.getMonth()]}` });
+    const d = new Date(minDate);
+    d.setDate(minDate.getDate() + i);
+    weeks.push({ label: `${d.getDate()} ${MONTHS_ES[d.getMonth()]}` });
   }
 
   const statusColor = (s: string) =>
     s === 'done' ? 'var(--green)' : s === 'block' ? 'var(--red)' : s === 'rev' ? 'var(--amber)' : s === 'curso' ? 'var(--blue)' : 'var(--text-3)';
 
+  const onBarMouseDown = useCallback((e: React.MouseEvent, taskId: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const startX   = e.clientX;
+    const startOff = offsets[taskId] ?? 0;
+    setDragging(taskId);
+    let rafId = 0;
+    const move = (ev: MouseEvent) => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const delta = Math.round((ev.clientX - startX) / colW);
+        setOffsets(o => ({ ...o, [taskId]: startOff + delta }));
+      });
+    };
+    const up = () => {
+      cancelAnimationFrame(rafId);
+      setDragging(null);
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+    window.addEventListener('mousemove', move, { passive: true });
+    window.addEventListener('mouseup', up);
+  }, [offsets, colW]);
+
   return (
     <div style={{ padding: '8px 0 48px' }}>
       <div style={{ padding: '0 32px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
-        <div className="tabs">
-          <span className="tab">Día</span>
-          <span className="tab active">Semana</span>
-          <span className="tab">Mes</span>
-          <span className="tab">Trim.</span>
-        </div>
-        <span className="text-3 f-xs" style={{ marginLeft: 'auto' }}>20 feb — 5 abr 2026</span>
+        <span className="text-3 f-xs" style={{ marginLeft: 'auto' }}>Vista de semana</span>
       </div>
       <div className="gantt-shell">
         <div className="gantt-left">
@@ -280,24 +305,12 @@ function ProjectGantt({ project, tasks, openTask }: { project: NonNullable<Retur
               const off = offsets[t.id] ?? 0;
               const x   = xOf(ts) + off * colW;
               const w   = len * colW;
-              const onDown = (e: React.MouseEvent) => {
-                e.stopPropagation();
-                const startX   = e.clientX;
-                const startOff = offsets[t.id] ?? 0;
-                const move = (ev: MouseEvent) => {
-                  const delta = Math.round((ev.clientX - startX) / colW);
-                  setOffsets(o => ({ ...o, [t.id]: startOff + delta }));
-                };
-                const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
-                window.addEventListener('mousemove', move);
-                window.addEventListener('mouseup', up);
-              };
               return (
                 <div key={t.id} className="gantt-body-row">
                   <div
-                    className="gantt-bar"
-                    onMouseDown={onDown}
-                    onClick={e => { if (!e.defaultPrevented) openTask(t.id); }}
+                    className={`gantt-bar ${dragging === t.id ? 'dragging' : ''}`}
+                    onMouseDown={e => onBarMouseDown(e, t.id)}
+                    onClick={e => { if (dragging === null) openTask(t.id); else e.preventDefault(); }}
                     style={{ left: x, width: w, background: t.status === 'done' ? statusColor(t.status) : statusColor(t.status) + '40', color: t.status === 'done' ? '#0A0A0B' : 'var(--text-1)', borderLeft: `3px solid ${statusColor(t.status)}` }}
                   >
                     {t.title}
@@ -305,7 +318,9 @@ function ProjectGantt({ project, tasks, openTask }: { project: NonNullable<Retur
                 </div>
               );
             })}
-            <div className="gantt-milestone" style={{ left: dueX - 8, top: 8 + taskBars.length * 36 + 4, color: 'var(--teal)' }}></div>
+            {allDates.length > 0 && (
+              <div className="gantt-milestone" style={{ left: dueX - 8, top: 8 + taskBars.length * 36 + 4, color: 'var(--teal)' }}></div>
+            )}
             <svg style={{ position: 'absolute', left: 0, top: 36, pointerEvents: 'none' }} width={totalW} height={taskBars.length * 36}>
               {taskBars.slice(0, -1).map(({ end: te }, i) => {
                 const x1   = xOf(te);
@@ -319,6 +334,102 @@ function ProjectGantt({ project, tasks, openTask }: { project: NonNullable<Retur
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Project Calendar ───
+function ProjectCalendar({ tasks, openTask }: { tasks: Task[]; openTask: (id: string) => void }) {
+  const today = new Date();
+  const [year,  setYear]  = useState(today.getFullYear());
+  const [month, setMonth] = useState(today.getMonth());
+
+  const monthStart   = new Date(year, month, 1);
+  const startWeekday = (monthStart.getDay() + 6) % 7;
+  const daysInMonth  = new Date(year, month + 1, 0).getDate();
+
+  const cells: { date: Date; muted: boolean }[] = [];
+  for (let i = 0; i < startWeekday; i++) {
+    const d = new Date(monthStart);
+    d.setDate(d.getDate() - (startWeekday - i));
+    cells.push({ date: d, muted: true });
+  }
+  for (let i = 1; i <= daysInMonth; i++) cells.push({ date: new Date(year, month, i, 12), muted: false });
+  while (cells.length % 7 !== 0 || cells.length < 35) {
+    const last = cells[cells.length - 1].date;
+    const d = new Date(last);
+    d.setDate(d.getDate() + 1);
+    cells.push({ date: d, muted: true });
+    if (cells.length >= 42) break;
+  }
+
+  const isoOf    = (d: Date) => d.toISOString().slice(0, 10);
+  const todayIso = today.toISOString().slice(0, 10);
+  const [sel, setSel] = useState(todayIso);
+
+  const taskByDay: Record<string, Task[]> = {};
+  tasks.forEach(t => { (taskByDay[t.due] = taskByDay[t.due] || []).push(t); });
+  const dayTasks = taskByDay[sel] || [];
+
+  const MONTHS_FULL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const DAYS = ['lun','mar','mié','jue','vie','sáb','dom'];
+
+  const prev = () => { if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1); };
+  const next = () => { if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1); };
+
+  const statusColor = (s: string) =>
+    s === 'done' ? 'var(--green)' : s === 'block' ? 'var(--red)' : s === 'rev' ? 'var(--amber)' : s === 'curso' ? 'var(--blue)' : 'var(--text-3)';
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', height: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 24px', borderBottom: '1px solid var(--border)' }}>
+          <button className="btn btn-ghost btn-sm btn-icon" onClick={prev}><ChevronLeft size={14} /></button>
+          <span style={{ fontWeight: 600, fontSize: 14, minWidth: 160, textAlign: 'center' }}>{MONTHS_FULL[month]} {year}</span>
+          <button className="btn btn-ghost btn-sm btn-icon" onClick={next}><ChevronRight size={14} /></button>
+          <button className="btn btn-secondary btn-sm" style={{ marginLeft: 8 }} onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth()); setSel(todayIso); }}>Hoy</button>
+        </div>
+        <div className="cal-grid" style={{ flex: 1 }}>
+          {DAYS.map(d => <div key={d} className="cal-wkh">{d}</div>)}
+          {cells.map((c, i) => {
+            const iso     = isoOf(c.date);
+            const isToday = iso === todayIso;
+            const isSel   = iso === sel;
+            const evts    = taskByDay[iso] || [];
+            return (
+              <div
+                key={i}
+                className={`cal-cell ${c.muted ? 'muted' : ''} ${isToday ? 'today' : ''} ${isSel ? 'sel' : ''}`}
+                onClick={() => setSel(iso)}
+              >
+                <span className="num">{c.date.getDate()}</span>
+                {evts.slice(0, 3).map(t => (
+                  <div key={t.id} className="cal-event" style={{ background: statusColor(t.status) + '20' }} onClick={e => { e.stopPropagation(); openTask(t.id); }}>
+                    <span className="dot" style={{ background: statusColor(t.status) }}></span>{t.title}
+                  </div>
+                ))}
+                {evts.length > 3 && <div className="micro" style={{ paddingLeft: 4 }}>+{evts.length - 3} más</div>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <aside style={{ padding: 20, overflowY: 'auto' }}>
+        <div className="micro mb-8">Detalle del día</div>
+        <div style={{ fontSize: 18, fontWeight: 600 }}>{sel ? new Date(sel + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'long' }) : '—'}</div>
+        <div className="text-2 f-sm mt-4 mb-16">{dayTasks.length} tareas con vencimiento</div>
+        {dayTasks.length === 0 && <div className="text-3 f-sm">Sin tareas en este día.</div>}
+        {dayTasks.map(t => (
+          <div key={t.id} className="card card-pad" style={{ padding: 12, cursor: 'pointer', marginBottom: 8 }} onClick={() => openTask(t.id)}>
+            <div style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.4, marginBottom: 8 }}>{t.title}</div>
+            <div className="row gap-8 items-center">
+              <StatusPill status={t.status} />
+              <PriorityPill priority={t.priority} />
+            </div>
+          </div>
+        ))}
+      </aside>
     </div>
   );
 }
@@ -346,15 +457,7 @@ export default function ProjectPage() {
         {view === 'kanban' && <ProjectKanban tasks={tasks} openTask={openTask} />}
         {view === 'gantt'  && <ProjectGantt  project={project} tasks={tasks} openTask={openTask} />}
         {view === 'table'  && <ProjectList   tasks={tasks} openTask={openTask} projectId={id} />}
-        {view === 'cal'    && (
-          <div style={{ padding: 32 }}>
-            <div className="empty">
-              <div className="ill"><Calendar size={26} /></div>
-              <p className="t">Calendario del proyecto</p>
-              <p className="d">Vista de calendario por proyecto próximamente.</p>
-            </div>
-          </div>
-        )}
+        {view === 'cal'    && <ProjectCalendar tasks={tasks} openTask={openTask} />}
       </div>
     </div>
   );
