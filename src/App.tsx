@@ -20,7 +20,9 @@ import ProjectPage from '@/pages/ProjectPage'
 import Landing from '@/pages/Landing'
 
 function AppRoutes() {
-  const { taskDetailId, closeTask, cmdkOpen, setCmdK, showLanding } = useAppStore()
+  const { taskDetailId, closeTask, cmdkOpen, setCmdK, showLanding, loadTasks } = useAppStore()
+
+  useEffect(() => { loadTasks() }, [loadTasks])
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {

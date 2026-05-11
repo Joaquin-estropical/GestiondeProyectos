@@ -1,19 +1,21 @@
 import { useState } from 'react';
 import { Play, Pause } from 'lucide-react';
-import { TASKS, getProject, fmtDate, dueColor } from '@/lib/mock-data';
-import { AreaPill } from '@/components/shared/Badges';
-import { PriorityPill } from '@/components/shared/Badges';
+import { useTasks, useProjects } from '@/hooks/useSupabase';
+import { fmtDate, dueColor } from '@/lib/mock-data';
+import { AreaPill, PriorityPill } from '@/components/shared/Badges';
 import { PageHead } from '@/components/shared/PageHead';
 import { useAppStore } from '@/stores/app';
 import type { Task } from '@/types';
 
 export default function MyDay() {
   const { openTask } = useAppStore();
-  const mine = TASKS.filter(t => t.assignee === 'joa');
-  const todayTasks = mine.filter(t => t.status !== 'done' && new Date(t.due + 'T00:00:00') <= new Date('2026-03-11T00:00:00'));
-  const upcoming = mine.filter(t => t.status !== 'done' && new Date(t.due + 'T00:00:00') > new Date('2026-03-11T00:00:00'));
-  const review = mine.filter(t => t.status === 'rev');
-  const [timing, setTiming] = useState<string | null>(null);
+  const { data: allTasks = [] }  = useTasks({ assigneeId: 'joa' });
+  const { data: projects = [] }  = useProjects();
+  const [timing, setTiming]      = useState<string | null>(null);
+
+  const todayTasks = allTasks.filter(t => t.status !== 'done' && new Date(t.due + 'T00:00:00') <= new Date('2026-03-11T00:00:00'));
+  const upcoming   = allTasks.filter(t => t.status !== 'done' && new Date(t.due + 'T00:00:00') > new Date('2026-03-11T00:00:00'));
+  const review     = allTasks.filter(t => t.status === 'rev');
 
   const grouped = (list: Task[]) => {
     const map: Record<string, Task[]> = {};
@@ -46,7 +48,7 @@ export default function MyDay() {
 
   return (
     <>
-      <PageHead title="Mi día" subtitle="Martes 10 de marzo · 6 tareas asignadas" />
+      <PageHead title="Mi día" subtitle={`${allTasks.length} tareas asignadas`} />
       <div className="page-body" style={{ maxWidth: 980 }}>
         <div className="card mb-16">
           <div className="card-head">
@@ -55,7 +57,8 @@ export default function MyDay() {
           </div>
           <div style={{ padding: '0 18px 8px' }}>
             {Object.entries(grouped(todayTasks)).map(([pid, list]) => {
-              const p = getProject(pid)!;
+              const p = projects.find(x => x.id === pid);
+              if (!p) return null;
               return (
                 <div key={pid} style={{ marginTop: 14 }}>
                   <div className="row gap-8 items-center mb-8">
@@ -66,6 +69,9 @@ export default function MyDay() {
                 </div>
               );
             })}
+            {todayTasks.length === 0 && (
+              <div style={{ padding: '18px 0', color: 'var(--text-3)', fontSize: 13 }}>Sin tareas para hoy.</div>
+            )}
           </div>
         </div>
 

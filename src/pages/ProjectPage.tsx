@@ -1,16 +1,15 @@
 import { useState, useReducer } from 'react';
 import { useParams } from 'react-router-dom';
 import { List, Kanban, GanttChart, Calendar, Table, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, Clock } from 'lucide-react';
-import { PROJECTS, TASKS, getMember, STATUS_ORDER, STATUS_LABELS, MONTHS_ES, TODAY, fmtDate, dueColor } from '@/lib/mock-data';
+import { useProjects, useTasks } from '@/hooks/useSupabase';
+import { getMember, STATUS_ORDER, STATUS_LABELS, MONTHS_ES, TODAY, fmtDate, dueColor } from '@/lib/mock-data';
 import { Avatar } from '@/components/shared/Avatar';
 import { StatusPill, PriorityPill, AreaPill } from '@/components/shared/Badges';
 import { useAppStore } from '@/stores/app';
 import type { Task, TaskStatus } from '@/types';
 
 // ─── Project Header ───
-function ProjectHeader({ projectId, view, setView }: { projectId: string; view: string; setView: (v: string) => void }) {
-  const project = PROJECTS.find(p => p.id === projectId);
-  if (!project) return null;
+function ProjectHeader({ project, view, setView }: { project: NonNullable<ReturnType<typeof useProjects>['data']>[0]; view: string; setView: (v: string) => void }) {
   const teamIds = ['joa', 'and', 'car', 'sof'];
   const views = [
     { id: 'list',   label: 'Lista',      Icon: List },
@@ -59,8 +58,7 @@ function ProjectHeader({ projectId, view, setView }: { projectId: string; view: 
 }
 
 // ─── Project List ───
-function ProjectList({ projectId, openTask }: { projectId: string; openTask: (id: string) => void }) {
-  const tasks = TASKS.filter(t => t.project === projectId);
+function ProjectList({ tasks, openTask }: { tasks: Task[]; openTask: (id: string) => void }) {
   const grouped = STATUS_ORDER.map(s => ({ status: s as TaskStatus, tasks: tasks.filter(t => t.status === s) })).filter(g => g.tasks.length > 0);
 
   const dotColor = (s: string) =>
@@ -93,7 +91,7 @@ function ProjectList({ projectId, openTask }: { projectId: string; openTask: (id
                 </td>
               </tr>
               {g.tasks.map(t => {
-                const m = getMember(t.assignee)!
+                const m = getMember(t.assignee)!;
                 const done = t.status === 'done';
                 return (
                   <tr key={t.id} onClick={() => openTask(t.id)}>
@@ -108,7 +106,7 @@ function ProjectList({ projectId, openTask }: { projectId: string; openTask: (id
                     <td><span className="mono f-xs" style={{ color: dueColor(t.due) }}>{fmtDate(t.due)}</span></td>
                     <td><PriorityPill priority={t.priority} /></td>
                     <td><StatusPill status={t.status} /></td>
-                    <td><span className="mono f-xs text-2">{t.time !== '00:00' ? t.time : '—'}</span></td>
+                    <td><span className="mono f-xs text-2">{t.time !== '0h' ? t.time : '—'}</span></td>
                     <td><span className="f-xs text-3 mono">{t.comments > 0 ? t.comments : ''}</span></td>
                   </tr>
                 );
@@ -125,13 +123,11 @@ function ProjectList({ projectId, openTask }: { projectId: string; openTask: (id
 }
 
 // ─── Project Kanban ───
-function ProjectKanban({ projectId, openTask }: { projectId: string; openTask: (id: string) => void }) {
+function ProjectKanban({ tasks, openTask }: { tasks: Task[]; openTask: (id: string) => void }) {
   const { updateTaskStatus } = useAppStore();
   const [, force] = useReducer((x: number) => x + 1, 0);
   const [drag, setDrag] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
-
-  const tasks = TASKS.filter(t => t.project === projectId);
 
   const onDragStart = (e: React.DragEvent, t: Task) => {
     setDrag(t.id);
@@ -141,12 +137,8 @@ function ProjectKanban({ projectId, openTask }: { projectId: string; openTask: (
   const onDragOver = (e: React.DragEvent, s: string) => { e.preventDefault(); setOver(s); };
   const onDrop = (e: React.DragEvent, s: string) => {
     e.preventDefault();
-    if (drag) {
-      updateTaskStatus(drag, s as TaskStatus);
-      force();
-    }
-    setDrag(null);
-    setOver(null);
+    if (drag) { updateTaskStatus(drag, s as TaskStatus); force(); }
+    setDrag(null); setOver(null);
   };
 
   const dotColor = (s: string) =>
@@ -171,7 +163,7 @@ function ProjectKanban({ projectId, openTask }: { projectId: string; openTask: (
               onDragLeave={() => setOver(null)}
             >
               {list.map(t => {
-                const m = getMember(t.assignee)!
+                const m = getMember(t.assignee)!;
                 return (
                   <div
                     key={t.id}
@@ -203,7 +195,7 @@ function ProjectKanban({ projectId, openTask }: { projectId: string; openTask: (
                         {t.comments > 0 && (
                           <span className="row gap-4 items-center"><MessageSquare size={11} /><span className="mono">{t.comments}</span></span>
                         )}
-                        {t.time !== '00:00' && (
+                        {t.time !== '0h' && (
                           <span className="row gap-4 items-center"><Clock size={11} /><span className="mono">{t.time}</span></span>
                         )}
                       </div>
@@ -220,38 +212,33 @@ function ProjectKanban({ projectId, openTask }: { projectId: string; openTask: (
 }
 
 // ─── Project Gantt ───
-function ProjectGantt({ projectId, openTask }: { projectId: string; openTask: (id: string) => void }) {
-  const project = PROJECTS.find(p => p.id === projectId);
-  if (!project) return null;
-  const tasks = TASKS.filter(t => t.project === projectId);
-
-  const start = new Date('2026-02-20T12:00:00');
-  const end   = new Date('2026-04-05T12:00:00');
+function ProjectGantt({ project, tasks, openTask }: { project: NonNullable<ReturnType<typeof useProjects>['data']>[0]; tasks: Task[]; openTask: (id: string) => void }) {
+  const start    = new Date('2026-02-20T12:00:00');
+  const end      = new Date('2026-04-05T12:00:00');
   const totalDays = Math.round((end.getTime() - start.getTime()) / 86400000);
-  const colW = 26;
-  const totalW = totalDays * colW;
+  const colW     = 26;
+  const totalW   = totalDays * colW;
 
   const [offsets, setOffsets] = useState<Record<string, number>>({});
 
   const taskBars = tasks.map((t, i) => {
     const dueD = new Date(t.due + 'T12:00:00');
-    const len = 4 + (i % 5) * 2;
-    const taskStart = new Date(dueD);
-    taskStart.setDate(dueD.getDate() - len);
-    return { t, start: taskStart, end: dueD, len };
+    const len  = 4 + (i % 5) * 2;
+    const ts   = new Date(dueD);
+    ts.setDate(dueD.getDate() - len);
+    return { t, start: ts, end: dueD, len };
   });
 
-  const xOf = (d: Date) => Math.round((d.getTime() - start.getTime()) / 86400000) * colW;
+  const xOf    = (d: Date) => Math.round((d.getTime() - start.getTime()) / 86400000) * colW;
   const todayX = xOf(new Date(TODAY + 'T12:00:00')) + colW / 2;
+  const dueX   = xOf(new Date(project.due + 'T12:00:00'));
 
-  const weeks: { d: Date; x: number; label: string }[] = [];
+  const weeks: { x: number; label: string }[] = [];
   for (let i = 0; i < totalDays; i += 7) {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
-    weeks.push({ d, x: i * colW, label: `${d.getDate()} ${MONTHS_ES[d.getMonth()]}` });
+    weeks.push({ x: i * colW, label: `${d.getDate()} ${MONTHS_ES[d.getMonth()]}` });
   }
-
-  const dueX = xOf(new Date(project.due + 'T12:00:00'));
 
   const statusColor = (s: string) =>
     s === 'done' ? 'var(--green)' : s === 'block' ? 'var(--red)' : s === 'rev' ? 'var(--amber)' : s === 'curso' ? 'var(--blue)' : 'var(--text-3)';
@@ -290,20 +277,17 @@ function ProjectGantt({ projectId, openTask }: { projectId: string; openTask: (i
             <div className="gantt-today" style={{ left: todayX, height: 36 + taskBars.length * 36 }}></div>
             {taskBars.map(({ t, start: ts, len }) => {
               const off = offsets[t.id] ?? 0;
-              const x = xOf(ts) + off * colW;
-              const w = len * colW;
+              const x   = xOf(ts) + off * colW;
+              const w   = len * colW;
               const onDown = (e: React.MouseEvent) => {
                 e.stopPropagation();
-                const startX = e.clientX;
+                const startX   = e.clientX;
                 const startOff = offsets[t.id] ?? 0;
                 const move = (ev: MouseEvent) => {
                   const delta = Math.round((ev.clientX - startX) / colW);
                   setOffsets(o => ({ ...o, [t.id]: startOff + delta }));
                 };
-                const up = () => {
-                  window.removeEventListener('mousemove', move);
-                  window.removeEventListener('mouseup', up);
-                };
+                const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
                 window.addEventListener('mousemove', move);
                 window.addEventListener('mouseup', up);
               };
@@ -313,12 +297,7 @@ function ProjectGantt({ projectId, openTask }: { projectId: string; openTask: (i
                     className="gantt-bar"
                     onMouseDown={onDown}
                     onClick={e => { if (!e.defaultPrevented) openTask(t.id); }}
-                    style={{
-                      left: x, width: w,
-                      background: t.status === 'done' ? statusColor(t.status) : statusColor(t.status) + '40',
-                      color: t.status === 'done' ? '#0A0A0B' : 'var(--text-1)',
-                      borderLeft: `3px solid ${statusColor(t.status)}`,
-                    }}
+                    style={{ left: x, width: w, background: t.status === 'done' ? statusColor(t.status) : statusColor(t.status) + '40', color: t.status === 'done' ? '#0A0A0B' : 'var(--text-1)', borderLeft: `3px solid ${statusColor(t.status)}` }}
                   >
                     {t.title}
                   </div>
@@ -328,15 +307,12 @@ function ProjectGantt({ projectId, openTask }: { projectId: string; openTask: (i
             <div className="gantt-milestone" style={{ left: dueX - 8, top: 8 + taskBars.length * 36 + 4, color: 'var(--teal)' }}></div>
             <svg style={{ position: 'absolute', left: 0, top: 36, pointerEvents: 'none' }} width={totalW} height={taskBars.length * 36}>
               {taskBars.slice(0, -1).map(({ end: te }, i) => {
-                const x1 = xOf(te);
-                const y1 = i * 36 + 18;
+                const x1   = xOf(te);
+                const y1   = i * 36 + 18;
                 const next = taskBars[i + 1];
-                const x2 = xOf(next.start);
-                const y2 = (i + 1) * 36 + 18;
-                return (
-                  <path key={i} d={`M${x1} ${y1} L${x1 + 6} ${y1} L${x1 + 6} ${y2} L${x2} ${y2}`}
-                    stroke="var(--border-hover)" strokeWidth="1" fill="none" />
-                );
+                const x2   = xOf(next.start);
+                const y2   = (i + 1) * 36 + 18;
+                return <path key={i} d={`M${x1} ${y1} L${x1 + 6} ${y1} L${x1 + 6} ${y2} L${x2} ${y2}`} stroke="var(--border-hover)" strokeWidth="1" fill="none" />;
               })}
             </svg>
           </div>
@@ -348,22 +324,28 @@ function ProjectGantt({ projectId, openTask }: { projectId: string; openTask: (i
 
 // ─── Main export ───
 export default function ProjectPage() {
-  const { projectId } = useParams<{ projectId: string }>();
-  const { openTask } = useAppStore();
-  const [view, setView] = useState('list');
-  const id = projectId ?? '';
+  const { projectId }       = useParams<{ projectId: string }>();
+  const { openTask }        = useAppStore();
+  const [view, setView]     = useState('list');
+  const id                  = projectId ?? '';
 
-  const project = PROJECTS.find(p => p.id === id);
+  const { data: projects = [], loading } = useProjects();
+  const { data: tasks    = [] }          = useTasks({ projectId: id });
+
+  const project = projects.find(p => p.id === id);
+
+  if (loading) return <div className="page-body" style={{ color: 'var(--text-3)', fontSize: 13 }}>Cargando proyecto...</div>;
   if (!project) return <div className="page-body">Proyecto no encontrado.</div>;
 
   return (
     <div style={{ height: '100%', overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-      <ProjectHeader projectId={id} view={view} setView={setView} />
+      <ProjectHeader project={project} view={view} setView={setView} />
       <div style={{ flex: 1 }}>
-        {view === 'list' && <ProjectList projectId={id} openTask={openTask} />}
-        {view === 'kanban' && <ProjectKanban projectId={id} openTask={openTask} />}
-        {view === 'gantt' && <ProjectGantt projectId={id} openTask={openTask} />}
-        {view === 'cal' && (
+        {view === 'list'   && <ProjectList   tasks={tasks} openTask={openTask} />}
+        {view === 'kanban' && <ProjectKanban tasks={tasks} openTask={openTask} />}
+        {view === 'gantt'  && <ProjectGantt  project={project} tasks={tasks} openTask={openTask} />}
+        {view === 'table'  && <ProjectList   tasks={tasks} openTask={openTask} />}
+        {view === 'cal'    && (
           <div style={{ padding: 32 }}>
             <div className="empty">
               <div className="ill"><Calendar size={26} /></div>
@@ -372,7 +354,6 @@ export default function ProjectPage() {
             </div>
           </div>
         )}
-        {view === 'table' && <ProjectList projectId={id} openTask={openTask} />}
       </div>
     </div>
   );

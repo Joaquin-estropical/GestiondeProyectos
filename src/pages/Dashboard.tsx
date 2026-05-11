@@ -1,6 +1,7 @@
 import { Filter, Plus, Zap, Users, ArrowRight, CircleAlert, TriangleAlert, CircleCheck, ListTodo, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { TASKS, PROJECTS, AREAS, ACTIVITY, getMember, daysFromToday, fmtDate, dueColor } from '@/lib/mock-data';
+import { useAreas, useProjects, useTasks } from '@/hooks/useSupabase';
+import { getMember, daysFromToday, fmtDate, dueColor, ACTIVITY } from '@/lib/mock-data';
 import { Avatar } from '@/components/shared/Avatar';
 import { StatusPill, AreaPill } from '@/components/shared/Badges';
 import { PageHead } from '@/components/shared/PageHead';
@@ -10,19 +11,19 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { openTask } = useAppStore();
 
-  const myTasks = TASKS.filter(t => t.assignee === 'joa' && t.status !== 'done').slice(0, 5);
+  const { data: areas    = [] } = useAreas();
+  const { data: projects = [] } = useProjects();
+  const { data: tasks    = [] } = useTasks();
 
-  const activityIcon = (k: string) => {
-    if (k === 'done') return <CircleCheck size={14} color="var(--green)" />;
-    if (k === 'block') return <CircleAlert size={14} color="var(--red)" />;
-    if (k === 'create') return <Plus size={14} color="var(--teal)" />;
-    return <ArrowRight size={14} color="var(--text-2)" />;
-  };
+  const myTasks  = tasks.filter(t => t.assignee === 'joa' && t.status !== 'done').slice(0, 5);
+  const overdue  = tasks.filter(t => t.status !== 'done' && new Date(t.due) < new Date('2026-03-10'));
+  const atRisk   = tasks.filter(t => t.status !== 'done' && daysFromToday(t.due) <= 2 && daysFromToday(t.due) >= 0);
+  const doneWeek = tasks.filter(t => t.status === 'done').length;
 
-  const areaLoad = AREAS.map(a => {
-    const proj = PROJECTS.filter(p => p.area === a.id);
-    const tasks = TASKS.filter(t => t.area === a.id);
-    const open = tasks.filter(t => t.status !== 'done').length;
+  const areaLoad = areas.map(a => {
+    const proj  = projects.filter(p => p.area === a.id);
+    const atasks = tasks.filter(t => t.area === a.id);
+    const open  = atasks.filter(t => t.status !== 'done').length;
     return {
       ...a,
       projects: proj.length,
@@ -31,19 +32,22 @@ export default function Dashboard() {
     };
   });
 
+  const activityIcon = (k: string) => {
+    if (k === 'done')   return <CircleCheck size={14} color="var(--green)" />;
+    if (k === 'block')  return <CircleAlert size={14} color="var(--red)" />;
+    if (k === 'create') return <Plus size={14} color="var(--teal)" />;
+    return <ArrowRight size={14} color="var(--text-2)" />;
+  };
+
   return (
     <>
       <PageHead
         title="Hola, Joaquín"
-        subtitle="Martes 10 de marzo · 5 áreas activas · 18 tareas abiertas"
+        subtitle={`${areas.length} áreas activas · ${tasks.filter(t => t.status !== 'done').length} tareas abiertas`}
         right={
           <div className="row gap-8">
-            <button className="btn btn-secondary btn-md">
-              <Filter size={14} /> Filtros
-            </button>
-            <button className="btn btn-primary btn-md">
-              <Plus size={14} /> Nueva tarea
-            </button>
+            <button className="btn btn-secondary btn-md"><Filter size={14} /> Filtros</button>
+            <button className="btn btn-primary btn-md"><Plus size={14} /> Nueva tarea</button>
           </div>
         }
       />
@@ -53,23 +57,23 @@ export default function Dashboard() {
         <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           <div className="card kpi">
             <div className="lbl"><ListTodo size={13} /> Tareas hoy</div>
-            <div className="val">8</div>
-            <div className="sub">+2 vs ayer</div>
+            <div className="val">{tasks.filter(t => t.status !== 'done' && daysFromToday(t.due) === 0).length}</div>
+            <div className="sub">asignadas hoy</div>
           </div>
           <div className="card kpi danger">
             <div className="lbl"><CircleAlert size={13} /> Vencidas</div>
-            <div className="val">2</div>
-            <div className="sub">En 2 áreas</div>
+            <div className="val">{overdue.length}</div>
+            <div className="sub">requieren atención</div>
           </div>
           <div className="card kpi warn">
             <div className="lbl"><TriangleAlert size={13} /> En riesgo</div>
-            <div className="val">3</div>
-            <div className="sub">Fecha próxima</div>
+            <div className="val">{atRisk.length}</div>
+            <div className="sub">vencen en 48h</div>
           </div>
           <div className="card kpi ok">
-            <div className="lbl"><CircleCheck size={13} /> Completadas semana</div>
-            <div className="val">24</div>
-            <div className="sub">+15% vs semana pasada</div>
+            <div className="lbl"><CircleCheck size={13} /> Completadas</div>
+            <div className="val">{doneWeek}</div>
+            <div className="sub">total completadas</div>
           </div>
         </div>
 
@@ -84,7 +88,7 @@ export default function Dashboard() {
               <span className="micro" style={{ marginLeft: 'auto' }}>Generado hace 2 min</span>
             </div>
             <p style={{ margin: '14px 0 0', color: 'var(--text-1)', fontSize: 14, lineHeight: 1.6, maxWidth: 780 }}>
-              Tenés <span className="fw-6">2 tareas vencidas</span> que requieren atención inmediata, ambas en Outlet Centro y bloqueando el avance de Remodelación local. <span className="fw-6">Migración POS</span> presenta riesgo: la tarea crítica de backup vence hoy y está en revisión. Las áreas de <span className="fw-6">Bodega Sur</span> y <span className="fw-6">Edificio Corporativo</span> bajaron su ritmo de cierre esta semana — recomiendo reasignar carga de Carlos R.
+              Tenés <span className="fw-6">{overdue.length} tareas vencidas</span> que requieren atención inmediata en Outlet Centro. <span className="fw-6">Migración POS</span> presenta riesgo: la tarea crítica vence hoy y está en revisión. Las áreas de <span className="fw-6">Bodega Sur</span> y <span className="fw-6">Edificio Corporativo</span> bajaron su ritmo de cierre esta semana — recomiendo reasignar carga de Carlos R.
             </p>
             <div className="row gap-8 mt-16">
               <button className="btn btn-secondary btn-sm"><Zap size={14} /> Resolver vencidas</button>
@@ -119,6 +123,9 @@ export default function Dashboard() {
                   </div>
                 );
               })}
+              {myTasks.length === 0 && (
+                <div style={{ padding: '24px 18px', color: 'var(--text-3)', fontSize: 13 }}>Sin tareas asignadas hoy.</div>
+              )}
             </div>
           </div>
 

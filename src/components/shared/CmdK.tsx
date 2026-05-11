@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, Home, Sun, Calendar, Inbox, BarChart3, Settings, Folder, CheckSquare, Plus, FolderPlus, MapPin, Sparkles, OctagonAlert, FileBarChart } from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
 import type { ComponentType } from 'react';
-import { PROJECTS, TASKS, getArea } from '@/lib/mock-data';
+import { useProjects, useTasks, useAreas } from '@/hooks/useSupabase';
 import { useAppStore } from '@/stores/app';
 
 interface CmdKProps {
@@ -24,56 +24,58 @@ export function CmdK({ onClose }: CmdKProps) {
   const { openTask } = useAppStore();
   const [q, setQ] = useState('');
 
+  const { data: projects = [] } = useProjects();
+  const { data: tasks    = [] } = useTasks();
+  const { data: areas    = [] } = useAreas();
+
   const nav = (path: string) => { navigate(path); onClose(); };
 
   const sections = useMemo<Record<string, CmdItem[]>>(() => {
     const Q = q.toLowerCase().trim();
 
     const navItems: CmdItem[] = [
-      { kind: 'Ir a', label: 'Inicio',            Icon: Home,         go: () => nav('/'),          k: 'inicio' },
-      { kind: 'Ir a', label: 'Mi día',            Icon: Sun,          go: () => nav('/myday'),     k: 'mi dia' },
-      { kind: 'Ir a', label: 'Calendario global', Icon: Calendar,     go: () => nav('/calendar'),  k: 'calendario' },
-      { kind: 'Ir a', label: 'Bandeja IA',        Icon: Inbox,        go: () => nav('/inbox'),     k: 'bandeja ia' },
-      { kind: 'Ir a', label: 'Reportes',          Icon: BarChart3,    go: () => nav('/reports'),   k: 'reportes' },
-      { kind: 'Ir a', label: 'Configuración',     Icon: Settings,     go: () => nav('/settings'),  k: 'config' },
+      { kind: 'Ir a', label: 'Inicio',            Icon: Home,         go: () => nav('/'),               k: 'inicio' },
+      { kind: 'Ir a', label: 'Mi día',            Icon: Sun,          go: () => nav('/mi-dia'),         k: 'mi dia' },
+      { kind: 'Ir a', label: 'Calendario global', Icon: Calendar,     go: () => nav('/calendario'),     k: 'calendario' },
+      { kind: 'Ir a', label: 'Bandeja IA',        Icon: Inbox,        go: () => nav('/bandeja-ia'),     k: 'bandeja ia' },
+      { kind: 'Ir a', label: 'Reportes',          Icon: BarChart3,    go: () => nav('/reportes'),       k: 'reportes' },
+      { kind: 'Ir a', label: 'Configuración',     Icon: Settings,     go: () => nav('/configuracion'),  k: 'config' },
     ];
 
-    const proj: CmdItem[] = PROJECTS.map(p => ({
+    const proj: CmdItem[] = projects.map(p => ({
       kind: 'Proyecto',
       label: p.name,
       Icon: Folder,
-      sub: getArea(p.area)?.name ?? '',
-      go: () => nav(`/project/${p.id}`),
+      sub: areas.find(a => a.id === p.area)?.name ?? '',
+      go: () => nav(`/proyecto/${p.id}`),
       k: p.name.toLowerCase(),
     }));
 
-    const taskItems: CmdItem[] = TASKS.slice(0, 10).map(t => ({
+    const taskItems: CmdItem[] = tasks.slice(0, 10).map(t => ({
       kind: 'Tarea',
       label: t.title,
       Icon: CheckSquare,
-      sub: t.code + ' · ' + (getArea(t.area)?.name ?? ''),
+      sub: t.code + ' · ' + (areas.find(a => a.id === t.area)?.name ?? ''),
       go: () => { openTask(t.id); onClose(); },
       k: t.title.toLowerCase(),
     }));
 
     const actions: CmdItem[] = [
-      { kind: 'Crear', label: 'Nueva tarea',              Icon: Plus,         k: 'nueva tarea' },
-      { kind: 'Crear', label: 'Nuevo proyecto',           Icon: FolderPlus,   k: 'nuevo proyecto' },
-      { kind: 'Crear', label: 'Nueva área',               Icon: MapPin,       k: 'nueva area' },
-      { kind: 'IA',    label: 'Resumen del día',          Icon: Sparkles,     k: 'resumen ia' },
-      { kind: 'IA',    label: 'Detector de bloqueos',     Icon: OctagonAlert, k: 'bloqueos' },
-      { kind: 'IA',    label: 'Generar reporte semanal',  Icon: FileBarChart, k: 'reporte ia' },
+      { kind: 'Crear', label: 'Nueva tarea',             Icon: Plus,         k: 'nueva tarea' },
+      { kind: 'Crear', label: 'Nuevo proyecto',          Icon: FolderPlus,   k: 'nuevo proyecto' },
+      { kind: 'Crear', label: 'Nueva área',              Icon: MapPin,       k: 'nueva area' },
+      { kind: 'IA',    label: 'Resumen del día',         Icon: Sparkles,     k: 'resumen ia' },
+      { kind: 'IA',    label: 'Detector de bloqueos',    Icon: OctagonAlert, k: 'bloqueos' },
+      { kind: 'IA',    label: 'Generar reporte semanal', Icon: FileBarChart, k: 'reporte ia' },
     ];
 
     const all = [...navItems, ...proj, ...taskItems, ...actions];
-    const filtered = Q
-      ? all.filter(x => x.k.includes(Q) || x.label.toLowerCase().includes(Q))
-      : all;
+    const filtered = Q ? all.filter(x => x.k.includes(Q) || x.label.toLowerCase().includes(Q)) : all;
 
     const byKind: Record<string, CmdItem[]> = {};
     filtered.forEach(it => { (byKind[it.kind] = byKind[it.kind] || []).push(it); });
     return byKind;
-  }, [q]);
+  }, [q, projects, tasks, areas]);
 
   const flat = Object.values(sections).flat();
   const [idx, setIdx] = useState(0);
@@ -85,10 +87,7 @@ export function CmdK({ onClose }: CmdKProps) {
       if (e.key === 'Escape') onClose();
       if (e.key === 'ArrowDown') { e.preventDefault(); setIdx(i => Math.min(i + 1, flat.length - 1)); }
       if (e.key === 'ArrowUp')   { e.preventDefault(); setIdx(i => Math.max(0, i - 1)); }
-      if (e.key === 'Enter') {
-        const it = flat[idx];
-        if (it?.go) it.go();
-      }
+      if (e.key === 'Enter') { const it = flat[idx]; if (it?.go) it.go(); }
     };
     window.addEventListener('keydown', fn);
     return () => window.removeEventListener('keydown', fn);

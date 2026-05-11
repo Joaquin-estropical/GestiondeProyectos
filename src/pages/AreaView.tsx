@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { Folder, ListTodo, Percent, Users, UserPlus, Plus } from 'lucide-react';
-import { AREAS, PROJECTS, TASKS, getMember, fmtDate, dueColor } from '@/lib/mock-data';
+import { useAreas, useProjects, useTasks } from '@/hooks/useSupabase';
+import { getMember, fmtDate, dueColor } from '@/lib/mock-data';
 import { Avatar } from '@/components/shared/Avatar';
 import { StatusPill, PriorityPill } from '@/components/shared/Badges';
 import { PageHead } from '@/components/shared/PageHead';
@@ -8,25 +9,32 @@ import { useAppStore } from '@/stores/app';
 
 export default function AreaView() {
   const { areaId } = useParams<{ areaId: string }>();
-  const navigate = useNavigate();
+  const navigate   = useNavigate();
   const { openTask } = useAppStore();
 
   const id = areaId ?? '';
-  const a = AREAS.find(x => x.id === id);
+
+  const { data: areas    = [], loading } = useAreas();
+  const { data: projects = [] }          = useProjects(id);
+  const { data: tasks    = [] }          = useTasks({ areaId: id });
+
+  const a = areas.find(x => x.id === id);
+
+  if (loading) return <div className="page-body" style={{ color: 'var(--text-3)', fontSize: 13 }}>Cargando área...</div>;
   if (!a) return <div className="page-body">Área no encontrada.</div>;
 
-  const projs = PROJECTS.filter(p => p.area === id);
-  const tasks = TASKS.filter(t => t.area === id);
-  const open = tasks.filter(t => t.status !== 'done').length;
-  const done = tasks.filter(t => t.status === 'done').length;
-  const pct = Math.round(done / Math.max(tasks.length, 1) * 100);
-  const critical = tasks.filter(t => t.priority === 'urg' || (t.status !== 'done' && new Date(t.due) <= new Date('2026-03-11'))).slice(0, 5);
+  const open     = tasks.filter(t => t.status !== 'done').length;
+  const done     = tasks.filter(t => t.status === 'done').length;
+  const pct      = Math.round(done / Math.max(tasks.length, 1) * 100);
+  const critical = tasks
+    .filter(t => t.priority === 'urg' || (t.status !== 'done' && new Date(t.due) <= new Date('2026-03-11')))
+    .slice(0, 5);
 
   return (
     <>
       <PageHead
         title={a.name}
-        subtitle={`${projs.length} proyectos activos · ${open} tareas abiertas`}
+        subtitle={`${projects.length} proyectos activos · ${open} tareas abiertas`}
         right={
           <div className="row gap-8">
             <button className="btn btn-secondary btn-md"><UserPlus size={14} /> Invitar</button>
@@ -38,7 +46,7 @@ export default function AreaView() {
         <div className="grid mb-24" style={{ gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
           <div className="card kpi">
             <div className="lbl"><Folder size={13} /> Proyectos activos</div>
-            <div className="val">{projs.length}</div>
+            <div className="val">{projects.length}</div>
           </div>
           <div className="card kpi">
             <div className="lbl"><ListTodo size={13} /> Tareas abiertas</div>
@@ -56,12 +64,12 @@ export default function AreaView() {
 
         <div className="section-title">Proyectos</div>
         <div className="grid mb-24" style={{ gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
-          {projs.map(p => (
+          {projects.map(p => (
             <div
               key={p.id}
               className="card"
               style={{ cursor: 'pointer' }}
-              onClick={() => navigate(`/project/${p.id}`)}
+              onClick={() => navigate(`/proyecto/${p.id}`)}
             >
               <div className="card-pad">
                 <div className="row between items-center">
@@ -98,6 +106,9 @@ export default function AreaView() {
                   <td style={{ width: 120 }}><StatusPill status={t.status} /></td>
                 </tr>
               ))}
+              {critical.length === 0 && (
+                <tr><td colSpan={6} style={{ padding: '18px', color: 'var(--text-3)', fontSize: 13 }}>Sin tareas críticas.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
