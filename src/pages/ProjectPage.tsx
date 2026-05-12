@@ -1,6 +1,6 @@
 import { useState, useReducer, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { List, Kanban, GanttChart, Calendar, Table, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, ChevronLeft, ChevronRight } from 'lucide-react';
+import { List, Kanban, GanttChart, Calendar, Table, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, ChevronLeft, ChevronRight, Maximize2, Minimize2, X } from 'lucide-react';
 import { useProjects, useTasks } from '@/hooks/useSupabase';
 import { getMember, STATUS_ORDER, STATUS_LABELS, MONTHS_ES, fmtDate, dueColor } from '@/lib/mock-data';
 import { useAppStore } from '@/stores/app';
@@ -271,10 +271,11 @@ function ProjectKanban({ tasks, openTask, projectId }: { tasks: Task[]; openTask
 }
 
 // ─── Project Gantt ───
-const ROW_H = 48;  // tall rows for readability
-const COL_W = 36;  // wider day columns
+const ROW_H = 48;
+const COL_W = 36;
 
 function ProjectGantt({ project, tasks, openTask }: { project: NonNullable<ReturnType<typeof useProjects>['data']>[0]; tasks: Task[]; openTask: (id: string) => void }) {
+  const [fullscreen, setFullscreen] = useState(false);
 
   // Derive time range from actual task due dates + 3 weeks padding
   const allMs  = tasks.map(t => new Date(t.due + 'T12:00:00').getTime());
@@ -345,14 +346,14 @@ function ProjectGantt({ project, tasks, openTask }: { project: NonNullable<Retur
     );
   }
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+  const ganttContent = (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: 'var(--bg)' }}>
       {/* Toolbar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0, background: 'var(--surface-1)' }}>
         <span style={{ fontSize: 12.5, color: 'var(--text-2)' }}>
           {tasks.length} tareas · Entrega <span style={{ color: 'var(--text-1)', fontWeight: 500 }}>{fmtDate(project.due)}</span>
         </span>
-        <div style={{ display: 'flex', gap: 12, marginLeft: 'auto', fontSize: 11.5, color: 'var(--text-3)' }}>
+        <div style={{ display: 'flex', gap: 12, fontSize: 11.5, color: 'var(--text-3)' }}>
           {(['curso','rev','block','done'] as const).map(s => (
             <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <span style={{ width: 8, height: 8, borderRadius: 2, background: statusColor(s) }} />
@@ -360,6 +361,19 @@ function ProjectGantt({ project, tasks, openTask }: { project: NonNullable<Retur
             </span>
           ))}
         </div>
+        <button
+          className="btn btn-secondary btn-sm"
+          style={{ marginLeft: 'auto' }}
+          onClick={() => setFullscreen(v => !v)}
+          title={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+        >
+          {fullscreen ? <><Minimize2 size={13} /> Salir</>  : <><Maximize2 size={13} /> Pantalla completa</>}
+        </button>
+        {fullscreen && (
+          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setFullscreen(false)}>
+            <X size={15} />
+          </button>
+        )}
       </div>
 
       {/* Gantt body — fixed left panel + scrollable right */}
@@ -463,6 +477,15 @@ function ProjectGantt({ project, tasks, openTask }: { project: NonNullable<Retur
       </div>
     </div>
   );
+
+  if (fullscreen) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'var(--bg)' }}>
+        {ganttContent}
+      </div>
+    );
+  }
+  return ganttContent;
 }
 
 // ─── Project Calendar ───

@@ -66,12 +66,14 @@ export interface Template {
 }
 
 export interface TemplateTask {
-  id:          string
-  template_id: string
-  title:       string
-  priority:    TaskPriority
-  day_offset:  number
-  sort_order:  number
+  id:            string
+  template_id:   string
+  title:         string
+  priority:      TaskPriority
+  day_offset:    number
+  sort_order:    number
+  phase_name:    string | null    // milestone/section grouping, e.g. "Área Legal"
+  duration_days: number           // how many days this task spans
 }
 
 // ── Subtareas y comentarios ───────────────────────────────

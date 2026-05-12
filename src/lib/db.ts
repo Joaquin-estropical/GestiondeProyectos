@@ -272,10 +272,22 @@ export async function createTemplate(input: { name: string; area_type: AreaType;
   return data as Template
 }
 
-export async function createTemplateTask(templateId: string, title: string, priority: TaskPriority, dayOffset: number, order: number): Promise<TemplateTask> {
+export async function createTemplateTask(
+  templateId: string, title: string, priority: TaskPriority, dayOffset: number, order: number,
+  opts?: { phaseName?: string | null; durationDays?: number }
+): Promise<TemplateTask> {
   const { data, error } = await supabase
     .from('template_tasks')
-    .insert({ id: 'tt-' + Date.now().toString(36), template_id: templateId, title, priority, day_offset: dayOffset, sort_order: order })
+    .insert({
+      id: 'tt-' + Date.now().toString(36),
+      template_id: templateId,
+      title,
+      priority,
+      day_offset:    dayOffset,
+      sort_order:    order,
+      phase_name:    opts?.phaseName    ?? null,
+      duration_days: opts?.durationDays ?? 1,
+    })
     .select().single()
   if (error) throw error
   return data as TemplateTask
