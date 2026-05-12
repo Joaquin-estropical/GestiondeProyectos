@@ -86,44 +86,81 @@ export default function CalendarView() {
           </div>
         }
       />
-      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr 300px', height: 'calc(100% - 89px)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr 300px', height: 'calc(100% - 89px)' }}>
 
         {/* Filters */}
-        <aside style={{ borderRight: '1px solid var(--border)', padding: '16px', overflowY: 'auto' }}>
-          <div className="micro mb-10">Áreas</div>
-          <div className="col gap-6 mb-20">
-            {areas.map(a => (
-              <label key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer', padding: '3px 0' }}>
-                <input
-                  type="checkbox"
-                  checked={activeAreas.includes(a.id)}
-                  onChange={() => toggleArea(a.id)}
-                  style={{ accentColor: a.color, width: 13, height: 13, flexShrink: 0 }}
-                />
-                <span style={{ width: 8, height: 8, borderRadius: 2, background: a.color, flexShrink: 0 }}></span>
-                <span style={{ flex: 1, color: activeAreas.includes(a.id) ? 'var(--text-1)' : 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
-                <span className="mono" style={{ fontSize: 10.5, color: 'var(--text-3)' }}>
-                  {taskByDay ? Object.values(taskByDay).flat().filter(t => t.area === a.id && t.status !== 'done').length : 0}
-                </span>
-              </label>
-            ))}
-            {areas.length === 0 && <div className="text-3 f-xs">Sin áreas</div>}
+        <aside style={{ borderRight: '1px solid var(--border)', padding: '20px 16px', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span className="micro">Áreas</span>
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ fontSize: 11, padding: '0 6px', height: 20 }}
+              onClick={() => setFiltAreas(activeAreas.length === areas.length ? [] : null)}
+            >
+              {activeAreas.length === areas.length ? 'Ninguna' : 'Todas'}
+            </button>
           </div>
-          <div className="micro mb-10">Personas</div>
-          <div className="col gap-6">
-            {members.map(m => (
-              <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer', padding: '3px 0' }}>
-                <input
-                  type="checkbox"
-                  checked={activePeople.includes(m.id)}
-                  onChange={() => togglePerson(m.id)}
-                  style={{ accentColor: 'var(--teal)', width: 13, height: 13, flexShrink: 0 }}
-                />
-                <Avatar name={m.name} size={18} />
-                <span style={{ flex: 1, color: activePeople.includes(m.id) ? 'var(--text-1)' : 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name.split(' ')[0]} {m.name.split(' ')[1]?.[0]}.</span>
-              </label>
-            ))}
-            {members.length === 0 && <div className="text-3 f-xs">Sin miembros</div>}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 24 }}>
+            {areas.map(a => {
+              const on = activeAreas.includes(a.id);
+              const cnt = Object.values(taskByDay).flat().filter(t => t.area === a.id && t.status !== 'done').length;
+              return (
+                <button
+                  key={a.id}
+                  onClick={() => toggleArea(a.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '8px 10px', borderRadius: 6, cursor: 'pointer', border: 'none',
+                    background: on ? a.color + '15' : 'transparent',
+                    outline: on ? `1px solid ${a.color}40` : '1px solid transparent',
+                    transition: 'background 0.12s, outline 0.12s',
+                  }}
+                >
+                  <span style={{
+                    width: 12, height: 12, borderRadius: 3, flexShrink: 0,
+                    background: on ? a.color : 'var(--border-hover)',
+                    transition: 'background 0.12s',
+                  }} />
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: on ? 'var(--text-1)' : 'var(--text-3)', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
+                  {cnt > 0 && <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: on ? a.color : 'var(--text-3)', background: on ? a.color + '20' : 'var(--surface-2)', padding: '0 5px', borderRadius: 999, lineHeight: 1.6 }}>{cnt}</span>}
+                </button>
+              );
+            })}
+            {areas.length === 0 && <div style={{ color: 'var(--text-3)', fontSize: 13, padding: '8px 0' }}>Sin áreas creadas</div>}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span className="micro">Personas</span>
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ fontSize: 11, padding: '0 6px', height: 20 }}
+              onClick={() => setFiltPeople(activePeople.length === members.length ? [] : null)}
+            >
+              {activePeople.length === members.length ? 'Ninguna' : 'Todas'}
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {members.map(m => {
+              const on = activePeople.includes(m.id);
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => togglePerson(m.id)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '8px 10px', borderRadius: 6, cursor: 'pointer', border: 'none',
+                    background: on ? 'var(--teal-bg)' : 'transparent',
+                    outline: on ? '1px solid rgba(20,184,166,.3)' : '1px solid transparent',
+                    transition: 'background 0.12s, outline 0.12s',
+                  }}
+                >
+                  <Avatar name={m.name} size={24} style={{ opacity: on ? 1 : 0.4, transition: 'opacity .12s' }} />
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: on ? 'var(--text-1)' : 'var(--text-3)', textAlign: 'left' }}>{m.name.split(' ')[0]} {m.name.split(' ')[1]?.[0]}.</span>
+                  {on && <span style={{ width: 8, height: 8, borderRadius: 999, background: 'var(--teal)', flexShrink: 0 }} />}
+                </button>
+              );
+            })}
+            {members.length === 0 && <div style={{ color: 'var(--text-3)', fontSize: 13, padding: '8px 0' }}>Sin miembros</div>}
           </div>
         </aside>
 

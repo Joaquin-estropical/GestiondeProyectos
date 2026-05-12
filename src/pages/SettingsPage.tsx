@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, MoreHorizontal, UserPlus, Pencil, Trash2, ChevronDown, ChevronRight, Flag } from 'lucide-react';
+import { Plus, UserPlus, MoreHorizontal, Pencil, Trash2, Flag, GripVertical, X, Check } from 'lucide-react';
 import { TEAM } from '@/lib/mock-data';
 import { useTemplates, useTemplateTasks } from '@/hooks/useSupabase';
 import { deleteArea, deleteTemplate, createTemplate, createTemplateTask, deleteTemplateTask } from '@/lib/db';
@@ -9,10 +9,10 @@ import { PageHead } from '@/components/shared/PageHead';
 import type { AreaType, TaskPriority } from '@/types';
 
 const TABS = [
-  { id: 'areas',     label: 'Áreas'         },
-  { id: 'templates', label: 'Plantillas'     },
-  { id: 'members',   label: 'Miembros'       },
-  { id: 'billing',   label: 'Facturación'    },
+  { id: 'areas',     label: 'Áreas'      },
+  { id: 'templates', label: 'Plantillas' },
+  { id: 'members',   label: 'Miembros'   },
+  { id: 'billing',   label: 'Facturación'},
 ];
 
 const AREA_TYPE_LABELS: Record<AreaType, string> = {
@@ -20,7 +20,10 @@ const AREA_TYPE_LABELS: Record<AreaType, string> = {
 };
 
 const PRIORITY_COLORS: Record<TaskPriority, string> = {
-  urg: 'var(--red)', alta: 'var(--amber)', med: 'var(--blue)', baja: 'var(--text-3)',
+  urg: '#EF4444', alta: '#F59E0B', med: '#3B82F6', baja: '#5A5A60',
+};
+const PRIORITY_LABELS: Record<TaskPriority, string> = {
+  urg: 'Urgente', alta: 'Alta', med: 'Media', baja: 'Baja',
 };
 
 // ── Tab: Áreas ───────────────────────────────────────────
@@ -62,9 +65,6 @@ function AreasTab() {
                 </div>
               </div>
               <div className="row gap-6 items-center">
-                <span className="avatar-stack" style={{ display: 'inline-flex' }}>
-                  {TEAM.slice(0, 3).map(m => <Avatar key={m.id} name={m.name} size={22} style={{ border: '1.5px solid var(--bg)' }} />)}
-                </span>
                 <button className="btn btn-ghost btn-sm btn-icon" onClick={() => openNewArea(a.id)}>
                   <Pencil size={13} />
                 </button>
@@ -92,98 +92,214 @@ function AreasTab() {
   );
 }
 
-// ── Tab: Plantillas ──────────────────────────────────────
-function TemplateRow({ templateId, onDeleted }: { templateId: string; onDeleted: () => void }) {
-  const { data: ttasks, reload } = useTemplateTasks(templateId);
-  const [expanded,  setExpanded]  = useState(false);
-  const [newTitle,  setNewTitle]  = useState('');
-  const [newPrio,   setNewPrio]   = useState<TaskPriority>('med');
-  const [adding,    setAdding]    = useState(false);
+// ── Template task row (editable) ─────────────────────────
+function TemplateTaskRow({
+  tt, onDelete,
+}: { tt: { id: string; title: string; priority: TaskPriority; day_offset: number; sort_order: number }; onDelete: (id: string) => void }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 6, background: 'var(--bg)', border: '1px solid var(--border)', marginBottom: 6 }}>
+      <GripVertical size={13} color="var(--text-3)" style={{ flexShrink: 0, cursor: 'grab' }} />
+      <Flag size={12} color={PRIORITY_COLORS[tt.priority]} style={{ flexShrink: 0 }} />
+      <span style={{ flex: 1, fontSize: 13 }}>{tt.title}</span>
+      <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'JetBrains Mono, monospace', background: 'var(--surface-2)', padding: '2px 6px', borderRadius: 4, flexShrink: 0 }}>
+        Día +{tt.day_offset}
+      </span>
+      <button
+        className="btn btn-ghost btn-sm btn-icon"
+        style={{ width: 22, height: 22 }}
+        onClick={() => onDelete(tt.id)}
+        title="Eliminar tarea"
+      >
+        <X size={11} color="var(--text-3)" />
+      </button>
+    </div>
+  );
+}
 
-  const handleAddTask = async () => {
-    if (!newTitle.trim()) return;
+// ── Template editor panel ─────────────────────────────────
+function TemplateEditor({ templateId, templateName, onClose }: { templateId: string; templateName: string; onClose: () => void }) {
+  const { data: ttasks, reload } = useTemplateTasks(templateId);
+
+  const [title,    setTitle]    = useState('');
+  const [priority, setPriority] = useState<TaskPriority>('med');
+  const [dayOff,   setDayOff]   = useState(0);
+  const [adding,   setAdding]   = useState(false);
+  const [error,    setError]    = useState('');
+
+  const handleAdd = async () => {
+    const t = title.trim();
+    if (!t) { setError('El título es obligatorio'); return; }
+    setError('');
     setAdding(true);
-    await createTemplateTask(templateId, newTitle.trim(), newPrio, 0, ttasks.length);
-    setNewTitle(''); reload();
+    await createTemplateTask(templateId, t, priority, dayOff, ttasks.length);
+    setTitle(''); setDayOff(0); reload();
     setAdding(false);
   };
 
-  const handleDeleteTask = async (id: string) => {
+  const handleDelete = async (id: string) => {
     await deleteTemplateTask(id);
     reload();
   };
 
   return (
-    <div>
-      <div
-        className="row gap-10 items-center"
-        style={{ cursor: 'pointer', padding: '4px 0' }}
-        onClick={() => setExpanded(v => !v)}
-      >
-        {expanded ? <ChevronDown size={13} color="var(--text-3)" /> : <ChevronRight size={13} color="var(--text-3)" />}
-        <span className="f-xs text-2 mono">{ttasks.length} tareas</span>
-        <button
-          className="btn btn-ghost btn-sm btn-icon"
-          style={{ marginLeft: 'auto' }}
-          onClick={e => { e.stopPropagation(); onDeleted(); }}
-          title="Eliminar plantilla"
-        >
-          <Trash2 size={12} color="var(--red)" />
-        </button>
-      </div>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: 560, maxWidth: '94vw', maxHeight: '85vh', background: 'var(--surface-1)', border: '1px solid var(--border-hover)', borderRadius: 10, boxShadow: '0 24px 80px rgba(0,0,0,.6)', display: 'flex', flexDirection: 'column' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '18px 20px', borderBottom: '1px solid var(--border)' }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 15 }}>{templateName}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{ttasks.length} tarea{ttasks.length !== 1 ? 's' : ''} en esta plantilla</div>
+          </div>
+          <button className="btn btn-ghost btn-sm btn-icon" style={{ marginLeft: 'auto' }} onClick={onClose}><X size={14} /></button>
+        </div>
 
-      {expanded && (
-        <div style={{ paddingLeft: 20, marginTop: 4 }}>
-          {ttasks.map(tt => (
-            <div key={tt.id} className="row gap-8 items-center" style={{ padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
-              <Flag size={11} color={PRIORITY_COLORS[tt.priority]} />
-              <span style={{ flex: 1, fontSize: 12.5 }}>{tt.title}</span>
-              <span className="mono f-xs text-3">+{tt.day_offset}d</span>
-              <button className="btn btn-ghost btn-sm btn-icon" onClick={() => handleDeleteTask(tt.id)}>
-                <Trash2 size={11} color="var(--text-3)" />
-              </button>
+        {/* Task list */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
+          {ttasks.length === 0 && (
+            <div style={{ textAlign: 'center', color: 'var(--text-3)', fontSize: 13, padding: '24px 0' }}>
+              Esta plantilla no tiene tareas aún. Agregá la primera abajo.
             </div>
+          )}
+          {ttasks.map(tt => (
+            <TemplateTaskRow key={tt.id} tt={tt} onDelete={handleDelete} />
           ))}
-          <div className="row gap-8 items-center mt-8">
+        </div>
+
+        {/* Add task form */}
+        <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', background: 'var(--surface-2)', borderRadius: '0 0 10px 10px' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text-3)', marginBottom: 10 }}>Agregar tarea a la plantilla</div>
+
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
             <input
-              value={newTitle}
-              onChange={e => setNewTitle(e.target.value)}
-              placeholder="Nueva tarea en plantilla..."
-              onKeyDown={e => e.key === 'Enter' && handleAddTask()}
-              style={{ flex: 1, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 4, padding: '4px 8px', fontSize: 12, color: 'var(--text-1)', outline: 'none' }}
+              value={title}
+              onChange={e => { setTitle(e.target.value); setError(''); }}
+              onKeyDown={e => e.key === 'Enter' && handleAdd()}
+              placeholder="Título de la tarea..."
+              autoFocus
+              style={{
+                flex: 1, background: 'var(--surface-1)', border: `1px solid ${error ? 'var(--red)' : 'var(--border)'}`,
+                borderRadius: 6, padding: '0 12px', height: 36, fontSize: 13, color: 'var(--text-1)', outline: 'none',
+              }}
             />
-            <select
-              value={newPrio}
-              onChange={e => setNewPrio(e.target.value as TaskPriority)}
-              style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 4, padding: '4px 6px', fontSize: 11, color: 'var(--text-1)', cursor: 'pointer' }}
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {/* Priority */}
+            <div style={{ display: 'flex', gap: 4 }}>
+              {(['urg','alta','med','baja'] as TaskPriority[]).map(p => (
+                <button
+                  key={p}
+                  onClick={() => setPriority(p)}
+                  style={{
+                    height: 30, padding: '0 10px', borderRadius: 5, border: `1px solid ${priority === p ? PRIORITY_COLORS[p] + '80' : 'var(--border)'}`,
+                    background: priority === p ? PRIORITY_COLORS[p] + '18' : 'var(--surface-1)',
+                    color: priority === p ? PRIORITY_COLORS[p] : 'var(--text-3)',
+                    fontSize: 11.5, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                  }}
+                >
+                  <Flag size={10} color={PRIORITY_COLORS[p]} />
+                  {PRIORITY_LABELS[p]}
+                </button>
+              ))}
+            </div>
+
+            {/* Day offset */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto', background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 6, padding: '0 10px', height: 30 }}>
+              <span style={{ fontSize: 11.5, color: 'var(--text-3)' }}>Día</span>
+              <input
+                type="number"
+                min={0}
+                max={365}
+                value={dayOff}
+                onChange={e => setDayOff(Number(e.target.value))}
+                style={{ width: 44, background: 'transparent', border: 0, outline: 0, fontSize: 13, color: 'var(--text-1)', textAlign: 'center', fontFamily: 'JetBrains Mono, monospace' }}
+              />
+            </div>
+
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={handleAdd}
+              disabled={adding || !title.trim()}
+              style={{ height: 30 }}
             >
-              <option value="urg">Urgente</option>
-              <option value="alta">Alta</option>
-              <option value="med">Media</option>
-              <option value="baja">Baja</option>
-            </select>
-            <button className="btn btn-primary btn-sm" onClick={handleAddTask} disabled={adding || !newTitle.trim()}>
-              <Plus size={12} />
+              {adding ? '...' : <><Check size={12} /> Agregar</>}
             </button>
           </div>
+          {error && <div style={{ fontSize: 11.5, color: 'var(--red)', marginTop: 6 }}>{error}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Template card ─────────────────────────────────────────
+function TemplateCard({
+  tpl, onDelete, onEdit,
+}: { tpl: { id: string; name: string; area_type: AreaType }; onDelete: () => void; onEdit: () => void }) {
+  const { data: ttasks } = useTemplateTasks(tpl.id);
+  const [confirmDel, setConfirmDel] = useState(false);
+
+  return (
+    <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+      {/* Card header */}
+      <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: ttasks.length > 0 ? '1px solid var(--border)' : 'none' }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>{tpl.name}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{ttasks.length} tarea{ttasks.length !== 1 ? 's' : ''}</div>
+        </div>
+        <button className="btn btn-secondary btn-sm" onClick={onEdit}>
+          <Pencil size={12} /> Editar tareas
+        </button>
+        {confirmDel ? (
+          <div className="row gap-6">
+            <button className="btn btn-destructive btn-sm" onClick={onDelete}>Eliminar</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDel(false)}>Cancelar</button>
+          </div>
+        ) : (
+          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setConfirmDel(true)} title="Eliminar plantilla">
+            <Trash2 size={13} color="var(--red)" />
+          </button>
+        )}
+      </div>
+
+      {/* Task preview (up to 4) */}
+      {ttasks.length > 0 && (
+        <div style={{ padding: '8px 16px 12px' }}>
+          {ttasks.slice(0, 4).map((tt, i) => (
+            <div key={tt.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: i < Math.min(ttasks.length, 4) - 1 ? '1px solid var(--border)' : 'none' }}>
+              <Flag size={10} color={PRIORITY_COLORS[tt.priority]} />
+              <span style={{ flex: 1, fontSize: 12.5, color: 'var(--text-2)' }}>{tt.title}</span>
+              <span style={{ fontSize: 10.5, color: 'var(--text-3)', fontFamily: 'JetBrains Mono, monospace' }}>+{tt.day_offset}d</span>
+            </div>
+          ))}
+          {ttasks.length > 4 && (
+            <div style={{ fontSize: 11.5, color: 'var(--text-3)', paddingTop: 6 }}>+{ttasks.length - 4} más...</div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
+// ── Tab: Plantillas ──────────────────────────────────────
 function TemplatesTab() {
   const { data: templates, reload } = useTemplates();
-  const [newName,     setNewName]     = useState('');
-  const [newType,     setNewType]     = useState<AreaType>('sucursal');
-  const [creating,    setCreating]    = useState(false);
-  const [showNew,     setShowNew]     = useState(false);
+  const [newName,    setNewName]    = useState('');
+  const [newType,    setNewType]    = useState<AreaType>('sucursal');
+  const [creating,   setCreating]   = useState(false);
+  const [showForm,   setShowForm]   = useState(false);
+  const [editingId,  setEditingId]  = useState<string | null>(null);
+  const [nameError,  setNameError]  = useState('');
+
+  const types: AreaType[] = ['sucursal', 'outlet', 'edificio', 'bodega', 'general'];
 
   const handleCreate = async () => {
-    if (!newName.trim()) return;
+    const n = newName.trim();
+    if (!n) { setNameError('El nombre es obligatorio'); return; }
+    setNameError('');
     setCreating(true);
-    await createTemplate({ name: newName.trim(), area_type: newType });
-    setNewName(''); setShowNew(false); reload();
+    await createTemplate({ name: n, area_type: newType });
+    setNewName(''); setShowForm(false); reload();
     setCreating(false);
   };
 
@@ -192,74 +308,99 @@ function TemplatesTab() {
     reload();
   };
 
+  const editingTemplate = templates.find(t => t.id === editingId);
+
   const byType = (type: AreaType) => templates.filter(t => t.area_type === type);
-  const types: AreaType[] = ['sucursal', 'outlet', 'edificio', 'bodega', 'general'];
 
   return (
     <>
-      <div className="row between items-center mb-16">
+      {/* Editor overlay */}
+      {editingId && editingTemplate && (
+        <TemplateEditor
+          templateId={editingId}
+          templateName={editingTemplate.name}
+          onClose={() => setEditingId(null)}
+        />
+      )}
+
+      <div className="row between items-center mb-20">
         <div>
           <div className="fw-6">Plantillas de tareas</div>
-          <div className="f-xs text-2 mt-4">Las plantillas se aplican al crear un nuevo proyecto según el tipo de área.</div>
+          <div className="f-xs text-2 mt-4">Definen las tareas que se crean automáticamente al iniciar un nuevo proyecto.</div>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={() => setShowNew(v => !v)}>
+        <button className="btn btn-primary btn-sm" onClick={() => setShowForm(v => !v)}>
           <Plus size={14} /> Nueva plantilla
         </button>
       </div>
 
-      {showNew && (
-        <div className="card card-pad mb-16">
-          <div className="fw-5 mb-12">Nueva plantilla</div>
-          <div className="row gap-12">
-            <div className="input" style={{ flex: 2 }}>
+      {/* New template form */}
+      {showForm && (
+        <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-hover)', borderRadius: 8, padding: '20px', marginBottom: 24 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14 }}>Nueva plantilla</div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <div style={{ flex: 2 }}>
               <input
                 autoFocus
                 value={newName}
-                onChange={e => setNewName(e.target.value)}
-                placeholder="Nombre de la plantilla..."
+                onChange={e => { setNewName(e.target.value); setNameError(''); }}
                 onKeyDown={e => e.key === 'Enter' && handleCreate()}
+                placeholder="Nombre de la plantilla (ej: Apertura de sucursal)"
+                style={{
+                  width: '100%', background: 'var(--surface-2)', border: `1px solid ${nameError ? 'var(--red)' : 'var(--border)'}`,
+                  borderRadius: 6, padding: '0 12px', height: 36, fontSize: 13, color: 'var(--text-1)', outline: 'none', boxSizing: 'border-box',
+                }}
               />
+              {nameError && <div style={{ fontSize: 11.5, color: 'var(--red)', marginTop: 4 }}>{nameError}</div>}
             </div>
-            <div className="input" style={{ padding: 0, flex: 1 }}>
-              <select
-                value={newType}
-                onChange={e => setNewType(e.target.value as AreaType)}
-                style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 12px', height: 36, color: 'var(--text-1)', fontSize: 13, cursor: 'pointer' }}
-              >
-                {types.map(t => <option key={t} value={t}>{AREA_TYPE_LABELS[t]}</option>)}
-              </select>
-            </div>
-            <button className="btn btn-primary btn-md" onClick={handleCreate} disabled={creating || !newName.trim()}>
-              Crear
-            </button>
-            <button className="btn btn-ghost btn-md" onClick={() => setShowNew(false)}>Cancelar</button>
+            <select
+              value={newType}
+              onChange={e => setNewType(e.target.value as AreaType)}
+              style={{ height: 36, padding: '0 10px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 13, color: 'var(--text-1)', cursor: 'pointer', outline: 'none' }}
+            >
+              {types.map(t => <option key={t} value={t}>{AREA_TYPE_LABELS[t]}</option>)}
+            </select>
+            <button className="btn btn-primary btn-md" onClick={handleCreate} disabled={creating}>Crear</button>
+            <button className="btn btn-ghost btn-md" onClick={() => { setShowForm(false); setNameError(''); }}>Cancelar</button>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 10 }}>
+            Después de crear la plantilla podrás agregar y ordenar sus tareas.
           </div>
         </div>
       )}
 
+      {/* Templates by type */}
       {types.map(type => {
         const list = byType(type);
         if (list.length === 0) return null;
         return (
-          <div key={type} className="mb-20">
-            <div className="micro mb-8">{AREA_TYPE_LABELS[type]}</div>
-            <div className="card">
-              {list.map((tpl, i) => (
-                <div key={tpl.id} style={{ padding: '12px 18px', borderBottom: i < list.length - 1 ? '1px solid var(--border)' : '' }}>
-                  <div className="fw-5" style={{ fontSize: 13, marginBottom: 6 }}>{tpl.name}</div>
-                  <TemplateRow templateId={tpl.id} onDeleted={() => handleDelete(tpl.id)} />
-                </div>
+          <div key={type} style={{ marginBottom: 28 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <span className="micro">{AREA_TYPE_LABELS[type]}</span>
+              <span style={{ height: 1, flex: 1, background: 'var(--border)' }} />
+              <span className="micro" style={{ color: 'var(--text-3)' }}>{list.length} plantilla{list.length > 1 ? 's' : ''}</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
+              {list.map(tpl => (
+                <TemplateCard
+                  key={tpl.id}
+                  tpl={tpl}
+                  onDelete={() => handleDelete(tpl.id)}
+                  onEdit={() => setEditingId(tpl.id)}
+                />
               ))}
             </div>
           </div>
         );
       })}
 
-      {templates.length === 0 && !showNew && (
+      {templates.length === 0 && !showForm && (
         <div className="empty" style={{ marginTop: 40 }}>
           <div className="ill"><Plus size={22} /></div>
           <p className="t">Sin plantillas</p>
-          <p className="d">Crea una plantilla para automatizar las tareas al crear nuevos proyectos.</p>
+          <p className="d">Crea una plantilla para automatizar las tareas al crear nuevos proyectos según el tipo de área.</p>
+          <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
+            <Plus size={13} /> Crear primera plantilla
+          </button>
         </div>
       )}
     </>
@@ -321,7 +462,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <div className="page-body" style={{ maxWidth: 920 }}>
+      <div className="page-body" style={{ maxWidth: 960 }}>
         {tab === 'areas'     && <AreasTab />}
         {tab === 'templates' && <TemplatesTab />}
         {tab === 'members'   && <MembersTab />}

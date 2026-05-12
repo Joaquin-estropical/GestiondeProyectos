@@ -1,6 +1,6 @@
-import { useState, useReducer, useCallback } from 'react';
+import { useState, useReducer, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { List, Kanban, GanttChart, Calendar, Table, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { List, Kanban, GanttChart, Calendar, Table, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useProjects, useTasks } from '@/hooks/useSupabase';
 import { getMember, STATUS_ORDER, STATUS_LABELS, MONTHS_ES, fmtDate, dueColor } from '@/lib/mock-data';
 import { useAppStore } from '@/stores/app';
@@ -124,86 +124,144 @@ function ProjectList({ tasks, openTask, projectId }: { tasks: Task[]; openTask: 
 }
 
 // ─── Project Kanban ───
-function ProjectKanban({ tasks, openTask }: { tasks: Task[]; openTask: (id: string) => void }) {
-  const { updateTaskStatus } = useAppStore();
-  const [, force] = useReducer((x: number) => x + 1, 0);
-  const [drag, setDrag] = useState<string | null>(null);
-  const [over, setOver] = useState<string | null>(null);
+const KAN_STATUS_COLORS: Record<string, string> = {
+  curso: 'var(--blue)', pend: 'var(--text-3)', rev: 'var(--amber)', block: 'var(--red)', done: 'var(--green)',
+};
+const KAN_STATUS_BG: Record<string, string> = {
+  curso: 'rgba(59,130,246,.08)', pend: 'transparent', rev: 'rgba(245,158,11,.08)', block: 'rgba(239,68,68,.08)', done: 'rgba(34,197,94,.08)',
+};
 
-  const onDragStart = (e: React.DragEvent, t: Task) => {
-    setDrag(t.id);
+function ProjectKanban({ tasks, openTask, projectId }: { tasks: Task[]; openTask: (id: string) => void; projectId: string }) {
+  const { updateTaskStatus, openNewTask } = useAppStore();
+  const [localTasks, setLocalTasks] = useReducer(
+    (_: Task[], next: Task[]) => next,
+    tasks
+  );
+  // keep localTasks in sync with incoming tasks (e.g. after reload)
+  useEffect(() => { setLocalTasks(tasks); }, [tasks]);
+
+  const [drag,    setDrag]    = useState<string | null>(null);
+  const [over,    setOver]    = useState<string | null>(null);
+  const [saving,  setSaving]  = useState<string | null>(null);
+
+  const onDragStart = (e: React.DragEvent, id: string) => {
+    setDrag(id);
+    e.dataTransfer.setData('text/plain', id);
     e.dataTransfer.effectAllowed = 'move';
   };
-  const onDragEnd = () => { setDrag(null); setOver(null); };
-  const onDragOver = (e: React.DragEvent, s: string) => { e.preventDefault(); setOver(s); };
-  const onDrop = (e: React.DragEvent, s: string) => {
-    e.preventDefault();
-    if (drag) { updateTaskStatus(drag, s as TaskStatus); force(); }
-    setDrag(null); setOver(null);
+  const onDragEnd  = () => { setDrag(null); setOver(null); };
+  const onDragOver = (e: React.DragEvent, s: string) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setOver(s); };
+  const onDragLeave = (e: React.DragEvent) => {
+    if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) setOver(null);
   };
-
-  const dotColor = (s: string) =>
-    s === 'done' ? 'var(--green)' : s === 'block' ? 'var(--red)' : s === 'rev' ? 'var(--amber)' : s === 'curso' ? 'var(--blue)' : 'var(--text-3)';
+  const onDrop = async (e: React.DragEvent, newStatus: TaskStatus) => {
+    e.preventDefault();
+    const id = e.dataTransfer.getData('text/plain') || drag;
+    setDrag(null); setOver(null);
+    if (!id) return;
+    const task = localTasks.find(t => t.id === id);
+    if (!task || task.status === newStatus) return;
+    // Optimistic update
+    setLocalTasks(localTasks.map(t => t.id === id ? { ...t, status: newStatus } : t));
+    setSaving(id);
+    updateTaskStatus(id, newStatus);
+    setSaving(null);
+  };
 
   return (
     <div className="kanban">
       {STATUS_ORDER.map(s => {
-        const list = tasks.filter(t => t.status === s);
+        const list = localTasks.filter(t => t.status === s);
+        const col  = KAN_STATUS_COLORS[s];
+        const bg   = KAN_STATUS_BG[s];
         return (
           <div key={s} className="kan-col">
-            <div className="kan-col-head">
-              <span style={{ width: 6, height: 6, borderRadius: 999, background: dotColor(s) }}></span>
-              <span className="micro" style={{ color: 'var(--text-1)' }}>{STATUS_LABELS[s]}</span>
-              <span className="cnt">{list.length}</span>
-              <button className="btn btn-ghost btn-sm btn-icon" style={{ width: 20, height: 20, marginLeft: 4 }}><Plus size={12} /></button>
+            {/* Column header */}
+            <div className="kan-col-head" style={{ borderTop: `2px solid ${col}`, borderRadius: '4px 4px 0 0', background: bg, padding: '10px 12px 10px' }}>
+              <span style={{ width: 7, height: 7, borderRadius: 999, background: col, flexShrink: 0 }}></span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)', letterSpacing: '.01em' }}>{STATUS_LABELS[s]}</span>
+              <span style={{ marginLeft: 6, fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: col, background: col + '20', padding: '1px 6px', borderRadius: 999 }}>{list.length}</span>
+              <button
+                className="btn btn-ghost btn-sm btn-icon"
+                style={{ width: 22, height: 22, marginLeft: 'auto' }}
+                onClick={() => openNewTask(projectId)}
+                title="Agregar tarea"
+              >
+                <Plus size={12} />
+              </button>
             </div>
+
+            {/* Drop zone */}
             <div
               className={`kan-col-body ${over === s ? 'dragover' : ''}`}
+              style={{ minHeight: 80 }}
               onDragOver={e => onDragOver(e, s)}
-              onDrop={e => onDrop(e, s)}
-              onDragLeave={() => setOver(null)}
+              onDrop={e => onDrop(e, s as TaskStatus)}
+              onDragLeave={onDragLeave}
             >
               {list.map(t => {
-                const m = getMember(t.assignee)!;
+                const m = getMember(t.assignee);
+                const isDragging = drag === t.id;
+                const isSaving   = saving === t.id;
                 return (
                   <div
                     key={t.id}
-                    className={`kan-card ${drag === t.id ? 'dragging' : ''}`}
+                    className={`kan-card ${isDragging ? 'dragging' : ''}`}
                     draggable
-                    onDragStart={e => onDragStart(e, t)}
+                    onDragStart={e => onDragStart(e, t.id)}
                     onDragEnd={onDragEnd}
                     onClick={() => openTask(t.id)}
+                    style={{ opacity: isSaving ? 0.6 : 1, borderLeft: `3px solid ${col}` }}
                   >
-                    <div className="row gap-6 items-center mb-8">
+                    {/* Top row: priority + code */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                       <PriorityPill priority={t.priority} iconOnly />
-                      <span className="mono f-xs text-3">{t.code}</span>
-                      <span style={{ marginLeft: 'auto' }}><AreaPill areaId={t.area} mini /></span>
+                      <span className="mono" style={{ fontSize: 10.5, color: 'var(--text-3)' }}>{t.code}</span>
+                      {t.status === 'done' && <CheckSquare size={11} color="var(--green)" style={{ marginLeft: 'auto' }} />}
                     </div>
-                    <div className="title">{t.title}</div>
+
+                    {/* Title */}
+                    <div style={{
+                      fontSize: 13.5, fontWeight: 500, lineHeight: 1.45,
+                      color: t.status === 'done' ? 'var(--text-3)' : 'var(--text-1)',
+                      textDecoration: t.status === 'done' ? 'line-through' : 'none',
+                      marginBottom: 12,
+                    }}>
+                      {t.title}
+                    </div>
+
+                    {/* Subtasks progress */}
                     {t.subtasks.total > 0 && (
-                      <div className="row gap-6 items-center mt-12 f-xs text-2">
-                        <CheckSquare size={11} />
-                        <span className="mono">{t.subtasks.done}/{t.subtasks.total}</span>
-                        <div className="progress" style={{ flex: 1, marginLeft: 6 }}>
-                          <div style={{ width: (t.subtasks.done / t.subtasks.total * 100) + '%', background: 'var(--text-3)' }}></div>
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                          <CheckSquare size={10} color="var(--text-3)" />
+                          <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'JetBrains Mono, monospace' }}>{t.subtasks.done}/{t.subtasks.total}</span>
+                        </div>
+                        <div className="progress">
+                          <div style={{ width: (t.subtasks.done / t.subtasks.total * 100) + '%', background: col }}></div>
                         </div>
                       </div>
                     )}
-                    <div className="meta">
-                      <Avatar name={m.name} size={20} />
-                      <span style={{ color: dueColor(t.due) }} className="mono">{fmtDate(t.due)}</span>
-                      <div className="right">
-                        {t.comments > 0 && (
-                          <span className="row gap-4 items-center"><MessageSquare size={11} /><span className="mono">{t.comments}</span></span>
-                        )}
-                        {t.time !== '0h' && (
-                          <span className="row gap-4 items-center"><Clock size={11} /><span className="mono">{t.time}</span></span>
-                        )}
-                      </div>
+
+                    {/* Bottom meta */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
+                      {m && <Avatar name={m.name} size={20} title={m.name} />}
+                      <span style={{ flex: 1, fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: dueColor(t.due) }}>{fmtDate(t.due)}</span>
+                      {t.comments > 0 && (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--text-3)' }}>
+                          <MessageSquare size={10} />{t.comments}
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
               })}
+
+              {list.length === 0 && over !== s && (
+                <div style={{ padding: '16px 12px', color: 'var(--text-3)', fontSize: 12, textAlign: 'center', borderRadius: 4, border: '1px dashed var(--border)' }}>
+                  Sin tareas
+                </div>
+              )}
             </div>
           </div>
         );
@@ -213,47 +271,49 @@ function ProjectKanban({ tasks, openTask }: { tasks: Task[]; openTask: (id: stri
 }
 
 // ─── Project Gantt ───
+const ROW_H = 48;  // tall rows for readability
+const COL_W = 36;  // wider day columns
+
 function ProjectGantt({ project, tasks, openTask }: { project: NonNullable<ReturnType<typeof useProjects>['data']>[0]; tasks: Task[]; openTask: (id: string) => void }) {
-  const colW = 26;
 
-  // Derive time range from actual task due dates
-  const allDates = tasks.map(t => new Date(t.due + 'T12:00:00').getTime());
-  const minDate  = allDates.length ? new Date(Math.min(...allDates)) : new Date();
-  const maxDate  = allDates.length ? new Date(Math.max(...allDates)) : new Date();
-  minDate.setDate(minDate.getDate() - 14);
-  maxDate.setDate(maxDate.getDate() + 14);
-  const totalDays = Math.max(Math.round((maxDate.getTime() - minDate.getTime()) / 86400000), 30);
-  const totalW    = totalDays * colW;
+  // Derive time range from actual task due dates + 3 weeks padding
+  const allMs  = tasks.map(t => new Date(t.due + 'T12:00:00').getTime());
+  const minDate = new Date(allMs.length ? Math.min(...allMs) : Date.now());
+  const maxDate = new Date(allMs.length ? Math.max(...allMs) : Date.now());
+  minDate.setDate(minDate.getDate() - 21);
+  maxDate.setDate(maxDate.getDate() + 21);
+  const totalDays = Math.max(Math.round((maxDate.getTime() - minDate.getTime()) / 86400000), 60);
+  const totalW    = totalDays * COL_W;
 
-  const [offsets, setOffsets] = useState<Record<string, number>>({});
+  const [offsets,  setOffsets]  = useState<Record<string, number>>({});
   const [dragging, setDragging] = useState<string | null>(null);
 
   const taskBars = tasks.map((t, i) => {
     const dueD = new Date(t.due + 'T12:00:00');
     const len  = t.start_date
       ? Math.max(1, Math.round((dueD.getTime() - new Date(t.start_date + 'T12:00:00').getTime()) / 86400000))
-      : 4 + (i % 5) * 2;
+      : 5 + (i % 6) * 2;
     const ts = t.start_date ? new Date(t.start_date + 'T12:00:00') : new Date(dueD.getTime() - len * 86400000);
     return { t, start: ts, end: dueD, len };
   });
 
-  const xOf    = useCallback((d: Date) => Math.round((d.getTime() - minDate.getTime()) / 86400000) * colW, [minDate, colW]);
-  const todayX = xOf(new Date()) + colW / 2;
+  const xOf    = useCallback((d: Date) => Math.round((d.getTime() - minDate.getTime()) / 86400000) * COL_W, [minDate]);
+  const todayX = xOf(new Date()) + COL_W / 2;
   const dueX   = xOf(new Date(project.due + 'T12:00:00'));
 
-  const weeks: { label: string }[] = [];
+  // Build week headers
+  const weeks: { label: string; day: number }[] = [];
   for (let i = 0; i < totalDays; i += 7) {
     const d = new Date(minDate);
     d.setDate(minDate.getDate() + i);
-    weeks.push({ label: `${d.getDate()} ${MONTHS_ES[d.getMonth()]}` });
+    weeks.push({ label: `${d.getDate()} ${MONTHS_ES[d.getMonth()]}`, day: i });
   }
 
   const statusColor = (s: string) =>
-    s === 'done' ? 'var(--green)' : s === 'block' ? 'var(--red)' : s === 'rev' ? 'var(--amber)' : s === 'curso' ? 'var(--blue)' : 'var(--text-3)';
+    s === 'done' ? '#22C55E' : s === 'block' ? '#EF4444' : s === 'rev' ? '#F59E0B' : s === 'curso' ? '#3B82F6' : '#5A5A60';
 
   const onBarMouseDown = useCallback((e: React.MouseEvent, taskId: string) => {
-    e.stopPropagation();
-    e.preventDefault();
+    e.stopPropagation(); e.preventDefault();
     const startX   = e.clientX;
     const startOff = offsets[taskId] ?? 0;
     setDragging(taskId);
@@ -261,7 +321,7 @@ function ProjectGantt({ project, tasks, openTask }: { project: NonNullable<Retur
     const move = (ev: MouseEvent) => {
       cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
-        const delta = Math.round((ev.clientX - startX) / colW);
+        const delta = Math.round((ev.clientX - startX) / COL_W);
         setOffsets(o => ({ ...o, [taskId]: startOff + delta }));
       });
     };
@@ -273,64 +333,131 @@ function ProjectGantt({ project, tasks, openTask }: { project: NonNullable<Retur
     };
     window.addEventListener('mousemove', move, { passive: true });
     window.addEventListener('mouseup', up);
-  }, [offsets, colW]);
+  }, [offsets]);
+
+  if (tasks.length === 0) {
+    return (
+      <div className="empty" style={{ marginTop: 48 }}>
+        <div className="ill"><GanttChart size={24} /></div>
+        <p className="t">Sin tareas para mostrar</p>
+        <p className="d">Agregá tareas al proyecto para visualizarlas en el Gantt.</p>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ padding: '8px 0 48px' }}>
-      <div style={{ padding: '0 32px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
-        <span className="text-3 f-xs" style={{ marginLeft: 'auto' }}>Vista de semana</span>
-      </div>
-      <div className="gantt-shell">
-        <div className="gantt-left">
-          <div className="gantt-row" style={{ borderBottom: '1px solid var(--border)', background: 'transparent', color: 'var(--text-3)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.05em', fontWeight: 500 }}>
-            Tarea
-          </div>
-          {taskBars.map(({ t }) => (
-            <div key={t.id} className="gantt-row" onClick={() => openTask(t.id)} style={{ cursor: 'pointer' }}>
-              <PriorityPill priority={t.priority} iconOnly />
-              <span style={{ marginLeft: 8, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12.5 }}>{t.title}</span>
-              <Avatar name={getMember(t.assignee)?.name ?? ''} size={20} />
-            </div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      {/* Toolbar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+        <span style={{ fontSize: 12.5, color: 'var(--text-2)' }}>
+          {tasks.length} tareas · Entrega <span style={{ color: 'var(--text-1)', fontWeight: 500 }}>{fmtDate(project.due)}</span>
+        </span>
+        <div style={{ display: 'flex', gap: 12, marginLeft: 'auto', fontSize: 11.5, color: 'var(--text-3)' }}>
+          {(['curso','rev','block','done'] as const).map(s => (
+            <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 8, height: 8, borderRadius: 2, background: statusColor(s) }} />
+              {STATUS_LABELS[s]}
+            </span>
           ))}
         </div>
-        <div className="gantt-right">
-          <div style={{ width: totalW, position: 'relative' }}>
-            <div className="gantt-header">
+      </div>
+
+      {/* Gantt body — fixed left panel + scrollable right */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        {/* Left: task list (fixed) */}
+        <div style={{ width: 320, flexShrink: 0, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflowY: 'hidden' }}>
+          {/* Header */}
+          <div style={{ height: ROW_H, display: 'flex', alignItems: 'center', padding: '0 16px', background: 'var(--surface-1)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)' }}>Tarea</span>
+          </div>
+          {/* Rows */}
+          <div style={{ overflowY: 'auto', flex: 1 }}>
+            {taskBars.map(({ t }) => {
+              const sc = statusColor(t.status);
+              return (
+                <div
+                  key={t.id}
+                  style={{ height: ROW_H, display: 'flex', alignItems: 'center', padding: '0 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer', gap: 10 }}
+                  onClick={() => openTask(t.id)}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-1)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = '')}
+                >
+                  <span style={{ width: 3, height: 24, borderRadius: 2, background: sc, flexShrink: 0 }} />
+                  <PriorityPill priority={t.priority} iconOnly />
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
+                  <Avatar name={getMember(t.assignee)?.name ?? ''} size={22} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Right: scrollable timeline */}
+        <div style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', position: 'relative' }}>
+          <div style={{ width: totalW, position: 'relative', minHeight: '100%' }}>
+            {/* Week headers (sticky) */}
+            <div style={{ position: 'sticky', top: 0, height: ROW_H, display: 'flex', alignItems: 'flex-end', background: 'var(--surface-1)', borderBottom: '1px solid var(--border)', zIndex: 4 }}>
               {weeks.map((w, i) => (
-                <div key={i} className="gantt-tick" style={{ width: 7 * colW }}>{w.label}</div>
+                <div key={i} style={{ width: 7 * COL_W, flexShrink: 0, borderRight: '1px solid var(--border)', padding: '0 10px 8px', fontSize: 11, color: 'var(--text-3)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.04em', height: '100%', display: 'flex', alignItems: 'flex-end' }}>
+                  {w.label}
+                </div>
               ))}
             </div>
-            <div className="gantt-today" style={{ left: todayX, height: 36 + taskBars.length * 36 }}></div>
-            {taskBars.map(({ t, start: ts, len }) => {
+
+            {/* Today marker */}
+            <div style={{ position: 'absolute', left: todayX, top: 0, bottom: 0, width: 2, background: 'var(--teal)', zIndex: 3, pointerEvents: 'none' }}>
+              <span style={{ position: 'absolute', top: ROW_H + 4, left: 4, fontSize: 9, fontWeight: 700, color: 'var(--teal)', fontFamily: 'JetBrains Mono, monospace', letterSpacing: '.05em' }}>HOY</span>
+            </div>
+
+            {/* Alternating week bands */}
+            {weeks.map((w, i) => (
+              i % 2 === 0 ? null :
+              <div key={i} style={{ position: 'absolute', left: w.day * COL_W, top: ROW_H, width: 7 * COL_W, bottom: 0, background: 'rgba(255,255,255,.015)', pointerEvents: 'none' }} />
+            ))}
+
+            {/* Vertical day lines */}
+            {Array.from({ length: Math.ceil(totalDays / 7) }).map((_, i) => (
+              <div key={i} style={{ position: 'absolute', left: i * 7 * COL_W, top: ROW_H, bottom: 0, width: 1, background: 'var(--border)', pointerEvents: 'none' }} />
+            ))}
+
+            {/* Task bars */}
+            {taskBars.map(({ t, start: ts, len }, rowIdx) => {
               const off = offsets[t.id] ?? 0;
-              const x   = xOf(ts) + off * colW;
-              const w   = len * colW;
+              const x   = xOf(ts) + off * COL_W;
+              const w   = Math.max(len * COL_W, COL_W);
+              const sc  = statusColor(t.status);
               return (
-                <div key={t.id} className="gantt-body-row">
+                <div
+                  key={t.id}
+                  style={{ position: 'absolute', top: ROW_H + rowIdx * ROW_H, height: ROW_H, width: totalW, pointerEvents: 'none' }}
+                >
                   <div
                     className={`gantt-bar ${dragging === t.id ? 'dragging' : ''}`}
                     onMouseDown={e => onBarMouseDown(e, t.id)}
-                    onClick={e => { if (dragging === null) openTask(t.id); else e.preventDefault(); }}
-                    style={{ left: x, width: w, background: t.status === 'done' ? statusColor(t.status) : statusColor(t.status) + '40', color: t.status === 'done' ? '#0A0A0B' : 'var(--text-1)', borderLeft: `3px solid ${statusColor(t.status)}` }}
+                    onClick={e => { if (!dragging) openTask(t.id); else e.preventDefault(); }}
+                    style={{
+                      left: x, width: w,
+                      top: 8, height: ROW_H - 16,
+                      borderRadius: 5,
+                      background: t.status === 'done' ? sc : sc + '28',
+                      borderLeft: `4px solid ${sc}`,
+                      color: t.status === 'done' ? '#0A0A0B' : 'var(--text-1)',
+                      fontSize: 12, fontWeight: 500,
+                      pointerEvents: 'all',
+                      boxShadow: dragging === t.id ? `0 4px 16px ${sc}50` : 'none',
+                    }}
                   >
-                    {t.title}
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 10, opacity: 0.7, flexShrink: 0 }}>{fmtDate(t.due)}</span>
                   </div>
                 </div>
               );
             })}
-            {allDates.length > 0 && (
-              <div className="gantt-milestone" style={{ left: dueX - 8, top: 8 + taskBars.length * 36 + 4, color: 'var(--teal)' }}></div>
+
+            {/* Project due milestone */}
+            {allMs.length > 0 && (
+              <div style={{ position: 'absolute', left: dueX - 10, top: ROW_H + taskBars.length * ROW_H + 6, width: 20, height: 20, transform: 'rotate(45deg)', border: '2px solid var(--teal)', background: 'var(--bg)', borderRadius: 2 }} title={`Entrega: ${fmtDate(project.due)}`} />
             )}
-            <svg style={{ position: 'absolute', left: 0, top: 36, pointerEvents: 'none' }} width={totalW} height={taskBars.length * 36}>
-              {taskBars.slice(0, -1).map(({ end: te }, i) => {
-                const x1   = xOf(te);
-                const y1   = i * 36 + 18;
-                const next = taskBars[i + 1];
-                const x2   = xOf(next.start);
-                const y2   = (i + 1) * 36 + 18;
-                return <path key={i} d={`M${x1} ${y1} L${x1 + 6} ${y1} L${x1 + 6} ${y2} L${x2} ${y2}`} stroke="var(--border-hover)" strokeWidth="1" fill="none" />;
-              })}
-            </svg>
           </div>
         </div>
       </div>
@@ -449,12 +576,14 @@ export default function ProjectPage() {
   if (loading) return <div className="page-body" style={{ color: 'var(--text-3)', fontSize: 13 }}>Cargando proyecto...</div>;
   if (!project) return <div className="page-body">Proyecto no encontrado.</div>;
 
+  const isFullHeight = view === 'gantt' || view === 'kanban' || view === 'cal';
+
   return (
-    <div style={{ height: '100%', overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100%', overflow: isFullHeight ? 'hidden' : 'auto', display: 'flex', flexDirection: 'column' }}>
       <ProjectHeader project={project} view={view} setView={setView} />
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, overflow: isFullHeight ? 'hidden' : 'auto' }}>
         {view === 'list'   && <ProjectList   tasks={tasks} openTask={openTask} projectId={id} />}
-        {view === 'kanban' && <ProjectKanban tasks={tasks} openTask={openTask} />}
+        {view === 'kanban' && <ProjectKanban tasks={tasks} openTask={openTask} projectId={id} />}
         {view === 'gantt'  && <ProjectGantt  project={project} tasks={tasks} openTask={openTask} />}
         {view === 'table'  && <ProjectList   tasks={tasks} openTask={openTask} projectId={id} />}
         {view === 'cal'    && <ProjectCalendar tasks={tasks} openTask={openTask} />}

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Home, Sun, Calendar, Inbox, BarChart3, Settings, Folder, CheckSquare, Plus, FolderPlus, MapPin, Sparkles, OctagonAlert, FileBarChart } from 'lucide-react';
+import { Search, Home, Sun, Calendar, Inbox, BarChart3, Settings, Folder, CheckSquare, Plus, FolderPlus, MapPin, Sparkles, OctagonAlert, FileBarChart, ArrowRight } from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { useProjects, useTasks, useAreas } from '@/hooks/useSupabase';
@@ -64,14 +64,26 @@ export function CmdK({ onClose }: CmdKProps) {
       k: m.name.toLowerCase(),
     }));
 
-    const taskItems: CmdItem[] = tasks.map(t => ({
-      kind: 'Tarea',
-      label: t.title,
-      Icon: CheckSquare,
-      sub: t.code + ' · ' + (areas.find(a => a.id === t.area)?.name ?? ''),
-      go: () => { openTask(t.id); onClose(); },
-      k: t.title.toLowerCase(),
-    }));
+    const taskItems: CmdItem[] = tasks.map(t => {
+      const proj = projects.find(p => p.id === t.project);
+      const area = areas.find(a => a.id === t.area);
+      const crumb = [area?.name, proj?.name].filter(Boolean).join(' › ');
+      return {
+        kind: 'Tarea',
+        label: t.title,
+        Icon: CheckSquare,
+        sub: crumb || t.code,
+        go: () => {
+          // Navigate to the project that contains this task, then open the task detail
+          if (proj) {
+            navigate(`/proyecto/${proj.id}`);
+          }
+          openTask(t.id);
+          onClose();
+        },
+        k: (t.title + ' ' + t.code + ' ' + crumb).toLowerCase(),
+      };
+    });
 
     const actions: CmdItem[] = [
       { kind: 'Crear', label: 'Nueva tarea',             Icon: Plus,         go: () => { openNewTask(); onClose(); },    k: 'nueva tarea' },
@@ -131,17 +143,19 @@ export function CmdK({ onClose }: CmdKProps) {
               <div className="cmdk-sec">{sec}</div>
               {items.map((it, i) => {
                 const flatIdx = flat.indexOf(it);
+                const isActive = flatIdx === idx;
                 return (
                   <div
                     key={i}
-                    className={`cmdk-item ${flatIdx === idx ? 'active' : ''}`}
+                    className={`cmdk-item ${isActive ? 'active' : ''}`}
                     onMouseEnter={() => setIdx(flatIdx)}
                     onClick={() => { if (it.go) it.go(); }}
                   >
-                    <it.Icon size={14} color="var(--text-2)" />
-                    <span>{it.label}</span>
-                    {it.sub && <span className="hint">{it.sub}</span>}
-                    {flatIdx === idx && <span className="kbd" style={{ marginLeft: it.sub ? 8 : 'auto' }}>↵</span>}
+                    <it.Icon size={14} color={isActive ? 'var(--teal)' : 'var(--text-3)'} style={{ flexShrink: 0 }} />
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.label}</span>
+                    {it.sub && <span className="hint" style={{ flexShrink: 0, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.sub}</span>}
+                    {isActive && it.go && <ArrowRight size={12} color="var(--teal)" style={{ flexShrink: 0, marginLeft: 4 }} />}
+                    {isActive && <span className="kbd" style={{ flexShrink: 0, marginLeft: 4 }}>↵</span>}
                   </div>
                 );
               })}
