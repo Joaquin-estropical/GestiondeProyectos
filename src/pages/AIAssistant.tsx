@@ -4,6 +4,7 @@ import type { LucideProps } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { Avatar } from '@/components/shared/Avatar';
 import { PageHead } from '@/components/shared/PageHead';
+import { useAppStore } from '@/stores/app';
 
 interface Agent {
   id: string;
@@ -38,10 +39,12 @@ interface Message {
 }
 
 export default function AIAssistant() {
+  const { currentUser } = useAppStore();
+  const firstName = currentUser.name.split(' ')[0];
   const [active, setActive] = useState('sum');
   const [msg, setMsg] = useState('');
   const [msgs, setMsgs] = useState<Message[]>([
-    { who: 'ai', text: 'Buen día Joaquín. Revisé tus 18 tareas abiertas. Tenés 2 vencidas en Outlet Centro y la migración POS necesita atención hoy. ¿Querés que reagende las tareas vencidas?' },
+    { who: 'ai', text: `Buen día ${firstName}. Estoy listo para ayudarte a gestionar proyectos, priorizar tareas y analizar el estado del equipo. ¿En qué puedo ayudarte hoy?` },
     { who: 'me', text: '¿Quién tiene más carga esta semana?' },
     { who: 'ai', text: 'Carlos Rojas tiene 7 tareas abiertas, 2 bloqueadas. Andrea M. tiene 5 y va al día. Recomiendo mover la auditoría de protocolos a Andrea — Carlos sigue en planos eléctricos pendientes del ingeniero externo.' },
   ]);
@@ -97,10 +100,10 @@ export default function AIAssistant() {
                       <Sparkles size={14} />
                     </span>
                   ) : (
-                    <Avatar name="Joaquín Rivera" size={28} />
+                    <Avatar name={currentUser.name} size={28} />
                   )}
                   <div style={{ fontSize: 13.5, lineHeight: 1.6, color: 'var(--text-1)', flex: 1 }}>
-                    <div className="micro mb-4">{m.who === 'ai' ? 'Asistente IA' : 'Joaquín'}</div>
+                    <div className="micro mb-4">{m.who === 'ai' ? 'Asistente IA' : firstName}</div>
                     {m.text}
                   </div>
                 </div>

@@ -10,9 +10,9 @@ export interface AppUser {
 }
 
 export const APP_USERS: AppUser[] = [
-  { id: 'joa', name: 'Joaquín Rivera',  role: 'Director Operaciones', short: 'Joaquín R.', email: 'joaquin@tropical.cl'  },
-  { id: 'and', name: 'Andrea Mendoza',  role: 'Ops Manager',          short: 'Andrea M.',  email: 'andrea@tropical.cl'   },
-  { id: 'car', name: 'Carlos Rojas',    role: 'Maintenance',          short: 'Carlos R.',  email: 'carlos@tropical.cl'   },
+  { id: 'joa', name: 'Joaquin Abastoflor', role: 'Jefe de Proyectos',         short: 'Joaquin A.', email: 'joaquin@tropical.bo'  },
+  { id: 'fab', name: 'Fabio Jimenez',      role: 'Coordinador Administrativo', short: 'Fabio J.',   email: 'fabio@tropical.bo'    },
+  { id: 'mar', name: 'Marcelo Jaldin',     role: 'Director de Finanzas',       short: 'Marcelo J.', email: 'marcelo@tropical.bo'  },
 ]
 
 const KEY = 'ot_current_user'

@@ -3,9 +3,10 @@ import { Link2, MoreHorizontal, X, Play, Pause, Plus, AtSign, Paperclip, ArrowUp
 import { useAppStore } from '@/stores/app';
 import { getMember, getProject, fmtDate, dueColor, STATUS_LABELS } from '@/lib/mock-data';
 import { updateTask, createSubtask, toggleSubtask, createComment } from '@/lib/db';
-import { useSubtasks, useComments } from '@/hooks/useSupabase';
+import { useSubtasks, useComments, useMembers } from '@/hooks/useSupabase';
 import { Avatar } from '@/components/shared/Avatar';
 import { StatusPill, PriorityPill, AreaPill } from '@/components/shared/Badges';
+import { APP_USERS } from '@/lib/auth';
 import type { TaskStatus, TaskPriority } from '@/types';
 
 interface TaskDetailProps {
@@ -28,16 +29,11 @@ const PRIORITY_OPTIONS: { value: TaskPriority; label: string; color: string }[] 
   { value: 'baja', label: 'Baja',    color: 'var(--text-3)' },
 ];
 
-const MEMBERS = [
-  { id: 'joa', name: 'Joaquín Rivera'  },
-  { id: 'and', name: 'Andrea Mendoza'  },
-  { id: 'car', name: 'Carlos Rojas'    },
-  { id: 'sof', name: 'Sofía Vargas'    },
-  { id: 'die', name: 'Diego Aguilera'  },
-];
-
 export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
-  const { tasks, updateTaskStatus } = useAppStore();
+  const { tasks, updateTaskStatus, currentUser } = useAppStore();
+  const { data: membersFromDB = [] } = useMembers();
+  // Merge DB members with APP_USERS so app users always appear even if not in members table
+  const allMembers = membersFromDB.length > 0 ? membersFromDB : APP_USERS.map(u => ({ id: u.id, name: u.name, role: u.role, short: u.short }));
   const t = tasks.find(x => x.id === taskId);
 
   // time tracker
@@ -125,7 +121,7 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
   const handleSendComment = async () => {
     if (!comment.trim()) return;
     setSending(true);
-    await createComment(t.id, 'joa', comment.trim());
+    await createComment(t.id, currentUser.id, comment.trim());
     setComment('');
     reloadComments();
     setSending(false);
@@ -234,7 +230,7 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
               </div>
               {editAssignee && (
                 <div className="dropdown" style={{ top: 28, left: 0, minWidth: 180, zIndex: 100 }}>
-                  {MEMBERS.map(mb => (
+                  {allMembers.map(mb => (
                     <div key={mb.id} className="dd-item" onClick={() => handleAssigneeChange(mb.id)}>
                       <Avatar name={mb.name} size={18} />
                       {mb.name}
@@ -400,7 +396,7 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
 
           {/* Input comentario */}
           <div className="row gap-8 mt-16">
-            <Avatar name="Joaquín Rivera" size={26} />
+            <Avatar name={currentUser.name} size={26} />
             <div className="input" style={{ flex: 1, height: 'auto', padding: '8px 12px' }}>
               <input
                 type="text"
@@ -425,7 +421,7 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
           <div className="micro mt-24 mb-8">Actividad</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12, color: 'var(--text-2)' }}>
             <div>
-              <span style={{ color: 'var(--text-1)' }}>Joaquín</span> cambió estado a{' '}
+              <span style={{ color: 'var(--text-1)' }}>{currentUser.name.split(' ')[0]}</span> cambió estado a{' '}
               <span className="fw-5" style={{ color: 'var(--text-1)' }}>{STATUS_LABELS[t.status]}</span>
               {' · '}<span className="mono">hace 3h</span>
             </div>

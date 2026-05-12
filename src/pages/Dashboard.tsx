@@ -102,7 +102,7 @@ function activityIcon(k: string) {
 // ── Main ──────────────────────────────────────────────
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { openTask, openNewTask } = useAppStore();
+  const { openTask, openNewTask, currentUser } = useAppStore();
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
 
   const { data: areas    = [] } = useAreas();
@@ -116,7 +116,8 @@ export default function Dashboard() {
   const doneCount = tasks.filter(t => t.status === 'done').length;
   const todayCount = tasks.filter(t => t.status !== 'done' && daysFromToday(t.due) === 0).length;
 
-  const myTasks  = tasks.filter(t => t.assignee === 'joa' && t.status !== 'done').slice(0, 5);
+  const myTasks  = tasks.filter(t => t.assignee === currentUser.id && t.status !== 'done').slice(0, 5);
+  const firstName = currentUser.name.split(' ')[0];
 
   const filtered  = applyFilters(tasks, filters);
   const hasFilter = Object.values(filters).some(v => v !== '');
@@ -136,7 +137,7 @@ export default function Dashboard() {
   return (
     <>
       <PageHead
-        title="Hola, Joaquín"
+        title={`Hola, ${firstName}`}
         subtitle={`${areas.length} áreas activas · ${tasks.filter(t => t.status !== 'done').length} tareas abiertas`}
         right={
           <div className="row gap-8">

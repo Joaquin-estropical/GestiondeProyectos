@@ -1,7 +1,7 @@
 import { useState, useReducer, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { List, Kanban, GanttChart, Calendar, Table, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, ChevronLeft, ChevronRight, Maximize2, Minimize2, X } from 'lucide-react';
-import { useProjects, useTasks } from '@/hooks/useSupabase';
+import { useProjects, useTasks, useMembers } from '@/hooks/useSupabase';
 import { getMember, STATUS_ORDER, STATUS_LABELS, MONTHS_ES, fmtDate, dueColor } from '@/lib/mock-data';
 import { useAppStore } from '@/stores/app';
 import { Avatar } from '@/components/shared/Avatar';
@@ -9,8 +9,10 @@ import { StatusPill, PriorityPill, AreaPill } from '@/components/shared/Badges';
 import type { Task, TaskStatus } from '@/types';
 
 // ─── Project Header ───
-function ProjectHeader({ project, view, setView }: { project: NonNullable<ReturnType<typeof useProjects>['data']>[0]; view: string; setView: (v: string) => void }) {
-  const teamIds = ['joa', 'and', 'car', 'sof'];
+function ProjectHeader({ project, tasks, view, setView }: { project: NonNullable<ReturnType<typeof useProjects>['data']>[0]; tasks: Task[]; view: string; setView: (v: string) => void }) {
+  const { data: members = [] } = useMembers();
+  // Show avatars of members actually assigned to tasks in this project
+  const assigneeIds = [...new Set(tasks.map(t => t.assignee))].slice(0, 5);
   const views = [
     { id: 'list',   label: 'Lista',      Icon: List },
     { id: 'kanban', label: 'Kanban',     Icon: Kanban },
@@ -25,7 +27,10 @@ function ProjectHeader({ project, view, setView }: { project: NonNullable<Return
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-.005em' }}>{project.name}</h1>
         <span className="pill pill-status-curso" style={{ marginLeft: 4 }}><span className="dot"></span>En curso</span>
         <span style={{ marginLeft: 'auto' }} className="avatar-stack avatar-stack-bordered">
-          {teamIds.map(id => <Avatar key={id} name={getMember(id)?.name ?? ''} size={26} />)}
+          {assigneeIds.map(id => {
+              const m = members.find(x => x.id === id) ?? getMember(id);
+              return <Avatar key={id} name={m?.name ?? id} size={26} />;
+            })}
         </span>
         <button className="btn btn-secondary btn-sm"><UserPlus size={14} /></button>
         <button className="btn btn-secondary btn-sm"><MoreHorizontal size={14} /></button>
@@ -603,7 +608,7 @@ export default function ProjectPage() {
 
   return (
     <div style={{ height: '100%', overflow: isFullHeight ? 'hidden' : 'auto', display: 'flex', flexDirection: 'column' }}>
-      <ProjectHeader project={project} view={view} setView={setView} />
+      <ProjectHeader project={project} tasks={tasks} view={view} setView={setView} />
       <div style={{ flex: 1, overflow: isFullHeight ? 'hidden' : 'auto' }}>
         {view === 'list'   && <ProjectList   tasks={tasks} openTask={openTask} projectId={id} />}
         {view === 'kanban' && <ProjectKanban tasks={tasks} openTask={openTask} projectId={id} />}

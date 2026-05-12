@@ -699,7 +699,7 @@ function MembersTab() {
               <div className="fw-5" style={{ fontSize: 13 }}>{m.name}</div>
               <div className="f-xs text-2">{m.role}</div>
             </div>
-            <span className="pill" style={{ fontSize: 11 }}>{m.id === 'joa' ? 'Admin' : 'Miembro'}</span>
+            <span className="pill" style={{ fontSize: 11 }}>{m.role}</span>
             <button className="btn btn-ghost btn-sm btn-icon"><MoreHorizontal size={13} /></button>
           </div>
         ))}

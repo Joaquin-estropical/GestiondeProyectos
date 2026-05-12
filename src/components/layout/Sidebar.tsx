@@ -221,19 +221,35 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
             </div>
           </div>
         )}
-        <div className="sb-foot" style={{ cursor: collapsed ? 'default' : 'pointer' }} onClick={() => !collapsed && setShowUserMenu(v => !v)}>
-          <Avatar name={currentUser.name} size={28} />
-          {!collapsed && (
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {currentUser.name}
+        <div className="sb-foot">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, cursor: collapsed ? 'default' : 'pointer' }} onClick={() => !collapsed && setShowUserMenu(v => !v)}>
+            <Avatar name={currentUser.name} size={28} />
+            {!collapsed && (
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {currentUser.name}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{currentUser.role}</div>
               </div>
-              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{currentUser.role}</div>
-            </div>
-          )}
-          {!collapsed && (
-            <ChevronUp size={13} style={{ color: 'var(--text-3)', flexShrink: 0, transform: showUserMenu ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform .15s' }} />
-          )}
+            )}
+            {!collapsed && (
+              <ChevronUp size={13} style={{ color: 'var(--text-3)', flexShrink: 0, transform: showUserMenu ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform .15s' }} />
+            )}
+          </div>
+          <button
+            onClick={logout}
+            title="Cerrar sesión"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 28, height: 28, borderRadius: 6, border: 'none', cursor: 'pointer',
+              background: 'transparent', color: 'var(--text-3)', flexShrink: 0,
+              transition: 'background .12s, color .12s',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; (e.currentTarget as HTMLElement).style.color = 'var(--red)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--text-3)'; }}
+          >
+            <LogOut size={14} />
+          </button>
         </div>
       </div>
     </aside>

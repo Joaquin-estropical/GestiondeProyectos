@@ -11,11 +11,9 @@ export const AREAS: Area[] = [
 ]
 
 export const TEAM: Member[] = [
-  { id: 'joa', name: 'Joaquín Rivera',  role: 'Director ops',   short: 'Joaquín R.' },
-  { id: 'and', name: 'Andrea Mendoza',  role: 'Ops manager',    short: 'Andrea M.'  },
-  { id: 'car', name: 'Carlos Rojas',    role: 'Maintenance',    short: 'Carlos R.'  },
-  { id: 'sof', name: 'Sofía Vargas',    role: 'Visual merch',   short: 'Sofía V.'   },
-  { id: 'die', name: 'Diego Soto',      role: 'Inventory lead', short: 'Diego S.'   },
+  { id: 'joa', name: 'Joaquin Abastoflor', role: 'Jefe de Proyectos',          short: 'Joaquin A.' },
+  { id: 'fab', name: 'Fabio Jimenez',      role: 'Coordinador Administrativo', short: 'Fabio J.'   },
+  { id: 'mar', name: 'Marcelo Jaldin',     role: 'Director de Finanzas',        short: 'Marcelo J.' },
 ]
 
 export const PROJECTS: Project[] = [

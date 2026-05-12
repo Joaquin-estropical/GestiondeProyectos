@@ -67,7 +67,7 @@ export async function fetchProjects(areaId?: string): Promise<Project[]> {
 }
 
 export async function createProject(input: {
-  name: string; area: string; due: string; templateId?: string
+  name: string; area: string; due: string; templateId?: string; assignee?: string
 }): Promise<Project> {
   const id = 'p-' + Date.now().toString(36)
   const { data, error } = await supabase
@@ -97,7 +97,7 @@ export async function createProject(input: {
           title:    tt.title,
           project:  project.id,
           area:     input.area,
-          assignee: 'joa',
+          assignee: input.assignee ?? 'joa',
           due:      due.toISOString().split('T')[0],
           priority: tt.priority,
           status:   'pend' as TaskStatus,
