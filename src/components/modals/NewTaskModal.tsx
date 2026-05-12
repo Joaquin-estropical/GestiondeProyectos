@@ -3,7 +3,7 @@ import { X, Calendar, Flag } from 'lucide-react'
 import { useAppStore } from '@/stores/app'
 import { createTask } from '@/lib/db'
 import { useMembers } from '@/hooks/useSupabase'
-import { APP_USERS } from '@/lib/auth'
+import { APP_USERS, APP_USER_IDS, sortedMembers } from '@/lib/auth'
 import type { TaskPriority } from '@/types'
 
 const PRIORITIES: { value: TaskPriority; label: string; color: string }[] = [
@@ -16,9 +16,10 @@ const PRIORITIES: { value: TaskPriority; label: string; color: string }[] = [
 export function NewTaskModal() {
   const { newTaskOpen, newTaskProjectId, newTaskDate, closeNewTask, areas, projects, addTask, refreshAll, currentUser } = useAppStore()
   const { data: members = [] } = useMembers()
-  const memberList = members.length > 0
+  const rawList = members.length > 0
     ? members
     : APP_USERS.map(u => ({ id: u.id, name: u.name, role: u.role, short: u.short }))
+  const memberList = sortedMembers(rawList)
 
   const [title,     setTitle]     = useState('')
   const [areaId,    setAreaId]    = useState('')
@@ -190,7 +191,17 @@ export function NewTaskModal() {
                   onChange={e => setAssignee(e.target.value)}
                   style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 12px', height: 36, color: 'var(--text-1)', fontSize: 13, cursor: 'pointer' }}
                 >
-                  {memberList.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  {memberList.map((m, i) => {
+                    const isApp     = APP_USER_IDS.has(m.id)
+                    const prevIsApp = i > 0 && APP_USER_IDS.has(memberList[i - 1].id)
+                    const showSep   = !isApp && (i === 0 || prevIsApp)
+                    return (
+                      <>
+                        {showSep && <option disabled>──────────────</option>}
+                        <option key={m.id} value={m.id}>{isApp ? `★ ${m.name}` : m.name}</option>
+                      </>
+                    )
+                  })}
                 </select>
               </div>
             </div>
@@ -203,9 +214,17 @@ export function NewTaskModal() {
                   style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 12px', height: 36, color: helper ? 'var(--text-1)' : 'var(--text-3)', fontSize: 13, cursor: 'pointer' }}
                 >
                   <option value="">Sin auxiliar</option>
-                  {memberList.filter(m => m.id !== assignee).map(m => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
-                  ))}
+                  {memberList.filter(m => m.id !== assignee).map((m, i, arr) => {
+                    const isApp     = APP_USER_IDS.has(m.id)
+                    const prevIsApp = i > 0 && APP_USER_IDS.has(arr[i - 1].id)
+                    const showSep   = !isApp && (i === 0 || prevIsApp)
+                    return (
+                      <>
+                        {showSep && <option disabled>──────────────</option>}
+                        <option key={m.id} value={m.id}>{isApp ? `★ ${m.name}` : m.name}</option>
+                      </>
+                    )
+                  })}
                 </select>
               </div>
             </div>

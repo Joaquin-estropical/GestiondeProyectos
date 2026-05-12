@@ -15,6 +15,19 @@ export const APP_USERS: AppUser[] = [
   { id: 'mar', name: 'Marcelo Jaldin',     role: 'Director de Finanzas',       short: 'Marcelo J.', email: 'marcelo@tropical.bo'  },
 ]
 
+// IDs of app login users — they appear first and highlighted in member lists
+export const APP_USER_IDS = new Set(APP_USERS.map(u => u.id))
+
+// Sort a member list so app users come first, then alphabetically
+export function sortedMembers<T extends { id: string; name: string }>(members: T[]): T[] {
+  return [...members].sort((a, b) => {
+    const aApp = APP_USER_IDS.has(a.id)
+    const bApp = APP_USER_IDS.has(b.id)
+    if (aApp !== bApp) return aApp ? -1 : 1
+    return a.name.localeCompare(b.name, 'es')
+  })
+}
+
 const KEY = 'ot_current_user'
 
 export function getCurrentUser(): AppUser {

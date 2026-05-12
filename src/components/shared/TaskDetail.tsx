@@ -6,7 +6,7 @@ import { updateTask, createSubtask, toggleSubtask, createComment } from '@/lib/d
 import { useSubtasks, useComments, useMembers } from '@/hooks/useSupabase';
 import { Avatar } from '@/components/shared/Avatar';
 import { StatusPill, PriorityPill, AreaPill } from '@/components/shared/Badges';
-import { APP_USERS } from '@/lib/auth';
+import { APP_USERS, APP_USER_IDS, sortedMembers } from '@/lib/auth';
 import type { TaskStatus, TaskPriority } from '@/types';
 
 interface TaskDetailProps {
@@ -33,7 +33,7 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
   const { tasks, projects, updateTaskStatus, currentUser } = useAppStore();
   const { data: membersFromDB = [] } = useMembers();
   // Merge DB members with APP_USERS so app users always appear even if not in members table
-  const allMembers = membersFromDB.length > 0 ? membersFromDB : APP_USERS.map(u => ({ id: u.id, name: u.name, role: u.role, short: u.short }));
+  const allMembers = sortedMembers(membersFromDB.length > 0 ? membersFromDB : APP_USERS.map(u => ({ id: u.id, name: u.name, role: u.role, short: u.short })));
   const t = tasks.find(x => x.id === taskId);
 
   // time tracker
@@ -234,14 +234,22 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
                 <Pencil size={10} color="var(--text-3)" />
               </div>
               {editAssignee && (
-                <div className="dropdown" style={{ top: 28, left: 0, minWidth: 180, zIndex: 100 }}>
-                  {allMembers.map(mb => (
-                    <div key={mb.id} className="dd-item" onClick={() => handleAssigneeChange(mb.id)}>
-                      <Avatar name={mb.name} size={18} />
-                      {mb.name}
-                      {mb.id === t.assignee && <Check size={11} color="var(--teal)" style={{ marginLeft: 'auto' }} />}
-                    </div>
-                  ))}
+                <div className="dropdown" style={{ top: 28, left: 0, minWidth: 200, zIndex: 100 }}>
+                  {allMembers.map((mb, i) => {
+                    const isApp     = APP_USER_IDS.has(mb.id)
+                    const prevIsApp = i > 0 && APP_USER_IDS.has(allMembers[i - 1].id)
+                    const showSep   = !isApp && (i === 0 || prevIsApp)
+                    return (
+                      <>
+                        {showSep && <div key={`sep-${i}`} style={{ height: 1, background: 'var(--border)', margin: '3px 8px' }} />}
+                        <div key={mb.id} className="dd-item" onClick={() => handleAssigneeChange(mb.id)}>
+                          <Avatar name={mb.name} size={18} />
+                          <span style={{ fontWeight: isApp ? 600 : 400 }}>{mb.name}</span>
+                          {mb.id === t.assignee && <Check size={11} color="var(--teal)" style={{ marginLeft: 'auto' }} />}
+                        </div>
+                      </>
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -261,18 +269,26 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
                 <Pencil size={10} color="var(--text-3)" />
               </div>
               {editHelper && (
-                <div className="dropdown" style={{ top: 28, left: 0, minWidth: 180, zIndex: 100 }}>
+                <div className="dropdown" style={{ top: 28, left: 0, minWidth: 200, zIndex: 100 }}>
                   <div className="dd-item" onClick={() => handleHelperChange(null)}>
                     <span style={{ fontSize: 12, color: 'var(--text-3)' }}>— Sin auxiliar</span>
                     {!t.helper && <Check size={11} color="var(--teal)" style={{ marginLeft: 'auto' }} />}
                   </div>
-                  {allMembers.filter(mb => mb.id !== t.assignee).map(mb => (
-                    <div key={mb.id} className="dd-item" onClick={() => handleHelperChange(mb.id)}>
-                      <Avatar name={mb.name} size={18} />
-                      {mb.name}
-                      {mb.id === t.helper && <Check size={11} color="var(--teal)" style={{ marginLeft: 'auto' }} />}
-                    </div>
-                  ))}
+                  {allMembers.filter(mb => mb.id !== t.assignee).map((mb, i, arr) => {
+                    const isApp     = APP_USER_IDS.has(mb.id)
+                    const prevIsApp = i > 0 && APP_USER_IDS.has(arr[i - 1].id)
+                    const showSep   = !isApp && (i === 0 || prevIsApp)
+                    return (
+                      <>
+                        {showSep && <div key={`sep-${i}`} style={{ height: 1, background: 'var(--border)', margin: '3px 8px' }} />}
+                        <div key={mb.id} className="dd-item" onClick={() => handleHelperChange(mb.id)}>
+                          <Avatar name={mb.name} size={18} />
+                          <span style={{ fontWeight: isApp ? 600 : 400 }}>{mb.name}</span>
+                          {mb.id === t.helper && <Check size={11} color="var(--teal)" style={{ marginLeft: 'auto' }} />}
+                        </div>
+                      </>
+                    )
+                  })}
                 </div>
               )}
             </div>

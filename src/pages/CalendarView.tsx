@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Plus, GanttChart } from 'lucide-react';
 import { DAYS_ES } from '@/lib/mock-data';
 import { useAreas, useTasks, useMembers, useProjects } from '@/hooks/useSupabase';
+import { APP_USER_IDS, sortedMembers } from '@/lib/auth';
 import { Avatar } from '@/components/shared/Avatar';
 import { StatusPill, AreaPill } from '@/components/shared/Badges';
 import { PageHead } from '@/components/shared/PageHead';
@@ -451,10 +452,11 @@ export default function CalendarView() {
   const [sel,         setSel]         = useState(todayIso);
   const [ganttGroup,  setGanttGroup]  = useState<GanttGroup>('project');
 
-  const { data: areas    = [] } = useAreas();
-  const { data: tasks    = [] } = useTasks();
-  const { data: members  = [] } = useMembers();
-  const { data: projects = [] } = useProjects();
+  const { data: areas       = [] } = useAreas();
+  const { data: tasks       = [] } = useTasks();
+  const { data: rawMembers  = [] } = useMembers();
+  const { data: projects    = [] } = useProjects();
+  const members = sortedMembers(rawMembers);
 
   const [filtAreas,    setFiltAreas]    = useState<string[] | null>(null);
   const [filtPeople,   setFiltPeople]   = useState<string[] | null>(null);
@@ -628,21 +630,27 @@ export default function CalendarView() {
                 </button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {members.map(m => {
-                  const on = activePeople.includes(m.id);
+                {members.map((m, i) => {
+                  const on        = activePeople.includes(m.id);
+                  const isApp     = APP_USER_IDS.has(m.id);
+                  const prevIsApp = i > 0 && APP_USER_IDS.has(members[i - 1].id);
+                  const showSep   = !isApp && (i === 0 || prevIsApp);
                   return (
-                    <button key={m.id} onClick={() => togglePerson(m.id)} style={{
-                      display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 6,
-                      cursor: 'pointer', border: 'none',
-                      background: on ? 'var(--teal-bg)' : 'transparent',
-                      outline: on ? '1px solid rgba(20,184,166,.3)' : '1px solid transparent',
-                    }}>
-                      <Avatar name={m.name} size={22} style={{ opacity: on ? 1 : 0.4 }} />
-                      <span style={{ flex: 1, fontSize: 12.5, fontWeight: 500, color: on ? 'var(--text-1)' : 'var(--text-3)', textAlign: 'left' }}>
-                        {m.name.split(' ')[0]} {m.name.split(' ')[1]?.[0]}.
-                      </span>
-                      {on && <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--teal)', flexShrink: 0 }} />}
-                    </button>
+                    <>
+                      {showSep && <div key={`sep-${i}`} style={{ height: 1, background: 'var(--border)', margin: '2px 0' }} />}
+                      <button key={m.id} onClick={() => togglePerson(m.id)} style={{
+                        display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 6,
+                        cursor: 'pointer', border: 'none',
+                        background: on ? 'var(--teal-bg)' : 'transparent',
+                        outline: on ? '1px solid rgba(20,184,166,.3)' : '1px solid transparent',
+                      }}>
+                        <Avatar name={m.name} size={22} style={{ opacity: on ? 1 : 0.4 }} />
+                        <span style={{ flex: 1, fontSize: 12.5, fontWeight: isApp ? 600 : 400, color: on ? 'var(--text-1)' : 'var(--text-3)', textAlign: 'left' }}>
+                          {m.name.split(' ')[0]} {m.name.split(' ')[1]?.[0]}.
+                        </span>
+                        {on && <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--teal)', flexShrink: 0 }} />}
+                      </button>
+                    </>
                   );
                 })}
                 {members.length === 0 && <div style={{ color: 'var(--text-3)', fontSize: 12, padding: '6px 0' }}>Sin miembros</div>}
