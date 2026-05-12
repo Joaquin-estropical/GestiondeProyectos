@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Plus, UserPlus, MoreHorizontal, Pencil, Trash2, Flag, GripVertical, X, Check, ChevronRight, ChevronDown, Layers } from 'lucide-react';
-import { TEAM } from '@/lib/mock-data';
-import { useTemplates, useTemplateTasks } from '@/hooks/useSupabase';
+import { useTemplates, useTemplateTasks, useMembers } from '@/hooks/useSupabase';
 import { deleteArea, deleteTemplate, createTemplate, createTemplateTask, deleteTemplateTask } from '@/lib/db';
 import { useAppStore } from '@/stores/app';
 import { Avatar } from '@/components/shared/Avatar';
@@ -682,18 +681,19 @@ function TemplatesTab() {
 
 // ── Tab: Miembros ────────────────────────────────────────
 function MembersTab() {
+  const { data: members = [] } = useMembers()
   return (
     <>
       <div className="row between items-center mb-16">
         <div>
           <div className="fw-6">Miembros del workspace</div>
-          <div className="f-xs text-2 mt-4">Gestioná quién tiene acceso y qué puede hacer.</div>
+          <div className="f-xs text-2 mt-4">Responsables disponibles para asignar tareas.</div>
         </div>
         <button className="btn btn-primary btn-sm"><UserPlus size={14} /> Invitar</button>
       </div>
       <div className="card">
-        {TEAM.map((m, i) => (
-          <div key={m.id} style={{ padding: '12px 18px', borderBottom: i < TEAM.length - 1 ? '1px solid var(--border)' : '', display: 'flex', alignItems: 'center', gap: 12 }}>
+        {members.map((m, i) => (
+          <div key={m.id} style={{ padding: '12px 18px', borderBottom: i < members.length - 1 ? '1px solid var(--border)' : '', display: 'flex', alignItems: 'center', gap: 12 }}>
             <Avatar name={m.name} size={32} />
             <div style={{ flex: 1 }}>
               <div className="fw-5" style={{ fontSize: 13 }}>{m.name}</div>
