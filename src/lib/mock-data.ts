@@ -1,6 +1,6 @@
 import type { Area, Member, Project, Task, ActivityItem, InboxItem } from '@/types'
 
-export const TODAY = '2026-03-10'
+export const TODAY = new Date().toISOString().slice(0, 10)
 
 export const AREAS: Area[] = [
   { id: 'outlet', name: 'Outlet Centro',        color: '#14B8A6', icon: 'store',     slug: 'outlet-centro',  type: 'outlet',   description: null },
@@ -52,12 +52,12 @@ export const TASKS: Task[] = [
 ]
 
 export const ACTIVITY: ActivityItem[] = [
-  { who: 'and', action: 'completó',                   target: 'Capacitar personal nuevo turno tarde',        when: 'hace 12 min', kind: 'done'    },
-  { who: 'die', action: 'comentó en',                 target: 'Migración datos POS sucursal norte',          when: 'hace 38 min', kind: 'comment' },
-  { who: 'car', action: 'cambió estado a Bloqueado en', target: 'Solicitar planos eléctricos al ingeniero',  when: 'hace 1 h',    kind: 'block'   },
-  { who: 'sof', action: 'asignó a Andrea Mendoza en', target: 'Negociar contrato pintura interiores',        when: 'hace 2 h',    kind: 'assign'  },
-  { who: 'joa', action: 'creó',                       target: 'Definir KPIs apertura sucursal',              when: 'hace 3 h',    kind: 'create'  },
-  { who: 'and', action: 'movió a En revisión',        target: 'Revisar layout góndolas zona este',           when: 'hace 4 h',    kind: 'move'    },
+  { who: 'joa', action: 'creó',                          target: 'Primera tarea del sistema',    when: 'hace 12 min', kind: 'create'  },
+  { who: 'fab', action: 'actualizó el estado en',        target: 'Revisión de inventario Q2',    when: 'hace 38 min', kind: 'comment' },
+  { who: 'mar', action: 'cambió estado a Bloqueado en',  target: 'Auditoría de presupuesto',     when: 'hace 1 h',    kind: 'block'   },
+  { who: 'joa', action: 'completó',                      target: 'Reunión de kick-off',          when: 'hace 2 h',    kind: 'done'    },
+  { who: 'fab', action: 'creó',                          target: 'Plan de expansión Outlets',    when: 'hace 3 h',    kind: 'create'  },
+  { who: 'mar', action: 'movió a En revisión',           target: 'Informe mensual de finanzas',  when: 'hace 4 h',    kind: 'move'    },
 ]
 
 export const INBOX_ITEMS: InboxItem[] = [
@@ -104,7 +104,9 @@ export function initials(name: string): string {
 export function fmtDate(iso: string): string {
   if (!iso) return '—'
   const d = new Date(iso + 'T12:00:00')
-  return d.getDate() + ' ' + MONTHS_ES[d.getMonth()]
+  const year = d.getFullYear()
+  const thisYear = new Date().getFullYear()
+  return d.getDate() + ' ' + MONTHS_ES[d.getMonth()] + (year !== thisYear ? ' ' + year : '')
 }
 
 export function daysFromToday(iso: string): number {

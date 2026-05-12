@@ -271,9 +271,10 @@ export default function Dashboard() {
               </div>
               <div style={{ padding: '8px 18px 12px' }}>
                 {tasks.length === 0 ? (
-                  <div style={{ padding: '20px 0', color: 'var(--text-3)', fontSize: 13 }}>Sin actividad todavía.</div>
+                  <div style={{ padding: '20px 0', color: 'var(--text-3)', fontSize: 13 }}>Sin actividad todavía. Empezá creando tareas.</div>
                 ) : ACTIVITY.map((a, i) => {
-                  const m = getMember(a.who)!;
+                  const m = getMember(a.who) ?? members.find(x => x.id === a.who);
+                  if (!m) return null;
                   return (
                     <div
                       key={i}
@@ -281,7 +282,7 @@ export default function Dashboard() {
                     >
                       <Avatar name={m.name} size={22} />
                       <div style={{ flex: 1, fontSize: 12.5, lineHeight: 1.5 }}>
-                        <span className="fw-5">{m.short}</span> <span className="text-2">{a.action}</span> <span className="fw-5">{a.target}</span>
+                        <span className="fw-5">{m.short ?? m.name.split(' ')[0]}</span> <span className="text-2">{a.action}</span> <span className="fw-5">{a.target}</span>
                         <div className="mono" style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{a.when}</div>
                       </div>
                       <span style={{ marginTop: 2 }}>{activityIcon(a.kind)}</span>

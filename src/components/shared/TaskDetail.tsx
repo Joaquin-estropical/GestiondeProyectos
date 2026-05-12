@@ -30,7 +30,7 @@ const PRIORITY_OPTIONS: { value: TaskPriority; label: string; color: string }[] 
 ];
 
 export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
-  const { tasks, updateTaskStatus, currentUser } = useAppStore();
+  const { tasks, projects, updateTaskStatus, currentUser } = useAppStore();
   const { data: membersFromDB = [] } = useMembers();
   // Merge DB members with APP_USERS so app users always appear even if not in members table
   const allMembers = membersFromDB.length > 0 ? membersFromDB : APP_USERS.map(u => ({ id: u.id, name: u.name, role: u.role, short: u.short }));
@@ -71,8 +71,8 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
 
   if (!t) return null;
 
-  const m = getMember(t.assignee);
-  const p = getProject(t.project);
+  const m = allMembers.find(x => x.id === t.assignee) ?? getMember(t.assignee);
+  const p = projects.find(x => x.id === t.project) ?? getProject(t.project);
   const fmtSec = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -211,8 +211,7 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
 
             <AreaPill areaId={t.area} mini />
             <span className="micro" style={{ marginLeft: 'auto' }}>
-              {fmtDate(t.due)} 2026
-            </span>
+              {fmtDate(t.due)}            </span>
           </div>
         </div>
 
@@ -375,7 +374,7 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
           <div className="micro mt-24 mb-8">Comentarios</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {comments.map(c => {
-              const author = getMember(c.author);
+              const author = allMembers.find(x => x.id === c.author) ?? getMember(c.author);
               return (
                 <div key={c.id} style={{ display: 'flex', gap: 10 }}>
                   <Avatar name={author?.name ?? c.author} size={26} />

@@ -548,3 +548,12 @@ kbd, .kbd { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; backgro
 .dropdown { position: absolute; background: var(--surface-2); border: 1px solid var(--border-hover); border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.5); padding: 4px; display: flex; flex-direction: column; gap: 2px; }
 .dd-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 4px; font-size: 13px; color: var(--text-1); cursor: pointer; white-space: nowrap; }
 .dd-item:hover { background: var(--surface-1); }
+
+/* ════════════ Collapsed sidebar item ════════════ */
+.sb-item-collapsed { gap: 0; }
+.sb-item-collapsed:hover { background: var(--surface-1); }
+.sb-item-collapsed.active::before { display: none; }
+.app-shell.collapsed .sb-item.active {
+  background: var(--teal-bg);
+  outline: 1px solid rgba(20,184,166,.25);
+}

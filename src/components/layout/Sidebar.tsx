@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Home, Sun, Sparkles, Calendar, BarChart3, Settings,
   ChevronDown, ChevronRight, Plus, PanelLeftClose, PanelLeftOpen,
-  CheckSquare, LayoutTemplate, LogOut, ChevronUp,
+  LayoutTemplate, LogOut, ChevronUp,
 } from 'lucide-react'
 import { useAppStore } from '@/stores/app'
 import { Avatar } from '@/components/shared/Avatar'
@@ -26,7 +26,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const navigate    = useNavigate()
   const location    = useLocation()
   const { areas, projects, openNewArea, openNewProject, currentUser, setCurrentUser } = useAppStore()
-  const [expanded, setExpanded]       = useState<Record<string, boolean>>({})
+  const [expanded, setExpanded]         = useState<Record<string, boolean>>({})
   const [showUserMenu, setShowUserMenu] = useState(false)
 
   const isActive = (path: string) =>
@@ -50,11 +50,14 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
     window.location.reload()
   }
 
+  // Collapsed icon size — bigger so they're readable
+  const icoSize = collapsed ? 18 : 14
+
   return (
     <aside className={`app-sidebar${collapsed ? ' collapsed' : ''}`}>
-      {/* Brand */}
-      <div className="sb-head">
-        <span className="ot-logo">OT</span>
+      {/* Brand / header */}
+      <div className="sb-head" style={collapsed ? { justifyContent: 'center', padding: '14px 0 12px' } : {}}>
+        <span className="ot-logo" style={collapsed ? { width: 32, height: 32, borderRadius: 8, fontSize: 12 } : {}}>OT</span>
         {!collapsed && <span className="ot-name">Operaciones Tropical</span>}
         <button
           className="btn btn-ghost btn-sm btn-icon"
@@ -69,19 +72,22 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
       {/* Scroll area */}
       <div className="sb-scroll">
         {!collapsed && <div className="sb-section">Workspace</div>}
+        {collapsed && <div style={{ height: 10 }} />}
 
         {WS_ITEMS.map((it) => (
           <div
             key={it.id}
-            className={`sb-item${isActive(it.path) ? ' active' : ''}`}
+            className={`sb-item${isActive(it.path) ? ' active' : ''}${collapsed ? ' sb-item-collapsed' : ''}`}
             onClick={() => navigate(it.path)}
-            title={collapsed ? it.label : ''}
+            title={it.label}
+            style={collapsed ? { justifyContent: 'center', padding: '9px 0', margin: '2px 6px' } : {}}
           >
-            <it.Icon size={14} />
+            <it.Icon size={icoSize} style={{ flexShrink: 0 }} />
             {!collapsed && <span>{it.label}</span>}
           </div>
         ))}
 
+        {collapsed && <div style={{ height: 6, borderTop: '1px solid var(--border)', margin: '6px 8px' }} />}
         {!collapsed && <div className="sb-section">Áreas</div>}
 
         {areas.map((a) => {
@@ -92,9 +98,11 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
           return (
             <div key={a.id}>
               <div
-                className={`sb-item${isActive(areaPath) ? ' active' : ''}`}
-                style={{ paddingRight: 4 }}
-                title={collapsed ? a.name : ''}
+                className={`sb-item${isActive(areaPath) ? ' active' : ''}${collapsed ? ' sb-item-collapsed' : ''}`}
+                style={collapsed
+                  ? { justifyContent: 'center', padding: '9px 0', margin: '2px 6px' }
+                  : { paddingRight: 4 }}
+                title={a.name}
               >
                 {!collapsed && (
                   <span
@@ -108,7 +116,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                 )}
                 <span
                   className="sb-area-dot"
-                  style={{ background: a.color }}
+                  style={{ background: a.color, width: collapsed ? 10 : 8, height: collapsed ? 10 : 8, borderRadius: collapsed ? 3 : 2 }}
                   onClick={() => navigate(areaPath)}
                 />
                 {!collapsed && (
@@ -137,7 +145,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                         className={`sb-item${isActive(projPath) ? ' active' : ''}`}
                         onClick={() => navigate(projPath)}
                       >
-                        <CheckSquare size={12} />
+                        <span style={{ width: 6, height: 6, borderRadius: 1, background: a.color, flexShrink: 0 }} />
                         <span>{p.name}</span>
                       </div>
                     )
@@ -172,6 +180,20 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
               onClick={() => navigate('/empty-states')}
             >
               <LayoutTemplate size={14} /><span>Empty states</span>
+            </div>
+          </>
+        )}
+
+        {collapsed && (
+          <>
+            <div style={{ height: 6, borderTop: '1px solid var(--border)', margin: '6px 8px' }} />
+            <div
+              className={`sb-item${isActive('/configuracion') ? ' active' : ''} sb-item-collapsed`}
+              onClick={() => navigate('/configuracion')}
+              title="Configuración"
+              style={{ justifyContent: 'center', padding: '9px 0', margin: '2px 6px' }}
+            >
+              <Settings size={icoSize} />
             </div>
           </>
         )}
@@ -221,36 +243,54 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
             </div>
           </div>
         )}
-        <div className="sb-foot">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, cursor: collapsed ? 'default' : 'pointer' }} onClick={() => !collapsed && setShowUserMenu(v => !v)}>
-            <Avatar name={currentUser.name} size={28} />
-            {!collapsed && (
+
+        {collapsed ? (
+          /* Collapsed footer: just avatar + logout stacked */
+          <div style={{ borderTop: '1px solid var(--border)', padding: '10px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            <Avatar name={currentUser.name} size={32} />
+            <button
+              onClick={logout}
+              title="Cerrar sesión"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 32, height: 32, borderRadius: 6, border: 'none', cursor: 'pointer',
+                background: 'transparent', color: 'var(--text-3)',
+                transition: 'background .12s, color .12s',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; (e.currentTarget as HTMLElement).style.color = 'var(--red)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--text-3)'; }}
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
+        ) : (
+          <div className="sb-foot">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => setShowUserMenu(v => !v)}>
+              <Avatar name={currentUser.name} size={28} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {currentUser.name}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{currentUser.role}</div>
               </div>
-            )}
-            {!collapsed && (
               <ChevronUp size={13} style={{ color: 'var(--text-3)', flexShrink: 0, transform: showUserMenu ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform .15s' }} />
-            )}
+            </div>
+            <button
+              onClick={logout}
+              title="Cerrar sesión"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 28, height: 28, borderRadius: 6, border: 'none', cursor: 'pointer',
+                background: 'transparent', color: 'var(--text-3)', flexShrink: 0,
+                transition: 'background .12s, color .12s',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; (e.currentTarget as HTMLElement).style.color = 'var(--red)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--text-3)'; }}
+            >
+              <LogOut size={14} />
+            </button>
           </div>
-          <button
-            onClick={logout}
-            title="Cerrar sesión"
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 28, height: 28, borderRadius: 6, border: 'none', cursor: 'pointer',
-              background: 'transparent', color: 'var(--text-3)', flexShrink: 0,
-              transition: 'background .12s, color .12s',
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; (e.currentTarget as HTMLElement).style.color = 'var(--red)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--text-3)'; }}
-          >
-            <LogOut size={14} />
-          </button>
-        </div>
+        )}
       </div>
     </aside>
   )
