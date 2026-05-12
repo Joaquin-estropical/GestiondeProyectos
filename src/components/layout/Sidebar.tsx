@@ -1,17 +1,17 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
-  Home, Sun, Inbox, Sparkles, Calendar, BarChart3, Settings,
+  Home, Sun, Sparkles, Calendar, BarChart3, Settings,
   ChevronDown, ChevronRight, Plus, PanelLeftClose, PanelLeftOpen,
-  CheckSquare, LayoutTemplate,
+  CheckSquare, LayoutTemplate, LogOut, ChevronUp,
 } from 'lucide-react'
 import { useAppStore } from '@/stores/app'
 import { Avatar } from '@/components/shared/Avatar'
+import { APP_USERS, clearCurrentUser, setCurrentUser as saveUser } from '@/lib/auth'
 
 const WS_ITEMS = [
   { id: 'dashboard', label: 'Inicio',            Icon: Home,      path: '/'             },
   { id: 'myday',     label: 'Mi día',            Icon: Sun,       path: '/mi-dia'       },
-  { id: 'inbox',     label: 'Bandeja IA',        Icon: Inbox,     path: '/bandeja-ia',  badge: 3 },
   { id: 'ai',        label: 'Asistente IA',      Icon: Sparkles,  path: '/asistente-ia' },
   { id: 'calendar',  label: 'Calendario global', Icon: Calendar,  path: '/calendario'   },
   { id: 'reports',   label: 'Reportes',          Icon: BarChart3, path: '/reportes'     },
@@ -25,14 +25,30 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const navigate    = useNavigate()
   const location    = useLocation()
-  const { areas, projects, openNewArea, openNewProject } = useAppStore()
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const { areas, projects, openNewArea, openNewProject, currentUser, setCurrentUser } = useAppStore()
+  const [expanded, setExpanded]       = useState<Record<string, boolean>>({})
+  const [showUserMenu, setShowUserMenu] = useState(false)
 
   const isActive = (path: string) =>
     path === '/' ? location.pathname === '/' : location.pathname.startsWith(path)
 
   const toggle = (id: string) =>
     setExpanded((s) => ({ ...s, [id]: !s[id] }))
+
+  const switchUser = (uid: string) => {
+    const u = APP_USERS.find(x => x.id === uid)
+    if (!u) return
+    saveUser(uid)
+    setCurrentUser(u)
+    setShowUserMenu(false)
+    navigate('/')
+    window.location.reload()
+  }
+
+  const logout = () => {
+    clearCurrentUser()
+    window.location.reload()
+  }
 
   return (
     <aside className={`app-sidebar${collapsed ? ' collapsed' : ''}`}>
@@ -63,7 +79,6 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
           >
             <it.Icon size={14} />
             {!collapsed && <span>{it.label}</span>}
-            {!collapsed && it.badge && <span className="sb-badge">{it.badge}</span>}
           </div>
         ))}
 
@@ -162,22 +177,64 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         )}
       </div>
 
-      {/* Footer */}
-      <div className="sb-foot">
-        <Avatar name="Joaquín Rivera" size={28} />
-        {!collapsed && (
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Joaquín Rivera
+      {/* Footer with user switcher */}
+      <div style={{ position: 'relative' }}>
+        {showUserMenu && !collapsed && (
+          <div style={{
+            position: 'absolute', bottom: '100%', left: 8, right: 8,
+            background: 'var(--surface-2)', border: '1px solid var(--border)',
+            borderRadius: 8, padding: 6, zIndex: 50, marginBottom: 4,
+          }}>
+            <div style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--text-3)', padding: '4px 8px 8px' }}>
+              Cambiar usuario
             </div>
-            <div style={{ fontSize: 12, color: 'var(--text-3)' }}>Admin · Operaciones</div>
+            {APP_USERS.map(u => (
+              <button
+                key={u.id}
+                onClick={() => switchUser(u.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                  padding: '8px 10px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                  background: u.id === currentUser.id ? 'var(--teal-bg)' : 'transparent',
+                  color: u.id === currentUser.id ? 'var(--teal)' : 'var(--text-1)',
+                }}
+              >
+                <Avatar name={u.name} size={22} />
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 500 }}>{u.name.split(' ')[0]} {u.name.split(' ')[1]}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{u.role}</div>
+                </div>
+                {u.id === currentUser.id && <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--teal)' }} />}
+              </button>
+            ))}
+            <div style={{ borderTop: '1px solid var(--border)', marginTop: 6, paddingTop: 6 }}>
+              <button
+                onClick={logout}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                  padding: '7px 10px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                  background: 'transparent', color: 'var(--text-3)', fontSize: 12.5,
+                }}
+              >
+                <LogOut size={13} /> Cerrar sesión
+              </button>
+            </div>
           </div>
         )}
-        {!collapsed && (
-          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => navigate('/configuracion')}>
-            <Settings size={13} />
-          </button>
-        )}
+        <div className="sb-foot" style={{ cursor: collapsed ? 'default' : 'pointer' }} onClick={() => !collapsed && setShowUserMenu(v => !v)}>
+          <Avatar name={currentUser.name} size={28} />
+          {!collapsed && (
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {currentUser.name}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{currentUser.role}</div>
+            </div>
+          )}
+          {!collapsed && (
+            <ChevronUp size={13} style={{ color: 'var(--text-3)', flexShrink: 0, transform: showUserMenu ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform .15s' }} />
+          )}
+        </div>
       </div>
     </aside>
   )

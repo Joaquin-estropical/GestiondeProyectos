@@ -464,6 +464,8 @@ kbd, .kbd { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; backgro
 .cal-cell .num     { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; color: var(--text-1); align-self: flex-start; padding: 1px 6px; border-radius: 4px; }
 .cal-event         { font-size: 11px; padding: 2px 6px; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 5px; }
 .cal-event .dot    { width: 6px; height: 6px; border-radius: 2px; flex: none; }
+.cal-cell .cal-add-btn { opacity: 0; transition: opacity .12s; }
+.cal-cell:hover .cal-add-btn { opacity: 1; }
 
 /* ════════════ Bar chart ════════════ */
 .bar-row { display: grid; grid-template-columns: 140px 1fr 60px; gap: 12px; align-items: center; padding: 8px 0; font-size: 12.5px; }

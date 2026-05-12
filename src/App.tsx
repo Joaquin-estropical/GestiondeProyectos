@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import './index.css'
 
@@ -9,18 +9,20 @@ import { NewAreaModal }    from '@/components/modals/NewAreaModal'
 import { NewProjectModal } from '@/components/modals/NewProjectModal'
 import { NewTaskModal }    from '@/components/modals/NewTaskModal'
 import { useAppStore }     from '@/stores/app'
+import { getCurrentUser }  from '@/lib/auth'
+import type { AppUser }    from '@/lib/auth'
 
 import Dashboard    from '@/pages/Dashboard'
 import MyDay        from '@/pages/MyDay'
 import CalendarView from '@/pages/CalendarView'
 import AIAssistant  from '@/pages/AIAssistant'
-import AIInbox      from '@/pages/AIInbox'
 import Reports      from '@/pages/Reports'
 import SettingsPage from '@/pages/SettingsPage'
 import EmptyStates  from '@/pages/EmptyStates'
 import AreaView     from '@/pages/AreaView'
 import ProjectPage  from '@/pages/ProjectPage'
 import Landing      from '@/pages/Landing'
+import LoginPage    from '@/pages/LoginPage'
 
 function AppRoutes() {
   const {
@@ -28,13 +30,19 @@ function AppRoutes() {
     cmdkOpen, setCmdK,
     showLanding,
     loadTasks, loadAreas, loadProjects,
+    setCurrentUser,
   } = useAppStore()
 
+  const [user, setUser] = useState<AppUser | null>(() =>
+    localStorage.getItem('ot_current_user') ? getCurrentUser() : null
+  )
+
   useEffect(() => {
+    if (!user) return
     loadAreas()
     loadProjects()
     loadTasks()
-  }, [loadAreas, loadProjects, loadTasks])
+  }, [user, loadAreas, loadProjects, loadTasks])
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
@@ -47,6 +55,12 @@ function AppRoutes() {
     return () => window.removeEventListener('keydown', fn)
   }, [setCmdK])
 
+  const handleLogin = (u: AppUser) => {
+    setCurrentUser(u)
+    setUser(u)
+  }
+
+  if (!user) return <LoginPage onLogin={handleLogin} />
   if (showLanding) return <Landing />
 
   return (
@@ -57,7 +71,6 @@ function AppRoutes() {
           <Route path="/mi-dia"        element={<MyDay />}        />
           <Route path="/calendario"    element={<CalendarView />} />
           <Route path="/asistente-ia"  element={<AIAssistant />}  />
-          <Route path="/bandeja-ia"    element={<AIInbox />}      />
           <Route path="/reportes"      element={<Reports />}      />
           <Route path="/configuracion" element={<SettingsPage />} />
           <Route path="/empty-states"  element={<EmptyStates />}  />

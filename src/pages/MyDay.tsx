@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Play, Pause } from 'lucide-react';
+import { Play, Pause, Plus } from 'lucide-react';
 import { useTasks, useProjects } from '@/hooks/useSupabase';
 import { fmtDate, dueColor } from '@/lib/mock-data';
 import { AreaPill, PriorityPill } from '@/components/shared/Badges';
@@ -8,13 +8,15 @@ import { useAppStore } from '@/stores/app';
 import type { Task } from '@/types';
 
 export default function MyDay() {
-  const { openTask } = useAppStore();
-  const { data: allTasks = [] }  = useTasks({ assigneeId: 'joa' });
-  const { data: projects = [] }  = useProjects();
-  const [timing, setTiming]      = useState<string | null>(null);
+  const { openTask, openNewTask, currentUser } = useAppStore();
+  const today = new Date().toISOString().slice(0, 10);
 
-  const todayTasks = allTasks.filter(t => t.status !== 'done' && new Date(t.due + 'T00:00:00') <= new Date('2026-03-11T00:00:00'));
-  const upcoming   = allTasks.filter(t => t.status !== 'done' && new Date(t.due + 'T00:00:00') > new Date('2026-03-11T00:00:00'));
+  const { data: allTasks = [] } = useTasks({ assigneeId: currentUser.id });
+  const { data: projects = [] } = useProjects();
+  const [timing, setTiming]     = useState<string | null>(null);
+
+  const todayTasks = allTasks.filter(t => t.status !== 'done' && t.due <= today);
+  const upcoming   = allTasks.filter(t => t.status !== 'done' && t.due > today);
   const review     = allTasks.filter(t => t.status === 'rev');
 
   const grouped = (list: Task[]) => {
@@ -46,13 +48,23 @@ export default function MyDay() {
     );
   }
 
+  const firstName = currentUser.name.split(' ')[0];
+
   return (
     <>
-      <PageHead title="Mi día" subtitle={`${allTasks.length} tareas asignadas`} />
+      <PageHead
+        title={`Mi día · ${firstName}`}
+        subtitle={`${allTasks.filter(t => t.status !== 'done').length} tareas asignadas`}
+        right={
+          <button className="btn btn-primary btn-md" onClick={() => openNewTask()}>
+            <Plus size={14} /> Nueva tarea
+          </button>
+        }
+      />
       <div className="page-body" style={{ maxWidth: 980 }}>
         <div className="card mb-16">
           <div className="card-head">
-            <span className="title">Hoy</span>
+            <span className="title">Para hoy</span>
             <span className="micro" style={{ marginLeft: 'auto' }}>{todayTasks.length} tareas</span>
           </div>
           <div style={{ padding: '0 18px 8px' }}>
@@ -70,7 +82,9 @@ export default function MyDay() {
               );
             })}
             {todayTasks.length === 0 && (
-              <div style={{ padding: '18px 0', color: 'var(--text-3)', fontSize: 13 }}>Sin tareas para hoy.</div>
+              <div style={{ padding: '18px 0', color: 'var(--text-3)', fontSize: 13 }}>
+                {allTasks.length === 0 ? `No hay tareas asignadas a ${firstName} todavía.` : 'Sin tareas para hoy. ¡Todo al día!'}
+              </div>
             )}
           </div>
         </div>
@@ -94,6 +108,9 @@ export default function MyDay() {
             <span className="micro" style={{ marginLeft: 'auto' }}>{upcoming.length}</span>
           </div>
           <div style={{ padding: '0 18px 8px' }}>
+            {upcoming.length === 0 && (
+              <div style={{ padding: '18px 0', color: 'var(--text-3)', fontSize: 13 }}>Sin tareas próximas.</div>
+            )}
             {upcoming.map(t => <TaskRow key={t.id} t={t} />)}
           </div>
         </div>

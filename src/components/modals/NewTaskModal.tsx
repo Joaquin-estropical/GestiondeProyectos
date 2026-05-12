@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { X, Calendar, Flag } from 'lucide-react'
 import { useAppStore } from '@/stores/app'
 import { createTask } from '@/lib/db'
+import { useMembers } from '@/hooks/useSupabase'
+import { APP_USERS } from '@/lib/auth'
 import type { TaskPriority } from '@/types'
 
 const PRIORITIES: { value: TaskPriority; label: string; color: string }[] = [
@@ -11,21 +13,16 @@ const PRIORITIES: { value: TaskPriority; label: string; color: string }[] = [
   { value: 'baja', label: 'Baja',    color: 'var(--text-3)' },
 ]
 
-const MEMBERS = [
-  { id: 'joa', name: 'Joaquín Rivera'  },
-  { id: 'and', name: 'Andrea Mendoza'  },
-  { id: 'car', name: 'Carlos Rojas'    },
-  { id: 'sof', name: 'Sofía Vargas'    },
-  { id: 'die', name: 'Diego Aguilera'  },
-]
-
 export function NewTaskModal() {
-  const { newTaskOpen, newTaskProjectId, closeNewTask, areas, projects, addTask, refreshAll } = useAppStore()
+  const { newTaskOpen, newTaskProjectId, newTaskDate, closeNewTask, areas, projects, addTask, refreshAll, currentUser } = useAppStore()
+  const { data: members = [] } = useMembers()
+  // Fallback to APP_USERS if no members in DB yet
+  const memberList = members.length > 0 ? members : APP_USERS.map(u => ({ id: u.id, name: u.name, role: u.role, short: u.short }))
 
   const [title,     setTitle]     = useState('')
   const [projectId, setProjectId] = useState(newTaskProjectId ?? '')
   const [areaId,    setAreaId]    = useState('')
-  const [assignee,  setAssignee]  = useState('joa')
+  const [assignee,  setAssignee]  = useState(currentUser.id)
   const [due,       setDue]       = useState('')
   const [priority,  setPriority]  = useState<TaskPriority>('med')
   const [desc,      setDesc]      = useState('')
@@ -34,15 +31,16 @@ export function NewTaskModal() {
 
   useEffect(() => {
     if (newTaskOpen) {
-      setTitle(''); setDesc(''); setDue(''); setError('')
+      setTitle(''); setDesc(''); setError('')
+      setDue(newTaskDate ?? '')
       const pid = newTaskProjectId ?? projects[0]?.id ?? ''
       setProjectId(pid)
       const proj = projects.find(p => p.id === pid)
       setAreaId(proj?.area ?? areas[0]?.id ?? '')
       setPriority('med')
-      setAssignee('joa')
+      setAssignee(currentUser.id)
     }
-  }, [newTaskOpen, newTaskProjectId, projects, areas])
+  }, [newTaskOpen, newTaskProjectId, newTaskDate, projects, areas, currentUser.id])
 
   // sync area when project changes
   const handleProjectChange = (pid: string) => {
@@ -141,7 +139,7 @@ export function NewTaskModal() {
                   onChange={e => setAssignee(e.target.value)}
                   style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 12px', height: 36, color: 'var(--text-1)', fontSize: 13, cursor: 'pointer' }}
                 >
-                  {MEMBERS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  {memberList.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                 </select>
               </div>
             </div>

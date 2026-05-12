@@ -1,8 +1,13 @@
 import { create } from 'zustand'
 import { fetchTasks, fetchAreas, fetchProjects, updateTaskStatus as dbUpdateTaskStatus } from '@/lib/db'
+import { getCurrentUser } from '@/lib/auth'
 import type { Task, Area, Project, TaskStatus } from '@/types'
+import type { AppUser } from '@/lib/auth'
 
 interface AppState {
+  // auth
+  currentUser: AppUser
+  setCurrentUser: (u: AppUser) => void
   // data
   tasks:        Task[]
   areas:        Area[]
@@ -22,6 +27,7 @@ interface AppState {
   newProjectAreaId: string | null
   newTaskOpen:    boolean
   newTaskProjectId: string | null
+  newTaskDate:    string | null
   // actions: data
   loadTasks:    () => Promise<void>
   loadAreas:    () => Promise<void>
@@ -44,11 +50,14 @@ interface AppState {
   closeNewArea:    ()                => void
   openNewProject:  (areaId?: string) => void
   closeNewProject: ()                => void
-  openNewTask:     (projectId?: string) => void
+  openNewTask:     (projectId?: string, date?: string) => void
   closeNewTask:    ()                => void
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
+  currentUser: getCurrentUser(),
+  setCurrentUser: (u) => set({ currentUser: u }),
+
   tasks:        [],
   areas:        [],
   projects:     [],
@@ -65,6 +74,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   newProjectAreaId: null,
   newTaskOpen:      false,
   newTaskProjectId: null,
+  newTaskDate:      null,
 
   loadTasks: async () => {
     if (get().tasksLoaded) return
@@ -107,6 +117,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   closeNewArea:    ()        => set({ newAreaOpen: false,   editAreaId:    null }),
   openNewProject:  (areaId?) => set({ newProjectOpen: true, newProjectAreaId: areaId ?? null }),
   closeNewProject: ()        => set({ newProjectOpen: false,newProjectAreaId: null }),
-  openNewTask:     (pid?)    => set({ newTaskOpen: true,    newTaskProjectId: pid ?? null }),
-  closeNewTask:    ()        => set({ newTaskOpen: false,   newTaskProjectId: null }),
+  openNewTask:     (pid?, date?) => set({ newTaskOpen: true, newTaskProjectId: pid ?? null, newTaskDate: date ?? null }),
+  closeNewTask:    ()        => set({ newTaskOpen: false,   newTaskProjectId: null, newTaskDate: null }),
 }))
