@@ -33,9 +33,17 @@ function AppRoutes() {
     setCurrentUser,
   } = useAppStore()
 
-  const [user, setUser] = useState<AppUser | null>(() =>
-    localStorage.getItem('ot_current_user') ? getCurrentUser() : null
-  )
+  const [user, setUser] = useState<AppUser | null>(() => {
+    const saved = localStorage.getItem('ot_current_user')
+    if (!saved) return null
+    const u = getCurrentUser()
+    // If saved ID doesn't match any known user, clear and show login
+    if (!u || u.id !== saved) {
+      localStorage.removeItem('ot_current_user')
+      return null
+    }
+    return u
+  })
 
   useEffect(() => {
     if (!user) return
