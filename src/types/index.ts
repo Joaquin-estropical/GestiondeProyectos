@@ -45,6 +45,7 @@ export interface Task {
   project:     string
   area:        string
   assignee:    string
+  helper:      string | null   // auxiliar/ayudante opcional
   due:         string
   priority:    TaskPriority
   status:      TaskStatus

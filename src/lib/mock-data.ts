@@ -27,8 +27,8 @@ export const PROJECTS: Project[] = [
   { id: 'p8', name: 'Apertura Plaza',       area: 'plaza',   due: '2026-06-01', progress: 12, count: 8  },
 ]
 
-const T = (o: Omit<Task, 'description' | 'start_date' | 'tags'>): Task =>
-  ({ ...o, description: null, start_date: null, tags: [] })
+const T = (o: Omit<Task, 'description' | 'start_date' | 'tags' | 'helper'>): Task =>
+  ({ ...o, description: null, start_date: null, helper: null, tags: [] })
 
 export const TASKS: Task[] = [
   T({ id: 't1',  code: 'OT-1847', title: 'Cotizar proveedores de iluminación LED',        project: 'p1', area: 'outlet', assignee: 'and', due: '2026-03-12', priority: 'alta', status: 'curso',  time: '02:14', comments: 4, subtasks: { done: 2, total: 5 } }),
@@ -70,8 +70,9 @@ export const INBOX_ITEMS: InboxItem[] = [
 ]
 
 // ── Helpers ──
-export const MONTHS_ES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
-export const DAYS_ES   = ['lun','mar','mié','jue','vie','sáb','dom']
+export const MONTHS_ES    = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
+export const MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+export const DAYS_ES      = ['lun','mar','mié','jue','vie','sáb','dom']
 
 export const STATUS_LABELS: Record<string, string> = {
   curso: 'En curso',

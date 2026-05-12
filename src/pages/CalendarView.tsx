@@ -456,18 +456,26 @@ export default function CalendarView() {
   const { data: members  = [] } = useMembers();
   const { data: projects = [] } = useProjects();
 
-  const [filtAreas,  setFiltAreas]  = useState<string[] | null>(null);
-  const [filtPeople, setFiltPeople] = useState<string[] | null>(null);
+  const [filtAreas,    setFiltAreas]    = useState<string[] | null>(null);
+  const [filtPeople,   setFiltPeople]   = useState<string[] | null>(null);
+  const [filtProjects, setFiltProjects] = useState<string[] | null>(null);
 
-  const activeAreas  = filtAreas  ?? areas.map(a => a.id);
-  const activePeople = filtPeople ?? members.map(m => m.id);
+  const activeAreas    = filtAreas    ?? areas.map(a => a.id);
+  const activePeople   = filtPeople   ?? members.map(m => m.id);
+  const activeProjects = filtProjects ?? projects.map(p => p.id);
 
   const toggleArea = (id: string) =>
     setFiltAreas(prev => { const cur = prev ?? areas.map(a => a.id); return cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]; });
   const togglePerson = (id: string) =>
     setFiltPeople(prev => { const cur = prev ?? members.map(m => m.id); return cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]; });
+  const toggleProject = (id: string) =>
+    setFiltProjects(prev => { const cur = prev ?? projects.map(p => p.id); return cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]; });
 
-  const filtered = tasks.filter(t => activeAreas.includes(t.area) && activePeople.includes(t.assignee));
+  const filtered = tasks.filter(t =>
+    activeAreas.includes(t.area) &&
+    activePeople.includes(t.assignee) &&
+    (!view || view !== 'gantt' || activeProjects.includes(t.project))
+  );
   const areaColor = (id: string) => areas.find(a => a.id === id)?.color ?? 'var(--text-3)';
 
   const taskByDay: Record<string, Task[]> = {};
@@ -572,6 +580,43 @@ export default function CalendarView() {
             })}
             {areas.length === 0 && <div style={{ color: 'var(--text-3)', fontSize: 12, padding: '6px 0' }}>Sin áreas</div>}
           </div>
+
+          {/* Filtro por proyecto (Gantt) */}
+          {isGantt && projects.length > 0 && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span className="micro">Proyectos</span>
+                <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '0 6px', height: 20 }}
+                  onClick={() => setFiltProjects(activeProjects.length === projects.length ? [] : null)}>
+                  {activeProjects.length === projects.length ? 'Ninguno' : 'Todos'}
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {projects.map(p => {
+                  const on   = activeProjects.includes(p.id);
+                  const area = areas.find(a => a.id === p.area);
+                  const cnt  = tasks.filter(t => t.project === p.id && t.status !== 'done').length;
+                  return (
+                    <button key={p.id} onClick={() => toggleProject(p.id)} style={{
+                      display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 6,
+                      cursor: 'pointer', border: 'none',
+                      background: on ? (area?.color ?? 'var(--teal)') + '15' : 'transparent',
+                      outline: on ? `1px solid ${(area?.color ?? 'var(--teal)')}40` : '1px solid transparent',
+                      textAlign: 'left',
+                    }}>
+                      <span style={{ width: 8, height: 8, borderRadius: 2, flexShrink: 0, background: on ? (area?.color ?? 'var(--teal)') : 'var(--border-hover)' }} />
+                      <span style={{ flex: 1, fontSize: 12, fontWeight: 500, color: on ? 'var(--text-1)' : 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {p.name}
+                      </span>
+                      {cnt > 0 && (
+                        <span style={{ fontSize: 10, fontFamily: 'JetBrains Mono,monospace', color: on ? (area?.color ?? 'var(--teal)') : 'var(--text-3)', background: 'var(--surface-2)', padding: '0 4px', borderRadius: 999, lineHeight: 1.6 }}>{cnt}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
 
           {!isGantt && (
             <>

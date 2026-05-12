@@ -16,33 +16,61 @@ const PRIORITIES: { value: TaskPriority; label: string; color: string }[] = [
 export function NewTaskModal() {
   const { newTaskOpen, newTaskProjectId, newTaskDate, closeNewTask, areas, projects, addTask, refreshAll, currentUser } = useAppStore()
   const { data: members = [] } = useMembers()
-  // Fallback to APP_USERS if no members in DB yet
-  const memberList = members.length > 0 ? members : APP_USERS.map(u => ({ id: u.id, name: u.name, role: u.role, short: u.short }))
+  const memberList = members.length > 0
+    ? members
+    : APP_USERS.map(u => ({ id: u.id, name: u.name, role: u.role, short: u.short }))
 
   const [title,     setTitle]     = useState('')
-  const [projectId, setProjectId] = useState(newTaskProjectId ?? '')
   const [areaId,    setAreaId]    = useState('')
+  const [projectId, setProjectId] = useState('')
   const [assignee,  setAssignee]  = useState(currentUser.id)
+  const [helper,    setHelper]    = useState('')
   const [due,       setDue]       = useState('')
   const [priority,  setPriority]  = useState<TaskPriority>('med')
   const [desc,      setDesc]      = useState('')
   const [saving,    setSaving]    = useState(false)
   const [error,     setError]     = useState('')
 
+  // Get "Generales" project for a given area
+  const getGeneralesProject = (aid: string) =>
+    projects.find(p => p.area === aid && p.name === 'Generales')
+
+  const resolveProject = (aid: string, pid: string) => {
+    if (pid && projects.find(p => p.id === pid)) return pid
+    const gen = getGeneralesProject(aid)
+    return gen?.id ?? ''
+  }
+
   useEffect(() => {
     if (newTaskOpen) {
-      setTitle(''); setDesc(''); setError('')
+      setTitle(''); setDesc(''); setError(''); setHelper('')
       setDue(newTaskDate ?? '')
-      const pid = newTaskProjectId ?? projects[0]?.id ?? ''
-      setProjectId(pid)
-      const proj = projects.find(p => p.id === pid)
-      setAreaId(proj?.area ?? areas[0]?.id ?? '')
       setPriority('med')
       setAssignee(currentUser.id)
+
+      const pid = newTaskProjectId ?? ''
+      const proj = projects.find(p => p.id === pid)
+      const aid = proj?.area ?? areas[0]?.id ?? ''
+      setAreaId(aid)
+
+      // If no explicit project given, auto-select Generales
+      if (pid && proj) {
+        setProjectId(pid)
+      } else {
+        const gen = getGeneralesProject(aid)
+        setProjectId(gen?.id ?? projects.filter(p => p.area === aid)[0]?.id ?? '')
+      }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newTaskOpen, newTaskProjectId, newTaskDate, projects, areas, currentUser.id])
 
-  // sync area when project changes
+  const handleAreaChange = (aid: string) => {
+    setAreaId(aid)
+    // Auto-select Generales for the new area, or first project
+    const gen = getGeneralesProject(aid)
+    setProjectId(gen?.id ?? projects.filter(p => p.area === aid)[0]?.id ?? '')
+  }
+
   const handleProjectChange = (pid: string) => {
     setProjectId(pid)
     const proj = projects.find(p => p.id === pid)
@@ -50,15 +78,23 @@ export function NewTaskModal() {
   }
 
   const handleSave = async () => {
-    if (!title.trim())  { setError('El título es obligatorio'); return }
-    if (!projectId)     { setError('Seleccioná un proyecto'); return }
-    if (!due)           { setError('La fecha límite es obligatoria'); return }
+    if (!title.trim()) { setError('El título es obligatorio'); return }
+    const finalProjectId = resolveProject(areaId, projectId)
+    if (!finalProjectId) { setError('Seleccioná un proyecto o crea uno primero'); return }
+    if (!due) { setError('La fecha límite es obligatoria'); return }
+    const finalProj = projects.find(p => p.id === finalProjectId)
+    const finalArea = finalProj?.area ?? areaId
     setSaving(true); setError('')
     try {
       const task = await createTask({
-        title: title.trim(), project: projectId, area: areaId,
-        assignee, due, priority,
+        title: title.trim(),
+        project: finalProjectId,
+        area:    finalArea,
+        assignee,
+        due,
+        priority,
         description: desc || undefined,
+        helper: helper || undefined,
       })
       addTask(task)
       await refreshAll()
@@ -72,12 +108,13 @@ export function NewTaskModal() {
 
   if (!newTaskOpen) return null
 
-  const filteredProjects = areaId ? projects.filter(p => p.area === areaId) : projects
+  const areaProjects = areaId ? projects.filter(p => p.area === areaId) : projects
+  const hasGenerales = !!getGeneralesProject(areaId)
 
   return (
     <>
       <div className="modal-bd" onClick={closeNewTask} />
-      <div className="modal" style={{ maxWidth: 520 }}>
+      <div className="modal" style={{ maxWidth: 540 }}>
         <div className="modal-head">
           <span className="fw-6" style={{ fontSize: 15 }}>Nueva tarea</span>
           <button className="btn btn-ghost btn-sm btn-icon" style={{ marginLeft: 'auto' }} onClick={closeNewTask}>
@@ -99,14 +136,14 @@ export function NewTaskModal() {
             </div>
           </div>
 
-          {/* Área + Proyecto en fila */}
+          {/* Área + Proyecto */}
           <div className="row gap-12 mt-16">
             <div className="form-group" style={{ flex: 1 }}>
               <label className="form-label">Área</label>
               <div className="input" style={{ padding: 0 }}>
                 <select
                   value={areaId}
-                  onChange={e => { setAreaId(e.target.value); setProjectId('') }}
+                  onChange={e => handleAreaChange(e.target.value)}
                   style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 12px', height: 36, color: 'var(--text-1)', fontSize: 13, cursor: 'pointer' }}
                 >
                   <option value="">Todas</option>
@@ -115,7 +152,12 @@ export function NewTaskModal() {
               </div>
             </div>
             <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Proyecto <span style={{ color: 'var(--red)' }}>*</span></label>
+              <label className="form-label">
+                Proyecto <span style={{ color: 'var(--red)' }}>*</span>
+                {hasGenerales && !projectId && (
+                  <span className="micro" style={{ marginLeft: 6, color: 'var(--teal)' }}>→ Generales</span>
+                )}
+              </label>
               <div className="input" style={{ padding: 0 }}>
                 <select
                   value={projectId}
@@ -123,16 +165,25 @@ export function NewTaskModal() {
                   style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 12px', height: 36, color: 'var(--text-1)', fontSize: 13, cursor: 'pointer' }}
                 >
                   <option value="">Seleccionar...</option>
-                  {filteredProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  {areaProjects.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.name === 'Generales' ? '📋 ' : ''}{p.name}
+                    </option>
+                  ))}
                 </select>
               </div>
+              {areaId && areaProjects.length === 0 && (
+                <div style={{ fontSize: 11, color: 'var(--amber)', marginTop: 4 }}>
+                  Sin proyectos en esta área. Crea uno primero.
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Asignado + Fecha en fila */}
+          {/* Asignado + Ayudante */}
           <div className="row gap-12 mt-16">
             <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Asignado a</label>
+              <label className="form-label">Responsable</label>
               <div className="input" style={{ padding: 0 }}>
                 <select
                   value={assignee}
@@ -144,11 +195,28 @@ export function NewTaskModal() {
               </div>
             </div>
             <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Fecha límite <span style={{ color: 'var(--red)' }}>*</span></label>
-              <div className="input">
-                <Calendar size={13} color="var(--text-3)" />
-                <input type="date" value={due} onChange={e => setDue(e.target.value)} style={{ colorScheme: 'dark' }} />
+              <label className="form-label">Auxiliar / Ayudante <span className="micro" style={{ color: 'var(--text-3)', marginLeft: 4 }}>opcional</span></label>
+              <div className="input" style={{ padding: 0 }}>
+                <select
+                  value={helper}
+                  onChange={e => setHelper(e.target.value)}
+                  style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 12px', height: 36, color: helper ? 'var(--text-1)' : 'var(--text-3)', fontSize: 13, cursor: 'pointer' }}
+                >
+                  <option value="">Sin auxiliar</option>
+                  {memberList.filter(m => m.id !== assignee).map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
               </div>
+            </div>
+          </div>
+
+          {/* Fecha */}
+          <div className="form-group mt-16">
+            <label className="form-label">Fecha límite <span style={{ color: 'var(--red)' }}>*</span></label>
+            <div className="input">
+              <Calendar size={13} color="var(--text-3)" />
+              <input type="date" value={due} onChange={e => setDue(e.target.value)} style={{ colorScheme: 'dark' }} />
             </div>
           </div>
 
