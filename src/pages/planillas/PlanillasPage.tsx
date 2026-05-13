@@ -1,45 +1,51 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, ClipboardList, Layers, ChevronRight, CheckCircle2, Clock, AlertCircle } from 'lucide-react'
 import type { EventChecklist, ChecklistTemplate } from '@/types'
 import { fetchEventChecklists, fetchChecklistTemplates, createEventChecklist, createReceptionFromTemplate } from '@/lib/planillas'
 import { useAppStore } from '@/stores/app'
 
-// We reuse projects as "events" — each project can have checklists
 function statusIcon(s: string) {
-  if (s === 'completed')  return <CheckCircle2 size={13} style={{ color: 'var(--teal)' }} />
-  if (s === 'in_progress') return <Clock size={13} style={{ color: 'var(--amber, #f59e0b)' }} />
+  if (s === 'completed')   return <CheckCircle2 size={13} style={{ color: 'var(--teal)' }} />
+  if (s === 'in_progress') return <Clock size={13} style={{ color: '#f59e0b' }} />
   return <AlertCircle size={13} style={{ color: 'var(--text-3)' }} />
 }
 
 function statusLabel(s: string) {
-  if (s === 'completed')  return 'Cerrada'
+  if (s === 'completed')   return 'Cerrada'
   if (s === 'in_progress') return 'En curso'
   return 'Pendiente'
 }
 
 interface ProjectWithChecklists {
-  id: string
-  name: string
+  id:         string
+  name:       string
   checklists: EventChecklist[]
 }
 
 export default function PlanillasPage() {
-  const navigate                = useNavigate()
-  const { projects }            = useAppStore()
+  const navigate   = useNavigate()
+  const { projects } = useAppStore()
+
   const [data, setData]         = useState<ProjectWithChecklists[]>([])
   const [templates, setTemplates] = useState<ChecklistTemplate[]>([])
   const [loading, setLoading]   = useState(true)
 
-  // New checklist dialog state
-  const [showNew, setShowNew]   = useState(false)
+  const [showNew, setShowNew]           = useState(false)
   const [newProjectId, setNewProjectId] = useState('')
   const [newTemplateId, setNewTemplateId] = useState('')
-  const [creating, setCreating] = useState(false)
+  const [creating, setCreating]         = useState(false)
 
-  useEffect(() => { load() }, [projects])
+  // Stable reference: snapshot project IDs for the dependency array
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const projectIds = projects.map(p => p.id).join(',')
 
-  async function load() {
+  const load = useCallback(async () => {
+    if (projects.length === 0) {
+      setData([])
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
       const [tpls, allChecklists] = await Promise.all([
@@ -47,13 +53,18 @@ export default function PlanillasPage() {
         Promise.all(projects.map(p => fetchEventChecklists(p.id))),
       ])
       setTemplates(tpls)
-      setData(projects.map((p, i) => ({
+      const mapped: ProjectWithChecklists[] = projects.map((p, i) => ({
         id:         p.id,
         name:       p.name,
         checklists: allChecklists[i],
-      })).filter(p => p.checklists.length > 0 || projects.length < 20))
+      }))
+      setData(mapped)
     } finally { setLoading(false) }
-  }
+  // projectIds is a stable primitive derived from projects
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectIds])
+
+  useEffect(() => { load() }, [load])
 
   async function handleCreate() {
     if (!newProjectId) return
@@ -72,7 +83,6 @@ export default function PlanillasPage() {
   }
 
   const projectsWithData = data.filter(p => p.checklists.length > 0)
-  const projectsWithout  = projects.filter(p => !projectsWithData.find(x => x.id === p.id))
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto', padding: '28px 24px' }}>
@@ -85,10 +95,7 @@ export default function PlanillasPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={() => navigate('/planillas/plantillas')}
-          >
+          <button className="btn btn-ghost btn-sm" onClick={() => navigate('/planillas/plantillas')}>
             <Layers size={14} /> Gestionar plantillas
           </button>
           <button className="btn btn-primary btn-sm" onClick={() => setShowNew(true)}>
@@ -97,7 +104,7 @@ export default function PlanillasPage() {
         </div>
       </div>
 
-      {/* New checklist dialog */}
+      {/* New checklist form */}
       {showNew && (
         <div style={{
           background: 'var(--surface-2)', border: '1px solid var(--border)',
@@ -109,34 +116,24 @@ export default function PlanillasPage() {
               <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>
                 Proyecto / Evento *
               </label>
-              <select
-                className="input"
-                value={newProjectId}
-                onChange={e => setNewProjectId(e.target.value)}
-              >
+              <select className="input" value={newProjectId} onChange={e => setNewProjectId(e.target.value)}>
                 <option value="">Seleccionar proyecto…</option>
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div>
               <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>
                 Plantilla base (opcional)
               </label>
-              <select
-                className="input"
-                value={newTemplateId}
-                onChange={e => setNewTemplateId(e.target.value)}
-              >
+              <select className="input" value={newTemplateId} onChange={e => setNewTemplateId(e.target.value)}>
                 <option value="">Sin plantilla — empezar en blanco</option>
-                {templates.map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
+                {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => setShowNew(false)}>Cancelar</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setShowNew(false); setNewProjectId(''); setNewTemplateId('') }}>
+                Cancelar
+              </button>
               <button
                 className="btn btn-primary btn-sm"
                 disabled={!newProjectId || creating}
@@ -149,6 +146,7 @@ export default function PlanillasPage() {
         </div>
       )}
 
+      {/* Content */}
       {loading ? (
         <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: '48px 0', fontSize: 14 }}>
           Cargando planillas…
@@ -171,10 +169,9 @@ export default function PlanillasPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {projectsWithData.map(proj => (
             <div key={proj.id} style={{
-              background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10,
-              overflow: 'hidden',
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: 10, overflow: 'hidden',
             }}>
-              {/* Project header */}
               <div style={{
                 padding: '12px 16px', borderBottom: '1px solid var(--border)',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -185,15 +182,14 @@ export default function PlanillasPage() {
                 </span>
               </div>
 
-              {/* Checklists */}
-              {proj.checklists.map(cl => (
+              {proj.checklists.map((cl, idx) => (
                 <div
                   key={cl.id}
                   onClick={() => navigate(`/planillas/${cl.id}`)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 12,
                     padding: '11px 16px', cursor: 'pointer',
-                    borderBottom: '1px solid var(--border)',
+                    borderBottom: idx < proj.checklists.length - 1 ? '1px solid var(--border)' : 'none',
                     transition: 'background .1s',
                   }}
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
@@ -204,9 +200,7 @@ export default function PlanillasPage() {
                     <span style={{ fontSize: 13, fontWeight: 500 }}>
                       {cl.type === 'reception' ? 'Acta de recepción' : 'Acta de entrega'}
                     </span>
-                    <span style={{
-                      fontSize: 11, color: 'var(--text-3)', marginLeft: 8,
-                    }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-3)', marginLeft: 8 }}>
                       {statusLabel(cl.status)}
                     </span>
                   </div>

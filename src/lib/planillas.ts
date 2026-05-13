@@ -115,6 +115,16 @@ export async function deleteTemplateItem(id: string): Promise<void> {
 }
 
 // ── EVENT CHECKLISTS ──────────────────────────────────────────────────────────
+export async function fetchChecklistById(id: string): Promise<EventChecklist | null> {
+  const { data, error } = await supabase
+    .from('event_checklists')
+    .select('*')
+    .eq('id', id)
+    .single()
+  if (error) return null
+  return data as EventChecklist
+}
+
 export async function fetchEventChecklists(eventId: string): Promise<EventChecklist[]> {
   const { data, error } = await supabase
     .from('event_checklists')

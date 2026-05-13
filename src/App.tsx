@@ -89,10 +89,10 @@ function AppRoutes() {
           <Route path="/empty-states"  element={<EmptyStates />}  />
           <Route path="/area/:areaId"  element={<AreaView />}     />
           <Route path="/proyecto/:projectId" element={<ProjectPage />} />
-          <Route path="/planillas"              element={<PlanillasPage />}       />
-          <Route path="/planillas/:checklistId" element={<ChecklistDetailPage />} />
-          <Route path="/planillas/plantillas"   element={<TemplatesPage />}       />
-          <Route path="/planillas/plantillas/:templateId" element={<TemplateDetailPage />} />
+          <Route path="/planillas"                          element={<PlanillasPage />}       />
+          <Route path="/planillas/plantillas"              element={<TemplatesPage />}       />
+          <Route path="/planillas/plantillas/:templateId"  element={<TemplateDetailPage />}  />
+          <Route path="/planillas/:checklistId"            element={<ChecklistDetailPage />} />
         </Route>
         {/* Print is outside AppShell (sin navegación) */}
         <Route path="/planillas/:checklistId/imprimir" element={<PrintPage />} />

@@ -1,13 +1,13 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Plus, Printer, Lock, Trash2, Camera, ChevronDown, ChevronRight,
-  AlertTriangle, CheckCircle2, Minus,
+  AlertTriangle, Minus,
 } from 'lucide-react'
 import type { EventChecklist, ChecklistItem, ItemCondition, ItemCategory } from '@/types'
 import { ITEM_CATEGORIES } from '@/types'
 import {
-  fetchEventChecklists, fetchChecklistItems,
+  fetchChecklistById, fetchEventChecklists, fetchChecklistItems,
   createChecklistItem, updateChecklistItem, deleteChecklistItem,
   updateChecklistStatus, createDeliveryFromReception,
   uploadItemPhoto, calcDelta,
@@ -30,8 +30,8 @@ const CAT_COLORS: Record<string, string> = {
 }
 
 function ConditionPicker({
-  value, onChange, field,
-}: { value: ItemCondition | null; onChange: (v: ItemCondition) => void; field: 'in' | 'out' }) {
+  value, onChange,
+}: { value: ItemCondition | null; onChange: (v: ItemCondition) => void }) {
   const conditions: ItemCondition[] = ['good', 'fair', 'poor']
   return (
     <div style={{ display: 'flex', gap: 4 }}>
@@ -59,82 +59,72 @@ export default function ChecklistDetailPage() {
   const navigate = useNavigate()
   const { projects } = useAppStore()
 
-  const [checklist, setChecklist]   = useState<EventChecklist | null>(null)
-  const [sibling, setSibling]       = useState<EventChecklist | null>(null)
-  const [items, setItems]           = useState<ChecklistItem[]>([])
-  const [loading, setLoading]       = useState(true)
-  const [saving, setSaving]         = useState<string | null>(null)
+  const [checklist, setChecklist]       = useState<EventChecklist | null>(null)
+  const [sibling, setSibling]           = useState<EventChecklist | null>(null)
+  const [items, setItems]               = useState<ChecklistItem[]>([])
+  const [loading, setLoading]           = useState(true)
+  const [saving, setSaving]             = useState<string | null>(null)
 
-  const [addingItem, setAddingItem] = useState(false)
-  const [newItem, setNewItem]       = useState({ name: '', category: '' as ItemCategory | '', qty: 1 })
+  const [addingItem, setAddingItem]     = useState(false)
+  const [newItem, setNewItem]           = useState({ name: '', category: '' as ItemCategory | '', qty: 1 })
 
-  const [collapsed, setCollapsed]   = useState<Record<string, boolean>>({})
+  const [collapsed, setCollapsed]       = useState<Record<string, boolean>>({})
   const [creatingDelivery, setCreatingDelivery] = useState(false)
 
-  const photoInputRef = useRef<HTMLInputElement>(null)
+  // Track pending note per item to avoid double-save
+  const pendingNotes = useRef<Record<string, string>>({})
+
+  const photoInputRef  = useRef<HTMLInputElement>(null)
   const [uploadingFor, setUploadingFor] = useState<string | null>(null)
 
-  useEffect(() => { if (checklistId) load() }, [checklistId])
-
-  async function load() {
+  const load = useCallback(async () => {
+    if (!checklistId) return
     setLoading(true)
     try {
-      const its = await fetchChecklistItems(checklistId!)
+      // Direct lookup — no loop over all projects
+      const [cl, its] = await Promise.all([
+        fetchChecklistById(checklistId),
+        fetchChecklistItems(checklistId),
+      ])
       setItems(its)
-      if (its.length > 0) {
-        // Find the parent checklist via event_id — we need to fetch it
-        const cl = await getChecklist()
-        if (cl) {
-          setChecklist(cl)
-          const siblings = await fetchEventChecklists(cl.event_id)
-          const other = siblings.find(s => s.id !== cl.id)
-          setSibling(other ?? null)
-        }
-      } else {
-        const cl = await getChecklist()
-        if (cl) {
-          setChecklist(cl)
-          const siblings = await fetchEventChecklists(cl.event_id)
-          const other = siblings.find(s => s.id !== cl.id)
-          setSibling(other ?? null)
-        }
+      if (cl) {
+        setChecklist(cl)
+        const siblings = await fetchEventChecklists(cl.event_id)
+        setSibling(siblings.find(s => s.id !== cl.id) ?? null)
       }
     } finally { setLoading(false) }
-  }
+  }, [checklistId])
 
-  async function getChecklist(): Promise<EventChecklist | null> {
-    // We don't have a direct fetchChecklistById — search across known projects
-    for (const p of projects) {
-      const cls = await fetchEventChecklists(p.id)
-      const found = cls.find(c => c.id === checklistId)
-      if (found) return found
-    }
-    return null
-  }
+  useEffect(() => { load() }, [load])
 
-  async function setCondition(
-    itemId: string, field: 'condition_in' | 'condition_out', value: ItemCondition
-  ) {
+  async function setCondition(itemId: string, field: 'condition_in' | 'condition_out', value: ItemCondition) {
     setSaving(itemId)
     await updateChecklistItem(itemId, { [field]: value })
     setItems(prev => prev.map(it => it.id === itemId ? { ...it, [field]: value } : it))
     setSaving(null)
   }
 
-  async function setNotes(itemId: string, notes: string) {
-    await updateChecklistItem(itemId, { notes })
+  // Notes: track locally on change, persist on blur only — avoids double-save
+  function handleNoteChange(itemId: string, notes: string) {
+    pendingNotes.current[itemId] = notes
     setItems(prev => prev.map(it => it.id === itemId ? { ...it, notes } : it))
+  }
+
+  async function handleNoteBlur(itemId: string) {
+    const notes = pendingNotes.current[itemId]
+    if (notes === undefined) return
+    delete pendingNotes.current[itemId]
+    await updateChecklistItem(itemId, { notes })
   }
 
   async function handleAddItem() {
     if (!newItem.name.trim() || !checklistId) return
-    const order = items.length
     const created = await createChecklistItem({
       checklist_id: checklistId,
       name:         newItem.name.trim(),
       category:     newItem.category || undefined,
       qty:          newItem.qty,
-      sort_order:   order,
+      sort_order:   items.length,
     })
     setItems(prev => [...prev, created])
     setNewItem({ name: '', category: '', qty: 1 })
@@ -165,10 +155,9 @@ export default function ChecklistDetailPage() {
 
   async function handlePhotoUpload(itemId: string, file: File) {
     if (!checklist) return
-    const eventId = checklist.event_id
     setSaving(itemId)
     try {
-      const url = await uploadItemPhoto(eventId, checklist.id, itemId, file)
+      const url = await uploadItemPhoto(checklist.event_id, checklist.id, itemId, file)
       const item = items.find(i => i.id === itemId)
       const photos = [...(item?.photos ?? []), url]
       await updateChecklistItem(itemId, { photos })
@@ -182,16 +171,17 @@ export default function ChecklistDetailPage() {
   const isCompleted = checklist?.status === 'completed'
   const projectName = projects.find(p => p.id === checklist?.event_id)?.name ?? checklist?.event_id ?? ''
 
-  // Group items by category
-  const grouped = ITEM_CATEGORIES.reduce<Record<string, ChecklistItem[]>>((acc, cat) => {
-    acc[cat] = items.filter(i => i.category === cat)
-    return acc
-  }, {} as Record<string, ChecklistItem[]>)
+  // Group items by category; uncategorized goes last
+  const grouped: Record<string, ChecklistItem[]> = {}
+  for (const cat of ITEM_CATEGORIES) {
+    const catItems = items.filter(i => i.category === cat)
+    if (catItems.length > 0) grouped[cat] = catItems
+  }
   const uncategorized = items.filter(i => !i.category || !ITEM_CATEGORIES.includes(i.category as ItemCategory))
   if (uncategorized.length > 0) grouped['Sin categoría'] = uncategorized
 
-  const worsened = items.filter(i => calcDelta(i) === 'worsened').length
-  const notReviewed = items.filter(i => calcDelta(i) === 'not_reviewed' && checklist?.type === 'delivery').length
+  const worsened    = items.filter(i => calcDelta(i) === 'worsened').length
+  const notReviewed = !isReception ? items.filter(i => calcDelta(i) === 'not_reviewed').length : 0
 
   if (loading) return (
     <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: '64px 0', fontSize: 14 }}>Cargando…</div>
@@ -223,15 +213,12 @@ export default function ChecklistDetailPage() {
             </span>
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-3)' }}>
-            {projectName} · {items.length} ítems · {new Date(checklist.created_at).toLocaleDateString('es-AR')}
+            {projectName} · {items.length} ítem{items.length !== 1 ? 's' : ''} · {new Date(checklist.created_at).toLocaleDateString('es-AR')}
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={() => navigate(`/planillas/${checklistId}/imprimir`)}
-          >
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/planillas/${checklistId}/imprimir`)}>
             <Printer size={13} /> Imprimir
           </button>
           {!isCompleted && (
@@ -240,20 +227,13 @@ export default function ChecklistDetailPage() {
             </button>
           )}
           {isReception && isCompleted && !sibling && (
-            <button
-              className="btn btn-primary btn-sm"
-              onClick={handleCreateDelivery}
-              disabled={creatingDelivery}
-            >
+            <button className="btn btn-primary btn-sm" onClick={handleCreateDelivery} disabled={creatingDelivery}>
               <Plus size={13} /> {creatingDelivery ? 'Creando…' : 'Crear acta de entrega'}
             </button>
           )}
           {sibling && (
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={() => navigate(`/planillas/${sibling.id}`)}
-            >
-              {sibling.type === 'reception' ? 'Ver recepción' : 'Ver entrega'} →
+            <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/planillas/${sibling.id}`)}>
+              {sibling.type === 'reception' ? '← Ver recepción' : 'Ver entrega →'}
             </button>
           )}
         </div>
@@ -269,20 +249,42 @@ export default function ChecklistDetailPage() {
         }}>
           <AlertTriangle size={16} style={{ color: worsened > 0 ? 'var(--red)' : '#d97706', flexShrink: 0, marginTop: 1 }} />
           <div>
-            {worsened > 0 && <span style={{ color: 'var(--red)', fontWeight: 600 }}>{worsened} ítem{worsened !== 1 ? 's' : ''} con deterioro</span>}
+            {worsened > 0 && (
+              <span style={{ color: 'var(--red)', fontWeight: 600 }}>
+                {worsened} ítem{worsened !== 1 ? 's' : ''} con deterioro
+              </span>
+            )}
             {worsened > 0 && notReviewed > 0 && <span style={{ color: 'var(--text-3)' }}> · </span>}
-            {notReviewed > 0 && <span style={{ color: '#d97706' }}>{notReviewed} sin revisar</span>}
+            {notReviewed > 0 && (
+              <span style={{ color: '#d97706' }}>{notReviewed} sin revisar</span>
+            )}
           </div>
+        </div>
+      )}
+
+      {/* Empty state when no items yet */}
+      {items.length === 0 && !addingItem && (
+        <div style={{
+          textAlign: 'center', padding: '48px 24px',
+          border: '1px dashed var(--border)', borderRadius: 10, marginBottom: 16,
+          color: 'var(--text-3)', fontSize: 13,
+        }}>
+          Esta planilla no tiene ítems todavía.
+          {!isCompleted && (
+            <div style={{ marginTop: 12 }}>
+              <button className="btn btn-primary btn-sm" onClick={() => setAddingItem(true)}>
+                <Plus size={13} /> Agregar primer ítem
+              </button>
+            </div>
+          )}
         </div>
       )}
 
       {/* Items grouped by category */}
       {Object.entries(grouped).map(([cat, catItems]) => {
-        if (catItems.length === 0) return null
         const isCollapsed = collapsed[cat] ?? false
         return (
           <div key={cat} style={{ marginBottom: 20 }}>
-            {/* Category header */}
             <div
               style={{
                 display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0',
@@ -292,7 +294,7 @@ export default function ChecklistDetailPage() {
             >
               {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
               {CAT_COLORS[cat] && (
-                <span style={{ width: 8, height: 8, borderRadius: 2, background: CAT_COLORS[cat] ?? '#6b7280', flexShrink: 0 }} />
+                <span style={{ width: 8, height: 8, borderRadius: 2, background: CAT_COLORS[cat], flexShrink: 0 }} />
               )}
               <span style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-2)' }}>
                 {cat}
@@ -304,40 +306,31 @@ export default function ChecklistDetailPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {catItems.map(item => {
                   const delta = calcDelta(item)
-                  const hasProblem = delta === 'worsened' || (!isReception && !item.condition_out)
                   return (
                     <div
                       key={item.id}
                       style={{
                         background: 'var(--surface)',
                         border: `1px solid ${delta === 'worsened' ? 'var(--red)' : 'var(--border)'}`,
-                        borderRadius: 8,
-                        padding: '10px 14px',
-                        position: 'relative',
+                        borderRadius: 8, padding: '10px 14px',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                        {/* Name + qty */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{ fontSize: 13, fontWeight: 500 }}>{item.name}</span>
-                            <span style={{
-                              fontSize: 11, color: 'var(--text-3)',
-                              background: 'var(--surface-2)', padding: '1px 5px', borderRadius: 4,
-                            }}>×{item.qty}</span>
-                            {delta === 'worsened' && (
-                              <span style={{ fontSize: 10, color: 'var(--red)', fontWeight: 600 }}>↓ Deteriorado</span>
-                            )}
-                            {delta === 'improved' && (
-                              <span style={{ fontSize: 10, color: 'var(--teal)', fontWeight: 600 }}>↑ Mejoró</span>
-                            )}
-                          </div>
-                          {saving === item.id && (
-                            <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Guardando…</span>
-                          )}
-                        </div>
-
-                        {/* Delete */}
+                      {/* Row: name + qty + badges + delete */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>{item.name}</span>
+                        <span style={{
+                          fontSize: 11, color: 'var(--text-3)',
+                          background: 'var(--surface-2)', padding: '1px 5px', borderRadius: 4,
+                        }}>×{item.qty}</span>
+                        {delta === 'worsened' && (
+                          <span style={{ fontSize: 10, color: 'var(--red)', fontWeight: 600 }}>↓ Deteriorado</span>
+                        )}
+                        {delta === 'improved' && (
+                          <span style={{ fontSize: 10, color: 'var(--teal)', fontWeight: 600 }}>↑ Mejoró</span>
+                        )}
+                        {saving === item.id && (
+                          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Guardando…</span>
+                        )}
                         {!isCompleted && (
                           <button
                             className="btn btn-ghost btn-sm btn-icon"
@@ -356,11 +349,7 @@ export default function ChecklistDetailPage() {
                             {isReception ? 'CONDICIÓN' : 'AL RECIBIR (ref.)'}
                           </div>
                           {isReception && !isCompleted ? (
-                            <ConditionPicker
-                              value={item.condition_in}
-                              onChange={v => setCondition(item.id, 'condition_in', v)}
-                              field="in"
-                            />
+                            <ConditionPicker value={item.condition_in} onChange={v => setCondition(item.id, 'condition_in', v)} />
                           ) : (
                             <span style={{
                               fontSize: 12, fontWeight: 600,
@@ -377,11 +366,7 @@ export default function ChecklistDetailPage() {
                             <div>
                               <div style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 4, fontWeight: 500 }}>AL DEVOLVER</div>
                               {!isCompleted ? (
-                                <ConditionPicker
-                                  value={item.condition_out}
-                                  onChange={v => setCondition(item.id, 'condition_out', v)}
-                                  field="out"
-                                />
+                                <ConditionPicker value={item.condition_out} onChange={v => setCondition(item.id, 'condition_out', v)} />
                               ) : (
                                 <span style={{
                                   fontSize: 12, fontWeight: 600,
@@ -395,15 +380,19 @@ export default function ChecklistDetailPage() {
                         )}
                       </div>
 
-                      {/* Notes */}
-                      {!isCompleted && (item.condition_in === 'fair' || item.condition_in === 'poor' || item.condition_out === 'fair' || item.condition_out === 'poor' || item.notes) && (
+                      {/* Notes — show if condition is fair/poor, or if notes already exist */}
+                      {!isCompleted && (
+                        item.condition_in === 'fair' || item.condition_in === 'poor' ||
+                        item.condition_out === 'fair' || item.condition_out === 'poor' ||
+                        item.notes
+                      ) && (
                         <textarea
                           placeholder="Observaciones…"
                           value={item.notes ?? ''}
-                          onChange={e => setNotes(item.id, e.target.value)}
-                          onBlur={e => updateChecklistItem(item.id, { notes: e.target.value })}
+                          onChange={e => handleNoteChange(item.id, e.target.value)}
+                          onBlur={e => handleNoteBlur(item.id)}
                           style={{
-                            width: '100%', marginTop: 10, fontSize: 12,
+                            width: '100%', marginTop: 10, fontSize: 12, boxSizing: 'border-box',
                             background: 'var(--surface-2)', border: '1px solid var(--border)',
                             borderRadius: 6, padding: '6px 10px', resize: 'vertical', minHeight: 48,
                             color: 'var(--text-1)', fontFamily: 'inherit',
@@ -417,26 +406,26 @@ export default function ChecklistDetailPage() {
                       )}
 
                       {/* Photos */}
-                      <div style={{ display: 'flex', gap: 8, marginTop: item.photos.length > 0 ? 10 : 0, flexWrap: 'wrap' }}>
-                        {item.photos.map((url, idx) => (
-                          <img
-                            key={idx}
-                            src={url}
-                            alt="foto"
-                            style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }}
-                          />
-                        ))}
-                        {!isCompleted && (item.condition_in === 'poor' || item.condition_out === 'poor' || item.photos.length > 0) && (
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            style={{ width: 64, height: 64, borderRadius: 6, border: '1px dashed var(--border)', flexDirection: 'column', gap: 4 }}
-                            onClick={() => { setUploadingFor(item.id); photoInputRef.current?.click() }}
-                          >
-                            <Camera size={16} style={{ color: 'var(--text-3)' }} />
-                            <span style={{ fontSize: 9, color: 'var(--text-3)' }}>Foto</span>
-                          </button>
-                        )}
-                      </div>
+                      {(item.photos.length > 0 || (!isCompleted && (item.condition_in === 'poor' || item.condition_out === 'poor'))) && (
+                        <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                          {item.photos.map((url, idx) => (
+                            <img
+                              key={idx} src={url} alt="foto"
+                              style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }}
+                            />
+                          ))}
+                          {!isCompleted && (
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              style={{ width: 64, height: 64, borderRadius: 6, border: '1px dashed var(--border)', flexDirection: 'column', gap: 4 }}
+                              onClick={() => { setUploadingFor(item.id); photoInputRef.current?.click() }}
+                            >
+                              <Camera size={16} style={{ color: 'var(--text-3)' }} />
+                              <span style={{ fontSize: 9, color: 'var(--text-3)' }}>Foto</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -448,10 +437,10 @@ export default function ChecklistDetailPage() {
 
       {/* Add item */}
       {!isCompleted && (
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 8 }}>
           {addingItem ? (
             <div style={{
-              display: 'flex', gap: 8, alignItems: 'center',
+              display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap',
               background: 'var(--surface-2)', border: '1px solid var(--teal)',
               borderRadius: 8, padding: '10px 14px',
             }}>
@@ -461,7 +450,7 @@ export default function ChecklistDetailPage() {
                 value={newItem.name}
                 onChange={e => setNewItem(v => ({ ...v, name: e.target.value }))}
                 onKeyDown={e => { if (e.key === 'Enter') handleAddItem(); if (e.key === 'Escape') setAddingItem(false) }}
-                style={{ flex: 1, fontSize: 13 }}
+                style={{ flex: 1, minWidth: 140, fontSize: 13 }}
               />
               <select
                 className="input"
@@ -475,7 +464,7 @@ export default function ChecklistDetailPage() {
               <input
                 type="number" min={1} className="input"
                 value={newItem.qty}
-                onChange={e => setNewItem(v => ({ ...v, qty: Number(e.target.value) }))}
+                onChange={e => setNewItem(v => ({ ...v, qty: Math.max(1, Number(e.target.value)) }))}
                 style={{ width: 64, fontSize: 13, textAlign: 'center' }}
                 title="Cantidad"
               />
@@ -483,11 +472,7 @@ export default function ChecklistDetailPage() {
               <button className="btn btn-ghost btn-sm" onClick={() => setAddingItem(false)}>Cancelar</button>
             </div>
           ) : (
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={() => setAddingItem(true)}
-              style={{ color: 'var(--teal)' }}
-            >
+            <button className="btn btn-ghost btn-sm" onClick={() => setAddingItem(true)} style={{ color: 'var(--teal)' }}>
               <Plus size={13} /> Agregar ítem
             </button>
           )}
@@ -497,9 +482,7 @@ export default function ChecklistDetailPage() {
       {/* Hidden photo input */}
       <input
         ref={photoInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
+        type="file" accept="image/*" capture="environment"
         style={{ display: 'none' }}
         onChange={async e => {
           const file = e.target.files?.[0]
