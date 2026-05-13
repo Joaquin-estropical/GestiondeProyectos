@@ -3,18 +3,19 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Home, Sun, Sparkles, Calendar, BarChart3, Settings,
   ChevronDown, ChevronRight, Plus, PanelLeftClose, PanelLeftOpen,
-  LayoutTemplate, LogOut, ChevronUp,
+  LayoutTemplate, LogOut, ChevronUp, ClipboardList,
 } from 'lucide-react'
 import { useAppStore } from '@/stores/app'
 import { Avatar } from '@/components/shared/Avatar'
 import { APP_USERS, clearCurrentUser, setCurrentUser as saveUser } from '@/lib/auth'
 
 const WS_ITEMS = [
-  { id: 'dashboard', label: 'Inicio',            Icon: Home,      path: '/'             },
-  { id: 'myday',     label: 'Mi día',            Icon: Sun,       path: '/mi-dia'       },
-  { id: 'ai',        label: 'Asistente IA',      Icon: Sparkles,  path: '/asistente-ia' },
-  { id: 'calendar',  label: 'Calendario global', Icon: Calendar,  path: '/calendario'   },
-  { id: 'reports',   label: 'Reportes',          Icon: BarChart3, path: '/reportes'     },
+  { id: 'dashboard', label: 'Inicio',            Icon: Home,          path: '/'             },
+  { id: 'myday',     label: 'Mi día',            Icon: Sun,           path: '/mi-dia'       },
+  { id: 'ai',        label: 'Asistente IA',      Icon: Sparkles,      path: '/asistente-ia' },
+  { id: 'calendar',  label: 'Calendario global', Icon: Calendar,      path: '/calendario'   },
+  { id: 'reports',   label: 'Reportes',          Icon: BarChart3,     path: '/reportes'     },
+  { id: 'planillas', label: 'Planillas',          Icon: ClipboardList, path: '/planillas'    },
 ]
 
 interface SidebarProps {

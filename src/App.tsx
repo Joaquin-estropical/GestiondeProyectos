@@ -23,6 +23,11 @@ import AreaView     from '@/pages/AreaView'
 import ProjectPage  from '@/pages/ProjectPage'
 import Landing      from '@/pages/Landing'
 import LoginPage    from '@/pages/LoginPage'
+import PlanillasPage       from '@/pages/planillas/PlanillasPage'
+import ChecklistDetailPage from '@/pages/planillas/ChecklistDetailPage'
+import PrintPage           from '@/pages/planillas/PrintPage'
+import TemplatesPage       from '@/pages/planillas/TemplatesPage'
+import TemplateDetailPage  from '@/pages/planillas/TemplateDetailPage'
 
 function AppRoutes() {
   const {
@@ -84,7 +89,13 @@ function AppRoutes() {
           <Route path="/empty-states"  element={<EmptyStates />}  />
           <Route path="/area/:areaId"  element={<AreaView />}     />
           <Route path="/proyecto/:projectId" element={<ProjectPage />} />
+          <Route path="/planillas"              element={<PlanillasPage />}       />
+          <Route path="/planillas/:checklistId" element={<ChecklistDetailPage />} />
+          <Route path="/planillas/plantillas"   element={<TemplatesPage />}       />
+          <Route path="/planillas/plantillas/:templateId" element={<TemplateDetailPage />} />
         </Route>
+        {/* Print is outside AppShell (sin navegación) */}
+        <Route path="/planillas/:checklistId/imprimir" element={<PrintPage />} />
       </Routes>
 
       {/* Overlays globales */}
