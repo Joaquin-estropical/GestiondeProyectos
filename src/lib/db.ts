@@ -154,14 +154,13 @@ export async function fetchTasks(filters?: {
   return (data as Record<string, unknown>[]).map(normaliseTask)
 }
 
-let taskCounter = 100
 export async function createTask(input: {
   title: string; project: string; area: string; assignee: string
   due: string; priority: TaskPriority; description?: string; start_date?: string; helper?: string
 }): Promise<Task> {
-  taskCounter++
-  const id   = 't-' + Date.now().toString(36)
-  const code = `OT-${String(taskCounter).padStart(3, '0')}`
+  const ts   = Date.now()
+  const id   = 't-' + ts.toString(36)
+  const code = `OT-${ts.toString(36).slice(-5).toUpperCase()}`
   const row = {
     id, code,
     title:       input.title,

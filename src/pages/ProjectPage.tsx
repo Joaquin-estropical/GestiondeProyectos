@@ -1,6 +1,6 @@
 import { useState, useReducer, useCallback, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { List, Kanban, GanttChart as GanttIcon, Calendar, Table, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, ChevronLeft, ChevronRight, X, Pen, Trash2, ExternalLink } from 'lucide-react';
+import { List, Kanban, GanttChart as GanttIcon, Calendar, Table, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, ChevronLeft, ChevronRight, X, Pen, Trash2 } from 'lucide-react';
 import { useProjects, useTasks, useMembers } from '@/hooks/useSupabase';
 import { getMember, STATUS_ORDER, STATUS_LABELS, fmtDate, dueColor } from '@/lib/mock-data';
 import { useAppStore } from '@/stores/app';
@@ -11,23 +11,32 @@ import type { Task, TaskStatus } from '@/types';
 
 // ─── Project actions dropdown ───
 function ProjectActionsMenu({ projectId }: { projectId: string }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
   const { openEditProject } = useAppStore();
+
+  const open = pos !== null;
 
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (btnRef.current && !btnRef.current.contains(target)) setPos(null);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
+  const toggle = () => {
+    if (open) { setPos(null); return; }
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+  };
+
   const item = (icon: React.ReactNode, label: string, color: string, onClick: () => void) => (
     <button
       style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 14px', background: 'none', border: 'none', color, fontSize: 13, cursor: 'pointer', textAlign: 'left' }}
-      onClick={() => { setOpen(false); onClick(); }}
+      onClick={() => { setPos(null); onClick(); }}
       onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
       onMouseLeave={e => (e.currentTarget.style.background = 'none')}
     >
@@ -36,24 +45,23 @@ function ProjectActionsMenu({ projectId }: { projectId: string }) {
   );
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <button className="btn btn-secondary btn-sm btn-icon" onClick={() => setOpen(v => !v)}>
+    <>
+      <button ref={btnRef} className="btn btn-secondary btn-sm btn-icon" onClick={toggle}>
         <MoreHorizontal size={14} />
       </button>
-      {open && (
+      {open && pos && (
         <div style={{
-          position: 'absolute', top: '100%', right: 0, zIndex: 300, marginTop: 4,
+          position: 'fixed', top: pos.top, right: pos.right, zIndex: 9000,
           background: 'var(--surface-1)', border: '1px solid var(--border)',
-          borderRadius: 8, padding: '4px 0', minWidth: 190,
-          boxShadow: '0 8px 24px rgba(0,0,0,.4)',
+          borderRadius: 8, padding: '4px 0', minWidth: 200,
+          boxShadow: '0 8px 24px rgba(0,0,0,.5)',
         }}>
           {item(<Pen size={13} color="var(--text-2)" />, 'Renombrar / editar', 'var(--text-1)', () => openEditProject(projectId))}
-          {item(<ExternalLink size={13} color="var(--text-2)" />, 'Duplicar proyecto', 'var(--text-2)', () => {})}
           <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
           {item(<Trash2 size={13} color="var(--red)" />, 'Eliminar proyecto', 'var(--red)', () => openEditProject(projectId))}
         </div>
       )}
-    </div>
+    </>
   );
 }
 

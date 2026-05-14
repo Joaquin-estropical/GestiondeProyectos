@@ -9,57 +9,61 @@ import { PageHead } from '@/components/shared/PageHead';
 import { useAppStore } from '@/stores/app';
 
 // ── Dropdown menu for project cards ──
-function ProjectMenu({ onEdit }: { projectId: string; onEdit: () => void }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+function ProjectMenu({ projectId: _projectId, onEdit }: { projectId: string; onEdit: () => void }) {
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const open = pos !== null;
 
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (btnRef.current && !btnRef.current.contains(e.target as Node)) setPos(null);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
+  const toggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (open) { setPos(null); return; }
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+  };
+
+  const menuItem = (icon: React.ReactNode, label: string, color: string, onClick: () => void) => (
+    <button
+      style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 14px', background: 'none', border: 'none', color, fontSize: 13, cursor: 'pointer', textAlign: 'left' }}
+      onClick={e => { e.stopPropagation(); setPos(null); onClick(); }}
+      onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+    >
+      {icon} {label}
+    </button>
+  );
+
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <>
       <button
+        ref={btnRef}
         className="btn btn-ghost btn-sm btn-icon"
         style={{ width: 26, height: 26, opacity: 0.7 }}
-        onClick={e => { e.stopPropagation(); setOpen(v => !v); }}
+        onClick={toggle}
       >
         <MoreHorizontal size={14} />
       </button>
-      {open && (
+      {open && pos && (
         <div style={{
-          position: 'absolute', top: '100%', right: 0, zIndex: 200,
+          position: 'fixed', top: pos.top, right: pos.right, zIndex: 9000,
           background: 'var(--surface-1)', border: '1px solid var(--border)',
-          borderRadius: 8, padding: '4px 0', minWidth: 160,
-          boxShadow: '0 8px 24px rgba(0,0,0,.4)',
+          borderRadius: 8, padding: '4px 0', minWidth: 180,
+          boxShadow: '0 8px 24px rgba(0,0,0,.5)',
         }}>
-          <button
-            className="dropdown-item"
-            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: 'var(--text-1)', fontSize: 13, cursor: 'pointer', textAlign: 'left' }}
-            onClick={e => { e.stopPropagation(); setOpen(false); onEdit(); }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-          >
-            <Pen size={13} color="var(--text-2)" /> Renombrar / editar
-          </button>
+          {menuItem(<Pen size={13} color="var(--text-2)" />, 'Renombrar / editar', 'var(--text-1)', onEdit)}
           <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-          <button
-            className="dropdown-item"
-            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: 'var(--red)', fontSize: 13, cursor: 'pointer', textAlign: 'left' }}
-            onClick={e => { e.stopPropagation(); setOpen(false); onEdit(); }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-          >
-            <Trash2 size={13} /> Eliminar proyecto
-          </button>
+          {menuItem(<Trash2 size={13} color="var(--red)" />, 'Eliminar proyecto', 'var(--red)', onEdit)}
         </div>
       )}
-    </div>
+    </>
   );
 }
 
