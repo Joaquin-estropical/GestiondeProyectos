@@ -10,7 +10,7 @@ const COND_COLOR: Record<string, string> = { good: '#059669', fair: '#d97706', p
 // Logo fiel al original: corazón azul + pin rojo encima + wordmark todo azul
 function EstropicalLogo() {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
       <svg width="52" height="40" viewBox="0 0 52 40" fill="none" xmlns="http://www.w3.org/2000/svg">
         {/* Corazón azul (mitad izquierda más grande, mitad derecha más chica) */}
         <path d="M20 34C20 34 2 22.5 2 12.5C2 7.25 6.25 3 11.5 3C14.42 3 17 4.4 18.5 6.6C19.1 5.5 20.2 4.1 21.5 3.5C18.5 6.5 18.5 10 20 12.5L20 34Z" fill="#003DA5"/>
