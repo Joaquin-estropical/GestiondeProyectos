@@ -1,5 +1,5 @@
 import { supabase, supabaseWriter } from './supabase'
-import type { ChecklistTemplate, TemplateItem, EventChecklist, ChecklistItem, ItemCondition, ChecklistItemDelta } from '@/types'
+import type { ChecklistTemplate, TemplateItem, EventChecklist, ChecklistItem, ItemCondition, ChecklistItemDelta, TemplateKind } from '@/types'
 
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6) }
 
@@ -16,16 +16,16 @@ export async function fetchChecklistById(id: string): Promise<EventChecklist | n
   return data as EventChecklist
 }
 
-export async function createChecklistTemplate(input: { name: string; description?: string }): Promise<ChecklistTemplate> {
+export async function createChecklistTemplate(input: { name: string; description?: string; kind?: TemplateKind }): Promise<ChecklistTemplate> {
   const { data, error } = await supabaseWriter
     .from('checklist_templates')
-    .insert({ name: input.name, description: input.description ?? null })
+    .insert({ name: input.name, description: input.description ?? null, kind: input.kind ?? 'custom' })
     .select().single()
   if (error) throw error
   return data as ChecklistTemplate
 }
 
-export async function updateChecklistTemplate(id: string, patch: Partial<Pick<ChecklistTemplate, 'name' | 'description'>>): Promise<void> {
+export async function updateChecklistTemplate(id: string, patch: Partial<Pick<ChecklistTemplate, 'name' | 'description' | 'kind'>>): Promise<void> {
   const { error } = await supabaseWriter
     .from('checklist_templates')
     .update({ ...patch, updated_at: new Date().toISOString() })
@@ -43,7 +43,7 @@ export async function duplicateChecklistTemplate(id: string): Promise<ChecklistT
   if (e1 || !tpl) throw e1 ?? new Error('Template not found')
   const { data: newTpl, error: e2 } = await supabaseWriter
     .from('checklist_templates')
-    .insert({ name: (tpl as ChecklistTemplate).name + ' (copia)', description: (tpl as ChecklistTemplate).description })
+    .insert({ name: (tpl as ChecklistTemplate).name + ' (copia)', description: (tpl as ChecklistTemplate).description, kind: (tpl as ChecklistTemplate).kind })
     .select().single()
   if (e2 || !newTpl) throw e2 ?? new Error('Failed to duplicate')
   const { data: items } = await supabase.from('template_items').select('*').eq('template_id', id).order('sort_order')

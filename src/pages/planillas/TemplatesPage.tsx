@@ -1,11 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Copy, Trash2, ChevronRight, Layers, Pencil, Check, X } from 'lucide-react'
-import type { ChecklistTemplate } from '@/types'
+import type { ChecklistTemplate, TemplateKind } from '@/types'
+import { TEMPLATE_KIND_LABELS } from '@/types'
 import {
   fetchChecklistTemplates, createChecklistTemplate,
   updateChecklistTemplate, deleteChecklistTemplate, duplicateChecklistTemplate,
 } from '@/lib/planillas'
+
+const KIND_COLORS: Record<TemplateKind, string> = {
+  event_delivery:  '#6366f1',
+  branch_delivery: '#0d9488',
+  local_return:    '#f59e0b',
+  custom:          '#6b7280',
+}
 
 export default function TemplatesPage() {
   const navigate = useNavigate()
@@ -13,6 +21,7 @@ export default function TemplatesPage() {
   const [loading, setLoading]     = useState(true)
   const [creating, setCreating]   = useState(false)
   const [newName, setNewName]     = useState('')
+  const [newKind, setNewKind]     = useState<TemplateKind>('custom')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName]   = useState('')
 
@@ -25,7 +34,7 @@ export default function TemplatesPage() {
 
   async function handleCreate() {
     if (!newName.trim()) return
-    await createChecklistTemplate({ name: newName.trim() })
+    await createChecklistTemplate({ name: newName.trim(), kind: newKind })
     setNewName(''); setCreating(false); load()
   }
 
@@ -46,6 +55,8 @@ export default function TemplatesPage() {
     await deleteChecklistTemplate(id); load()
   }
 
+  const kindEntries = Object.entries(TEMPLATE_KIND_LABELS) as [TemplateKind, string][]
+
   return (
     <div style={{ maxWidth: 700, margin: '0 auto', padding: '28px 24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
@@ -62,18 +73,34 @@ export default function TemplatesPage() {
 
       {creating && (
         <div style={{
-          display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16,
+          display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16,
           background: 'var(--surface-2)', border: '1px solid var(--teal)',
-          borderRadius: 8, padding: '10px 14px',
+          borderRadius: 8, padding: '14px 16px',
         }}>
           <input
             autoFocus className="input" placeholder="Nombre de la plantilla…"
             value={newName} onChange={e => setNewName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setCreating(false) }}
-            style={{ flex: 1 }}
           />
-          <button className="btn btn-primary btn-sm" onClick={handleCreate} disabled={!newName.trim()}>Crear</button>
-          <button className="btn btn-ghost btn-sm" onClick={() => setCreating(false)}>Cancelar</button>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 500, display: 'block', marginBottom: 6 }}>Tipo</label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {kindEntries.map(([k, label]) => (
+                <button
+                  key={k}
+                  className={`btn btn-sm ${newKind === k ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setNewKind(k)}
+                  style={{ fontSize: 12 }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button className="btn btn-primary btn-sm" onClick={handleCreate} disabled={!newName.trim()}>Crear</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setCreating(false)}>Cancelar</button>
+          </div>
         </div>
       )}
 
@@ -96,34 +123,39 @@ export default function TemplatesPage() {
               style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 background: 'var(--surface)', border: '1px solid var(--border)',
+                borderLeft: `3px solid ${KIND_COLORS[tpl.kind]}`,
                 borderRadius: 8, padding: '12px 14px',
                 transition: 'border-color .12s',
               }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--teal)')}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
             >
-              <Layers size={15} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
-
-              {editingId === tpl.id ? (
-                <>
-                  <input
-                    autoFocus className="input" value={editName}
-                    onChange={e => setEditName(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') handleRename(tpl.id); if (e.key === 'Escape') setEditingId(null) }}
-                    style={{ flex: 1, fontSize: 13 }}
-                    onClick={e => e.stopPropagation()}
-                  />
-                  <button className="btn btn-primary btn-sm btn-icon" onClick={() => handleRename(tpl.id)}><Check size={13} /></button>
-                  <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setEditingId(null)}><X size={13} /></button>
-                </>
-              ) : (
-                <>
-                  <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => navigate(`/planillas/plantillas/${tpl.id}`)}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {editingId === tpl.id ? (
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input
+                      autoFocus className="input" value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleRename(tpl.id); if (e.key === 'Escape') setEditingId(null) }}
+                      style={{ flex: 1, fontSize: 13 }}
+                      onClick={e => e.stopPropagation()}
+                    />
+                    <button className="btn btn-primary btn-sm btn-icon" onClick={() => handleRename(tpl.id)}><Check size={13} /></button>
+                    <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setEditingId(null)}><X size={13} /></button>
+                  </div>
+                ) : (
+                  <div style={{ cursor: 'pointer' }} onClick={() => navigate(`/planillas/plantillas/${tpl.id}`)}>
                     <div style={{ fontSize: 14, fontWeight: 600 }}>{tpl.name}</div>
+                    <div style={{ fontSize: 11, color: KIND_COLORS[tpl.kind], marginTop: 2, fontWeight: 500 }}>
+                      {TEMPLATE_KIND_LABELS[tpl.kind]}
+                    </div>
                     {tpl.description && (
-                      <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{tpl.description}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 1 }}>{tpl.description}</div>
                     )}
                   </div>
+                )}
+              </div>
+
+              {editingId !== tpl.id && (
+                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                   <button
                     className="btn btn-ghost btn-sm btn-icon" title="Renombrar"
                     onClick={e => { e.stopPropagation(); setEditingId(tpl.id); setEditName(tpl.name) }}
@@ -147,7 +179,7 @@ export default function TemplatesPage() {
                     size={14} style={{ color: 'var(--text-3)', cursor: 'pointer' }}
                     onClick={() => navigate(`/planillas/plantillas/${tpl.id}`)}
                   />
-                </>
+                </div>
               )}
             </div>
           ))}

@@ -1,6 +1,7 @@
 -- ================================================================
--- MÓDULO PLANILLAS: Recepción y entrega de locales
+-- MÓDULO PLANILLAS v2: Recepción y entrega de locales
 -- Ejecutar en: Supabase Dashboard → SQL Editor
+-- Idempotente: se puede ejecutar múltiples veces sin error
 -- ================================================================
 
 -- 1. PLANTILLAS REUTILIZABLES
@@ -8,9 +9,16 @@ create table if not exists checklist_templates (
   id          uuid primary key default gen_random_uuid(),
   name        text not null,
   description text,
+  kind        text not null default 'custom'
+              check (kind in ('event_delivery', 'branch_delivery', 'local_return', 'custom')),
   created_at  timestamptz default now(),
   updated_at  timestamptz default now()
 );
+
+-- Agregar columna kind si la tabla ya existe sin ella
+alter table checklist_templates
+  add column if not exists kind text not null default 'custom'
+  check (kind in ('event_delivery', 'branch_delivery', 'local_return', 'custom'));
 
 -- 2. ÍTEMS DE PLANTILLA
 create table if not exists template_items (
@@ -22,16 +30,24 @@ create table if not exists template_items (
   created_at   timestamptz default now()
 );
 
--- 3. PLANILLAS POR EVENTO (recepción o entrega)
+-- 3. PLANILLAS POR EVENTO / ÁREA (recepción o entrega)
 create table if not exists event_checklists (
-  id           uuid primary key default gen_random_uuid(),
-  event_id     text not null,
-  type         text not null check (type in ('reception', 'delivery')),
-  status       text default 'pending' check (status in ('pending', 'in_progress', 'completed')),
-  template_id  uuid references checklist_templates(id),
-  completed_at timestamptz,
-  created_at   timestamptz default now()
+  id                   uuid primary key default gen_random_uuid(),
+  event_id             text not null,
+  type                 text not null check (type in ('reception', 'delivery')),
+  status               text default 'pending' check (status in ('pending', 'in_progress', 'completed')),
+  template_id          uuid references checklist_templates(id),
+  title                text,
+  assigned_to_project  text,
+  assigned_to_area     text,
+  completed_at         timestamptz,
+  created_at           timestamptz default now()
 );
+
+-- Agregar columnas nuevas si la tabla ya existe sin ellas
+alter table event_checklists add column if not exists title               text;
+alter table event_checklists add column if not exists assigned_to_project text;
+alter table event_checklists add column if not exists assigned_to_area    text;
 
 -- 4. ÍTEMS DE PLANILLA
 create table if not exists checklist_items (
@@ -79,58 +95,64 @@ insert into storage.buckets (id, name, public)
   values ('event-photos', 'event-photos', true)
   on conflict (id) do nothing;
 
--- ── SEED: Plantilla general de eventos ────────────────────
-insert into checklist_templates (id, name, description)
+-- ── SEED: Actualizar kind de plantilla existente ───────────
+update checklist_templates
+set kind = 'event_delivery'
+where id = 'aaaaaaaa-0000-0000-0000-000000000001';
+
+-- ── SEED: Plantilla "Entrega de local (eventos)" ──────────
+insert into checklist_templates (id, name, description, kind)
 values (
   'aaaaaaaa-0000-0000-0000-000000000001',
   'Plantilla general de eventos',
-  'Plantilla base para eventos comerciales de mediana y gran escala. Editable.'
+  'Plantilla base para eventos comerciales de mediana y gran escala. Editable.',
+  'event_delivery'
 ) on conflict (id) do nothing;
 
 insert into template_items (template_id, name, category, sort_order) values
   -- Mobiliario
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Sillas',                                          'Mobiliario',       1),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Mesas redondas',                                  'Mobiliario',       2),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Mesas rectangulares',                             'Mobiliario',       3),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Mesas altas / cocteleras',                        'Mobiliario',       4),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Muebles de lounge (sofás, sillones, puffs)',      'Mobiliario',       5),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Atril / podio',                                   'Mobiliario',       6),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Percheros',                                       'Mobiliario',       7),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Sillas',                                                          'Mobiliario',        1),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Mesas redondas',                                                  'Mobiliario',        2),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Mesas rectangulares',                                             'Mobiliario',        3),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Mesas altas / cocteleras',                                        'Mobiliario',        4),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Muebles de lounge (sofás, sillones, puffs)',                      'Mobiliario',        5),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Atril / podio',                                                   'Mobiliario',        6),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Percheros',                                                       'Mobiliario',        7),
   -- Telas y textiles
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Manteles',                                        'Telas y textiles', 1),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Caminos de mesa',                                 'Telas y textiles', 2),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Servilletas de tela',                             'Telas y textiles', 3),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Lazos / cintas para sillas',                      'Telas y textiles', 4),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Fundas de silla',                                 'Telas y textiles', 5),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Telas de fondo / backdrop',                       'Telas y textiles', 6),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Cortinas',                                        'Telas y textiles', 7),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Manteles',                                                        'Telas y textiles',  1),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Caminos de mesa',                                                 'Telas y textiles',  2),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Servilletas de tela',                                             'Telas y textiles',  3),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Lazos / cintas para sillas',                                      'Telas y textiles',  4),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Fundas de silla',                                                 'Telas y textiles',  5),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Telas de fondo / backdrop',                                       'Telas y textiles',  6),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Cortinas',                                                        'Telas y textiles',  7),
   -- Decoración
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Elementos decorativos de mesa (centros, candelabros, jarrones)', 'Decoración', 1),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Espejos y cuadros',                               'Decoración',       2),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Estructuras decorativas (arcos, columnas, marcos)','Decoración',      3),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Alfombras',                                       'Decoración',       4),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Plantas / vegetación decorativa',                 'Decoración',       5),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Señalética y cartelería del local',               'Decoración',       6),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Elementos decorativos de mesa (centros, candelabros, jarrones)',  'Decoración',        1),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Espejos y cuadros',                                               'Decoración',        2),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Estructuras decorativas (arcos, columnas, marcos)',               'Decoración',        3),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Alfombras',                                                       'Decoración',        4),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Plantas / vegetación decorativa',                                 'Decoración',        5),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Señalética y cartelería del local',                               'Decoración',        6),
   -- Iluminación
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Iluminación general (funcionamiento)',             'Iluminación',      1),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Iluminación ambiental / decorativa',              'Iluminación',      2),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Iluminación de escena / reflectores',             'Iluminación',      3),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Extensiones y cables de poder',                   'Iluminación',      4),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Tablero eléctrico / breakers',                    'Iluminación',      5),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Iluminación general (funcionamiento)',                             'Iluminación',       1),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Iluminación ambiental / decorativa',                              'Iluminación',       2),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Iluminación de escena / reflectores',                             'Iluminación',       3),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Extensiones y cables de poder',                                   'Iluminación',       4),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Tablero eléctrico / breakers',                                    'Iluminación',       5),
   -- Audiovisual
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Sistema de sonido',                               'Audiovisual',      1),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Micrófonos',                                      'Audiovisual',      2),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Pantallas / proyector',                           'Audiovisual',      3),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Cables y conectores',                             'Audiovisual',      4),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Conectividad (WiFi / red)',                       'Audiovisual',      5),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Sistema de sonido',                                               'Audiovisual',       1),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Micrófonos',                                                      'Audiovisual',       2),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Pantallas / proyector',                                           'Audiovisual',       3),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Cables y conectores',                                             'Audiovisual',       4),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Conectividad (WiFi / red)',                                       'Audiovisual',       5),
   -- Instalaciones
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Pisos (estado general)',                          'Instalaciones',    1),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Paredes y pintura (estado general)',              'Instalaciones',    2),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Puertas y ventanas (funcionamiento)',             'Instalaciones',    3),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Baños (limpieza y funcionamiento)',               'Instalaciones',    4),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Cocina / área de servicio',                      'Instalaciones',    5),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Climatización (A/C o calefacción)',              'Instalaciones',    6),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Extintores y señalética de emergencia',           'Instalaciones',    7),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Áreas exteriores / terraza',                     'Instalaciones',    8),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Llaves y controles de acceso',                   'Instalaciones',    9)
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Pisos (estado general)',                                          'Instalaciones',     1),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Paredes y pintura (estado general)',                              'Instalaciones',     2),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Puertas y ventanas (funcionamiento)',                             'Instalaciones',     3),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Baños (limpieza y funcionamiento)',                               'Instalaciones',     4),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Cocina / área de servicio',                                      'Instalaciones',     5),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Climatización (A/C o calefacción)',                               'Instalaciones',     6),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Extintores y señalética de emergencia',                           'Instalaciones',     7),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Áreas exteriores / terraza',                                     'Instalaciones',     8),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Llaves y controles de acceso',                                    'Instalaciones',     9)
 on conflict do nothing;

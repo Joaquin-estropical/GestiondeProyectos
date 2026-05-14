@@ -120,6 +120,14 @@ export type ChecklistType      = 'reception' | 'delivery'
 export type ChecklistStatus    = 'pending' | 'in_progress' | 'completed'
 export type ItemCondition      = 'good' | 'fair' | 'poor'
 export type ChecklistItemDelta = 'improved' | 'same' | 'worsened' | 'pending'
+export type TemplateKind       = 'event_delivery' | 'branch_delivery' | 'local_return' | 'custom'
+
+export const TEMPLATE_KIND_LABELS: Record<TemplateKind, string> = {
+  event_delivery:  'Entrega de local (eventos)',
+  branch_delivery: 'Entrega de sucursal',
+  local_return:    'Devolución de local',
+  custom:          'Personalizada',
+}
 
 export const DEFAULT_CATEGORIES = [
   'Mobiliario',
@@ -134,6 +142,7 @@ export interface ChecklistTemplate {
   id:          string
   name:        string
   description: string | null
+  kind:        TemplateKind
   created_at:  string
   updated_at:  string
 }
@@ -148,13 +157,16 @@ export interface TemplateItem {
 }
 
 export interface EventChecklist {
-  id:           string
-  event_id:     string
-  type:         ChecklistType
-  status:       ChecklistStatus
-  template_id:  string | null
-  completed_at: string | null
-  created_at:   string
+  id:                  string
+  event_id:            string
+  type:                ChecklistType
+  status:              ChecklistStatus
+  template_id:         string | null
+  title:               string | null
+  assigned_to_project: string | null
+  assigned_to_area:    string | null
+  completed_at:        string | null
+  created_at:          string
 }
 
 export interface ChecklistItem {
