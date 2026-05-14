@@ -42,7 +42,7 @@ export async function createArea(input: {
     .insert({ id, slug, ...input })
     .select()
     .single()
-  if (error) throw error
+  if (error) throw new Error(`${error.message} | code:${error.code} | details:${error.details} | hint:${error.hint}`)
   return data as Area
 }
 

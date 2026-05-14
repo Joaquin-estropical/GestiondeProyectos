@@ -66,12 +66,8 @@ export function NewAreaModal() {
       await refreshAll()
       closeNewArea()
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Error al guardar'
-      if (msg.includes('invalid input value for enum') || msg.includes('area_type')) {
-        setError('El tipo "Otros" requiere una migración pendiente en Supabase. Ejecutá el SQL de migración (planillas_migration.sql) primero.')
-      } else {
-        setError(msg)
-      }
+      const msg = e instanceof Error ? e.message : JSON.stringify(e)
+      setError(msg)
     } finally {
       setSaving(false)
     }
