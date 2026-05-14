@@ -498,6 +498,7 @@ function ProjectCalendar({ tasks, openTask }: { tasks: Task[]; openTask: (id: st
   const today = new Date();
   const [year,  setYear]  = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
+  const [showSide, setShowSide] = useState(true);
 
   const monthStart   = new Date(year, month, 1);
   const startWeekday = (monthStart.getDay() + 6) % 7;
@@ -536,55 +537,88 @@ function ProjectCalendar({ tasks, openTask }: { tasks: Task[]; openTask: (id: st
     s === 'done' ? 'var(--green)' : s === 'block' ? 'var(--red)' : s === 'rev' ? 'var(--amber)' : s === 'curso' ? 'var(--blue)' : 'var(--text-3)';
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', height: '100%' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 24px', borderBottom: '1px solid var(--border)' }}>
+    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+      {/* Calendar grid — fills all available space */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Toolbar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
           <button className="btn btn-ghost btn-sm btn-icon" onClick={prev}><ChevronLeft size={14} /></button>
-          <span style={{ fontWeight: 600, fontSize: 14, minWidth: 160, textAlign: 'center' }}>{MONTHS_FULL[month]} {year}</span>
+          <span style={{ fontWeight: 600, fontSize: 14, minWidth: 150, textAlign: 'center' }}>{MONTHS_FULL[month]} {year}</span>
           <button className="btn btn-ghost btn-sm btn-icon" onClick={next}><ChevronRight size={14} /></button>
-          <button className="btn btn-secondary btn-sm" style={{ marginLeft: 8 }} onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth()); setSel(todayIso); }}>Hoy</button>
+          <button className="btn btn-secondary btn-sm" style={{ marginLeft: 4 }} onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth()); setSel(todayIso); }}>Hoy</button>
+          <button
+            className="btn btn-ghost btn-sm btn-icon"
+            style={{ marginLeft: 'auto' }}
+            title={showSide ? 'Ocultar panel' : 'Mostrar panel'}
+            onClick={() => setShowSide(v => !v)}
+          >
+            <ChevronRight size={14} style={{ transform: showSide ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform .2s' }} />
+          </button>
         </div>
-        <div className="cal-grid" style={{ flex: 1 }}>
-          {DAYS.map(d => <div key={d} className="cal-wkh">{d}</div>)}
-          {cells.map((c, i) => {
-            const iso     = isoOf(c.date);
-            const isToday = iso === todayIso;
-            const isSel   = iso === sel;
-            const evts    = taskByDay[iso] || [];
-            return (
-              <div
-                key={i}
-                className={`cal-cell ${c.muted ? 'muted' : ''} ${isToday ? 'today' : ''} ${isSel ? 'sel' : ''}`}
-                onClick={() => setSel(iso)}
-              >
-                <span className="num">{c.date.getDate()}</span>
-                {evts.slice(0, 3).map(t => (
-                  <div key={t.id} className="cal-event" style={{ background: statusColor(t.status) + '20' }} onClick={e => { e.stopPropagation(); openTask(t.id); }}>
-                    <span className="dot" style={{ background: statusColor(t.status) }}></span>{t.title}
-                  </div>
-                ))}
-                {evts.length > 3 && <div className="micro" style={{ paddingLeft: 4 }}>+{evts.length - 3} más</div>}
-              </div>
-            );
-          })}
+
+        {/* Grid — overflow hidden so it never pushes past parent */}
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          {/* Day headers */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+            {DAYS.map(d => (
+              <div key={d} className="cal-wkh" style={{ borderRight: '1px solid var(--border)', textAlign: 'center' }}>{d}</div>
+            ))}
+          </div>
+          {/* Cells — fill height evenly */}
+          <div style={{
+            flex: 1,
+            display: 'grid',
+            gridTemplateColumns: 'repeat(7,1fr)',
+            gridAutoRows: `${Math.floor(100 / Math.ceil(cells.length / 7))}%`,
+            borderLeft: '1px solid var(--border)',
+            overflow: 'hidden',
+          }}>
+            {cells.map((c, i) => {
+              const iso     = isoOf(c.date);
+              const isToday = iso === todayIso;
+              const isSel   = iso === sel;
+              const evts    = taskByDay[iso] || [];
+              return (
+                <div
+                  key={i}
+                  className={`cal-cell ${c.muted ? 'muted' : ''} ${isToday ? 'today' : ''} ${isSel ? 'sel' : ''}`}
+                  onClick={() => setSel(iso)}
+                  style={{ minHeight: 0, overflow: 'hidden' }}
+                >
+                  <span className="num">{c.date.getDate()}</span>
+                  {evts.slice(0, 3).map(t => (
+                    <div key={t.id} className="cal-event" style={{ background: statusColor(t.status) + '20' }} onClick={e => { e.stopPropagation(); openTask(t.id); }}>
+                      <span className="dot" style={{ background: statusColor(t.status) }}></span>{t.title}
+                    </div>
+                  ))}
+                  {evts.length > 3 && <div className="micro" style={{ paddingLeft: 4 }}>+{evts.length - 3} más</div>}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      <aside style={{ padding: 20, overflowY: 'auto' }}>
-        <div className="micro mb-8">Detalle del día</div>
-        <div style={{ fontSize: 18, fontWeight: 600 }}>{sel ? new Date(sel + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'long' }) : '—'}</div>
-        <div className="text-2 f-sm mt-4 mb-16">{dayTasks.length} tareas con vencimiento</div>
-        {dayTasks.length === 0 && <div className="text-3 f-sm">Sin tareas en este día.</div>}
-        {dayTasks.map(t => (
-          <div key={t.id} className="card card-pad" style={{ padding: 12, cursor: 'pointer', marginBottom: 8 }} onClick={() => openTask(t.id)}>
-            <div style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.4, marginBottom: 8 }}>{t.title}</div>
-            <div className="row gap-8 items-center">
-              <StatusPill status={t.status} />
-              <PriorityPill priority={t.priority} />
-            </div>
+      {/* Day detail sidebar — collapsible */}
+      {showSide && (
+        <aside style={{ width: 260, flexShrink: 0, borderLeft: '1px solid var(--border)', overflowY: 'auto', padding: '16px 16px' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--text-3)', marginBottom: 8 }}>Detalle del día</div>
+          <div style={{ fontSize: 16, fontWeight: 600 }}>
+            {sel ? new Date(sel + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'long' }) : '—'}
           </div>
-        ))}
-      </aside>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4, marginBottom: 14 }}>{dayTasks.length} tareas</div>
+          {dayTasks.length === 0 && <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>Sin tareas en este día.</div>}
+          {dayTasks.map(t => (
+            <div key={t.id} className="card" style={{ padding: '10px 12px', cursor: 'pointer', marginBottom: 6 }} onClick={() => openTask(t.id)}>
+              <div style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.4, marginBottom: 6 }}>{t.title}</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <StatusPill status={t.status} />
+                <PriorityPill priority={t.priority} />
+              </div>
+            </div>
+          ))}
+        </aside>
+      )}
     </div>
   );
 }
