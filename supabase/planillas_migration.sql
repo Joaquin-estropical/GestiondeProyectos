@@ -1,18 +1,21 @@
 -- ================================================================
--- MÓDULO PLANILLAS + ENUM OTROS
--- Estado verificado: ninguna de estas tablas existe todavía.
--- Ejecutar UNA VEZ en: Supabase Dashboard → SQL Editor → Run
+-- MÓDULO PLANILLAS — migración completa
+-- Ejecutar en Supabase Dashboard → SQL Editor
+--
+-- IMPORTANTE: El ALTER TYPE debe ejecutarse SOLO, en un paso
+-- separado, antes del resto. PostgreSQL no permite ADD VALUE
+-- dentro de una transacción.
+--
+-- PASO 1: Pegar y ejecutar SOLO estas 3 líneas:
 -- ================================================================
-
--- ── 1. Agregar 'otros' al enum area_type ──────────────────────
-ALTER TYPE public.area_type ADD VALUE IF NOT EXISTS 'otros';
-
--- ── 1b. Columnas faltantes en template_tasks ──────────────────
--- (el código las usa pero nunca se crearon en la DB)
+ALTER TYPE area_type ADD VALUE IF NOT EXISTS 'otros';
 ALTER TABLE template_tasks ADD COLUMN IF NOT EXISTS phase_name    text;
 ALTER TABLE template_tasks ADD COLUMN IF NOT EXISTS duration_days integer NOT NULL DEFAULT 1;
 
--- ── 2. Tabla: plantillas de planillas ─────────────────────────
+-- ================================================================
+-- PASO 2: Limpiar el editor, pegar TODO lo de abajo y ejecutar.
+-- ================================================================
+
 CREATE TABLE IF NOT EXISTS checklist_templates (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name        text NOT NULL,
@@ -23,7 +26,6 @@ CREATE TABLE IF NOT EXISTS checklist_templates (
   updated_at  timestamptz DEFAULT now()
 );
 
--- ── 3. Tabla: ítems de plantilla ──────────────────────────────
 CREATE TABLE IF NOT EXISTS template_items (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   template_id  uuid REFERENCES checklist_templates(id) ON DELETE CASCADE,
@@ -33,7 +35,6 @@ CREATE TABLE IF NOT EXISTS template_items (
   created_at   timestamptz DEFAULT now()
 );
 
--- ── 4. Tabla: planillas activas (por proyecto o área) ─────────
 CREATE TABLE IF NOT EXISTS event_checklists (
   id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   event_id             text NOT NULL,
@@ -47,7 +48,6 @@ CREATE TABLE IF NOT EXISTS event_checklists (
   created_at           timestamptz DEFAULT now()
 );
 
--- ── 5. Tabla: ítems de planilla activa ────────────────────────
 CREATE TABLE IF NOT EXISTS checklist_items (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   checklist_id   uuid REFERENCES event_checklists(id) ON DELETE CASCADE,
@@ -62,12 +62,10 @@ CREATE TABLE IF NOT EXISTS checklist_items (
   created_at     timestamptz DEFAULT now()
 );
 
--- ── 6. Índices ────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_template_items_template_id ON template_items(template_id);
 CREATE INDEX IF NOT EXISTS idx_event_checklists_event_id  ON event_checklists(event_id);
 CREATE INDEX IF NOT EXISTS idx_checklist_items_checklist  ON checklist_items(checklist_id);
 
--- ── 7. RLS (igual que el resto de la app) ────────────────────
 ALTER TABLE checklist_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE template_items      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE event_checklists    ENABLE ROW LEVEL SECURITY;
@@ -88,12 +86,10 @@ DO $$ BEGIN
   END IF;
 END $$;
 
--- ── 8. Storage bucket para fotos ─────────────────────────────
 INSERT INTO storage.buckets (id, name, public)
   VALUES ('event-photos', 'event-photos', true)
   ON CONFLICT (id) DO NOTHING;
 
--- ── 9. SEED: Plantilla general de eventos ────────────────────
 INSERT INTO checklist_templates (id, name, description, kind) VALUES (
   'aaaaaaaa-0000-0000-0000-000000000001',
   'Plantilla general de eventos',
