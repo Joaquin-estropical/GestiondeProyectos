@@ -8,29 +8,21 @@ import { Avatar } from '@/components/shared/Avatar';
 import { StatusPill, PriorityPill, AreaPill } from '@/components/shared/Badges';
 import type { Task, TaskStatus } from '@/types';
 
-// ─── Project Header ───
-function ProjectHeader({ project, tasks, view, setView }: { project: NonNullable<ReturnType<typeof useProjects>['data']>[0]; tasks: Task[]; view: string; setView: (v: string) => void }) {
+// ─── Project Header (info only, no tabs) ───
+function ProjectHeader({ project, tasks }: { project: NonNullable<ReturnType<typeof useProjects>['data']>[0]; tasks: Task[] }) {
   const { data: members = [] } = useMembers();
-  // Show avatars of members actually assigned to tasks in this project
   const assigneeIds = [...new Set(tasks.map(t => t.assignee))].slice(0, 5);
-  const views = [
-    { id: 'list',   label: 'Lista',      Icon: List },
-    { id: 'kanban', label: 'Kanban',     Icon: Kanban },
-    { id: 'gantt',  label: 'Gantt',      Icon: GanttChart },
-    { id: 'cal',    label: 'Calendario', Icon: Calendar },
-    { id: 'table',  label: 'Tabla',      Icon: Table },
-  ];
   return (
-    <div style={{ padding: '20px 32px 0' }}>
+    <div style={{ padding: '20px 32px 12px' }}>
       <div className="row gap-12 items-center">
         <AreaPill areaId={project.area} />
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-.005em' }}>{project.name}</h1>
         <span className="pill pill-status-curso" style={{ marginLeft: 4 }}><span className="dot"></span>En curso</span>
         <span style={{ marginLeft: 'auto' }} className="avatar-stack avatar-stack-bordered">
           {assigneeIds.map(id => {
-              const m = members.find(x => x.id === id) ?? getMember(id);
-              return <Avatar key={id} name={m?.name ?? id} size={26} />;
-            })}
+            const m = members.find(x => x.id === id) ?? getMember(id);
+            return <Avatar key={id} name={m?.name ?? id} size={26} />;
+          })}
         </span>
         <button className="btn btn-secondary btn-sm"><UserPlus size={14} /></button>
         <button className="btn btn-secondary btn-sm"><MoreHorizontal size={14} /></button>
@@ -40,23 +32,36 @@ function ProjectHeader({ project, tasks, view, setView }: { project: NonNullable
         <span><List size={12} /> {project.count} tareas</span>
         <span><CheckSquare size={12} /> {project.progress}% completado</span>
       </div>
-      <div className="row gap-12 items-center mt-20" style={{ borderBottom: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', gap: 0 }}>
-          {views.map(v => (
-            <button
-              key={v.id}
-              onClick={() => setView(v.id)}
-              className={`tab ${view === v.id ? 'active' : ''}`}
-              style={{ borderRadius: 0, padding: '8px 12px', color: view === v.id ? 'var(--text-1)' : 'var(--text-2)', background: 'transparent', border: 0, borderBottom: view === v.id ? '2px solid var(--teal)' : '2px solid transparent' }}
-            >
-              <v.Icon size={13} /> {v.label}
-            </button>
-          ))}
-        </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, paddingBottom: 8 }}>
-          <button className="btn btn-secondary btn-sm"><Filter size={14} /> Filtros</button>
-          <button className="btn btn-secondary btn-sm"><ArrowDownWideNarrow size={14} /> Agrupar</button>
-        </div>
+    </div>
+  );
+}
+
+// ─── View tabs bar (always visible, outside resize zone) ───
+const VIEW_TABS = [
+  { id: 'list',   label: 'Lista',      Icon: List },
+  { id: 'kanban', label: 'Kanban',     Icon: Kanban },
+  { id: 'gantt',  label: 'Gantt',      Icon: GanttChart },
+  { id: 'cal',    label: 'Calendario', Icon: Calendar },
+  { id: 'table',  label: 'Tabla',      Icon: Table },
+];
+function ViewTabsBar({ view, setView }: { view: string; setView: (v: string) => void }) {
+  return (
+    <div className="row gap-12 items-center" style={{ borderBottom: '1px solid var(--border)', padding: '0 32px', flexShrink: 0, background: 'var(--bg)' }}>
+      <div style={{ display: 'flex', gap: 0 }}>
+        {VIEW_TABS.map(v => (
+          <button
+            key={v.id}
+            onClick={() => setView(v.id)}
+            className={`tab ${view === v.id ? 'active' : ''}`}
+            style={{ borderRadius: 0, padding: '8px 12px', color: view === v.id ? 'var(--text-1)' : 'var(--text-2)', background: 'transparent', border: 0, borderBottom: view === v.id ? '2px solid var(--teal)' : '2px solid transparent' }}
+          >
+            <v.Icon size={13} /> {v.label}
+          </button>
+        ))}
+      </div>
+      <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, paddingBottom: 0 }}>
+        <button className="btn btn-secondary btn-sm"><Filter size={14} /> Filtros</button>
+        <button className="btn btn-secondary btn-sm"><ArrowDownWideNarrow size={14} /> Agrupar</button>
       </div>
     </div>
   );
@@ -732,12 +737,12 @@ export default function ProjectPage() {
 
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', userSelect: 'none' }}>
-      {/* Header — height controlled by drag */}
+      {/* Info header — resizable */}
       <div style={{ height: headerH, flexShrink: 0, overflow: 'hidden' }}>
-        <ProjectHeader project={project} tasks={tasks} view={view} setView={setView} />
+        <ProjectHeader project={project} tasks={tasks} />
       </div>
 
-      {/* Resize divider */}
+      {/* Resize handle */}
       <div
         onMouseDown={onDividerMouseDown}
         title="Arrastrá para redimensionar"
@@ -756,6 +761,9 @@ export default function ProjectPage() {
           <div key={i} style={{ width: 4, height: 4, borderRadius: 99, background: 'var(--text-3)', opacity: 0.5 }} />
         ))}
       </div>
+
+      {/* View tabs — always visible, outside resize zone */}
+      <ViewTabsBar view={view} setView={setView} />
 
       {/* Content */}
       <div style={{ flex: 1, overflow: isFullHeight ? 'hidden' : 'auto' }}>
