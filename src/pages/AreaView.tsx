@@ -9,7 +9,7 @@ import { PageHead } from '@/components/shared/PageHead';
 import { useAppStore } from '@/stores/app';
 
 // ── Dropdown menu for project cards ──
-function ProjectMenu({ projectId, onEdit }: { projectId: string; onEdit: () => void }) {
+function ProjectMenu({ onEdit }: { projectId: string; onEdit: () => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
