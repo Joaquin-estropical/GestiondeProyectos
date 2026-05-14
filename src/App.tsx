@@ -5,9 +5,10 @@ import './index.css'
 import { AppShell }        from '@/components/layout/AppShell'
 import { TaskDetail }      from '@/components/shared/TaskDetail'
 import { CmdK }            from '@/components/shared/CmdK'
-import { NewAreaModal }    from '@/components/modals/NewAreaModal'
-import { NewProjectModal } from '@/components/modals/NewProjectModal'
-import { NewTaskModal }    from '@/components/modals/NewTaskModal'
+import { NewAreaModal }     from '@/components/modals/NewAreaModal'
+import { NewProjectModal }  from '@/components/modals/NewProjectModal'
+import { EditProjectModal } from '@/components/modals/EditProjectModal'
+import { NewTaskModal }     from '@/components/modals/NewTaskModal'
 import { useAppStore }     from '@/stores/app'
 import { getCurrentUser }  from '@/lib/auth'
 import type { AppUser }    from '@/lib/auth'
@@ -103,6 +104,7 @@ function AppRoutes() {
       {cmdkOpen     && <CmdK onClose={() => setCmdK(false)} />}
       <NewAreaModal />
       <NewProjectModal />
+      <EditProjectModal />
       <NewTaskModal />
     </>
   )

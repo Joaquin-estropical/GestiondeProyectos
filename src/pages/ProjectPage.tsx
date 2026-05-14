@@ -1,6 +1,6 @@
-import { useState, useReducer, useCallback, useEffect } from 'react';
+import { useState, useReducer, useCallback, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { List, Kanban, GanttChart as GanttIcon, Calendar, Table, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { List, Kanban, GanttChart as GanttIcon, Calendar, Table, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, ChevronLeft, ChevronRight, X, Pen, Trash2, ExternalLink } from 'lucide-react';
 import { useProjects, useTasks, useMembers } from '@/hooks/useSupabase';
 import { getMember, STATUS_ORDER, STATUS_LABELS, fmtDate, dueColor } from '@/lib/mock-data';
 import { useAppStore } from '@/stores/app';
@@ -9,8 +9,56 @@ import { StatusPill, PriorityPill, AreaPill } from '@/components/shared/Badges';
 import { GanttChart } from '@/components/shared/GanttChart';
 import type { Task, TaskStatus } from '@/types';
 
+// ─── Project actions dropdown ───
+function ProjectActionsMenu({ projectId }: { projectId: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const { openEditProject } = useAppStore();
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const item = (icon: React.ReactNode, label: string, color: string, onClick: () => void) => (
+    <button
+      style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 14px', background: 'none', border: 'none', color, fontSize: 13, cursor: 'pointer', textAlign: 'left' }}
+      onClick={() => { setOpen(false); onClick(); }}
+      onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+    >
+      {icon} {label}
+    </button>
+  );
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button className="btn btn-secondary btn-sm btn-icon" onClick={() => setOpen(v => !v)}>
+        <MoreHorizontal size={14} />
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', right: 0, zIndex: 300, marginTop: 4,
+          background: 'var(--surface-1)', border: '1px solid var(--border)',
+          borderRadius: 8, padding: '4px 0', minWidth: 190,
+          boxShadow: '0 8px 24px rgba(0,0,0,.4)',
+        }}>
+          {item(<Pen size={13} color="var(--text-2)" />, 'Renombrar / editar', 'var(--text-1)', () => openEditProject(projectId))}
+          {item(<ExternalLink size={13} color="var(--text-2)" />, 'Duplicar proyecto', 'var(--text-2)', () => {})}
+          <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+          {item(<Trash2 size={13} color="var(--red)" />, 'Eliminar proyecto', 'var(--red)', () => openEditProject(projectId))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Project Header (info only, no tabs) ───
-function ProjectHeader({ project, tasks }: { project: NonNullable<ReturnType<typeof useProjects>['data']>[0]; tasks: Task[] }) {
+function ProjectHeader({ project, tasks, onNewTask }: { project: NonNullable<ReturnType<typeof useProjects>['data']>[0]; tasks: Task[]; onNewTask: () => void }) {
   const { data: members = [] } = useMembers();
   const assigneeIds = [...new Set(tasks.map(t => t.assignee))].slice(0, 5);
   return (
@@ -26,7 +74,10 @@ function ProjectHeader({ project, tasks }: { project: NonNullable<ReturnType<typ
           })}
         </span>
         <button className="btn btn-secondary btn-sm"><UserPlus size={14} /></button>
-        <button className="btn btn-secondary btn-sm"><MoreHorizontal size={14} /></button>
+        <button className="btn btn-primary btn-sm" onClick={onNewTask}>
+          <Plus size={14} /> Nueva tarea
+        </button>
+        <ProjectActionsMenu projectId={project.id} />
       </div>
       <div className="row gap-16 items-center mt-12 f-xs text-2">
         <span><Calendar size={12} /> Entrega {fmtDate(project.due)}</span>
@@ -486,7 +537,7 @@ const HEADER_DEFAULT = 210;
 
 export default function ProjectPage() {
   const { projectId }       = useParams<{ projectId: string }>();
-  const { openTask }        = useAppStore();
+  const { openTask, openNewTask } = useAppStore();
   const [view, setView]     = useState('list');
   const [headerH, setHeaderH] = useState(HEADER_DEFAULT);
   const id                  = projectId ?? '';
@@ -522,7 +573,7 @@ export default function ProjectPage() {
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', userSelect: 'none' }}>
       {/* Info header — resizable */}
       <div style={{ height: headerH, flexShrink: 0, overflow: 'hidden' }}>
-        <ProjectHeader project={project} tasks={tasks} />
+        <ProjectHeader project={project} tasks={tasks} onNewTask={() => openNewTask(id, undefined, project.area)} />
       </div>
 
       {/* Resize handle */}
@@ -560,7 +611,7 @@ export default function ProjectPage() {
               projectName={project.name}
               projectDue={project.due}
               onOpenTask={openTask}
-              onTaskCreated={() => { /* opens new task modal */ }}
+              onTaskCreated={() => openNewTask(id, undefined, project.area)}
             />
           </div>
         )}

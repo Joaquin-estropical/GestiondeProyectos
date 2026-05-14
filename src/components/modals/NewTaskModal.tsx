@@ -14,7 +14,7 @@ const PRIORITIES: { value: TaskPriority; label: string; color: string }[] = [
 ]
 
 export function NewTaskModal() {
-  const { newTaskOpen, newTaskProjectId, newTaskDate, closeNewTask, areas, projects, addTask, refreshAll, currentUser } = useAppStore()
+  const { newTaskOpen, newTaskProjectId, newTaskAreaId, newTaskDate, closeNewTask, areas, projects, addTask, refreshAll, currentUser } = useAppStore()
   const { data: members = [] } = useMembers()
   const rawList = members.length > 0
     ? members
@@ -88,10 +88,10 @@ export function NewTaskModal() {
 
       const pid = newTaskProjectId ?? ''
       const proj = projects.find(p => p.id === pid)
-      const aid = proj?.area ?? areas[0]?.id ?? ''
+      // priority: explicit projectId → its area; else explicit areaId; else first area
+      const aid = proj?.area ?? newTaskAreaId ?? areas[0]?.id ?? ''
       setAreaId(aid)
 
-      // If no explicit project given, auto-select Generales
       if (pid && proj) {
         setProjectId(pid)
       } else {
@@ -100,7 +100,7 @@ export function NewTaskModal() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [newTaskOpen, newTaskProjectId, newTaskDate, projects, areas, currentUser.id])
+  }, [newTaskOpen, newTaskProjectId, newTaskAreaId, newTaskDate, projects, areas, currentUser.id])
 
   const handleAreaChange = (aid: string) => {
     setAreaId(aid)

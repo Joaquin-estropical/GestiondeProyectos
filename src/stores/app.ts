@@ -25,8 +25,10 @@ interface AppState {
   editAreaId:     string | null
   newProjectOpen: boolean
   newProjectAreaId: string | null
+  editProjectId:  string | null
   newTaskOpen:    boolean
   newTaskProjectId: string | null
+  newTaskAreaId:  string | null
   newTaskDate:    string | null
   // actions: data
   loadTasks:    () => Promise<void>
@@ -50,7 +52,9 @@ interface AppState {
   closeNewArea:    ()                => void
   openNewProject:  (areaId?: string) => void
   closeNewProject: ()                => void
-  openNewTask:     (projectId?: string, date?: string) => void
+  openEditProject: (projectId: string) => void
+  closeEditProject: ()               => void
+  openNewTask:     (projectId?: string, date?: string, areaId?: string) => void
   closeNewTask:    ()                => void
 }
 
@@ -72,8 +76,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   editAreaId:       null,
   newProjectOpen:   false,
   newProjectAreaId: null,
+  editProjectId:    null,
   newTaskOpen:      false,
   newTaskProjectId: null,
+  newTaskAreaId:    null,
   newTaskDate:      null,
 
   loadTasks: async () => {
@@ -117,6 +123,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   closeNewArea:    ()        => set({ newAreaOpen: false,   editAreaId:    null }),
   openNewProject:  (areaId?) => set({ newProjectOpen: true, newProjectAreaId: areaId ?? null }),
   closeNewProject: ()        => set({ newProjectOpen: false,newProjectAreaId: null }),
-  openNewTask:     (pid?, date?) => set({ newTaskOpen: true, newTaskProjectId: pid ?? null, newTaskDate: date ?? null }),
-  closeNewTask:    ()        => set({ newTaskOpen: false,   newTaskProjectId: null, newTaskDate: null }),
+  openEditProject: (pid)     => set({ editProjectId: pid }),
+  closeEditProject: ()       => set({ editProjectId: null }),
+  openNewTask:     (pid?, date?, aid?) => set({ newTaskOpen: true, newTaskProjectId: pid ?? null, newTaskAreaId: aid ?? null, newTaskDate: date ?? null }),
+  closeNewTask:    ()        => set({ newTaskOpen: false,   newTaskProjectId: null, newTaskAreaId: null, newTaskDate: null }),
 }))
