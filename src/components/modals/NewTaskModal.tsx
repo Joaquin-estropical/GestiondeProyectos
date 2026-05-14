@@ -74,7 +74,8 @@ export function NewTaskModal() {
     projects.find(p => p.area === aid && p.name === 'Generales')
 
   const resolveProject = (aid: string, pid: string) => {
-    if (pid && projects.find(p => p.id === pid)) return pid
+    // Trust explicit pid even if not yet in local store (newly created project)
+    if (pid) return pid
     const gen = getGeneralesProject(aid)
     return gen?.id ?? ''
   }
@@ -88,11 +89,11 @@ export function NewTaskModal() {
 
       const pid = newTaskProjectId ?? ''
       const proj = projects.find(p => p.id === pid)
-      // priority: explicit projectId → its area; else explicit areaId; else first area
       const aid = proj?.area ?? newTaskAreaId ?? areas[0]?.id ?? ''
       setAreaId(aid)
 
-      if (pid && proj) {
+      if (pid) {
+        // Use the explicit projectId directly — even if not yet in local list
         setProjectId(pid)
       } else {
         const gen = getGeneralesProject(aid)
@@ -118,7 +119,8 @@ export function NewTaskModal() {
   const handleSave = async () => {
     if (!title.trim()) { setError('El título es obligatorio'); return }
     const finalProjectId = resolveProject(areaId, projectId)
-    if (!finalProjectId) { setError('Seleccioná un proyecto o crea uno primero'); return }
+    if (!finalProjectId) { setError('Seleccioná un proyecto. Si el área no tiene proyectos, crea uno primero desde el área.'); return }
+    if (!assignee) { setError('Seleccioná un responsable'); return }
     if (!due) { setError('La fecha límite es obligatoria'); return }
     const finalProj = projects.find(p => p.id === finalProjectId)
     const finalArea = finalProj?.area ?? areaId
@@ -149,7 +151,8 @@ export function NewTaskModal() {
     const lines = bulkText.split('\n').map(l => l.trim()).filter(Boolean)
     if (lines.length === 0) { setError('Escribí al menos una tarea'); return }
     const finalProjectId = resolveProject(areaId, projectId)
-    if (!finalProjectId) { setError('Seleccioná un proyecto o crea uno primero'); return }
+    if (!finalProjectId) { setError('Seleccioná un proyecto. Si el área no tiene proyectos, crea uno primero desde el área.'); return }
+    if (!assignee) { setError('Seleccioná un responsable'); return }
     if (!due) { setError('La fecha límite es obligatoria'); return }
     const finalProj = projects.find(p => p.id === finalProjectId)
     const finalArea = finalProj?.area ?? areaId
