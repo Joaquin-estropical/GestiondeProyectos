@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Home, Sun, Sparkles, Calendar, BarChart3, Settings,
@@ -24,17 +24,43 @@ interface SidebarProps {
 }
 
 export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
-  const navigate    = useNavigate()
-  const location    = useLocation()
-  const { areas, projects, openNewArea, openNewProject, currentUser, setCurrentUser } = useAppStore()
+  const navigate   = useNavigate()
+  const location   = useLocation()
+  const { areas, projects, openNewArea, openNewProject, currentUser, setCurrentUser, mobileOpen, setMobileOpen } = useAppStore()
   const [expanded, setExpanded]         = useState<Record<string, boolean>>({})
   const [showUserMenu, setShowUserMenu] = useState(false)
+
+  // Detect tablet breakpoint reactively
+  const [isTablet, setIsTablet] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth >= 768 && window.innerWidth < 1024
+  )
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth < 768
+  )
+  useEffect(() => {
+    const update = () => {
+      setIsTablet(window.innerWidth >= 768 && window.innerWidth < 1024)
+      setIsMobile(window.innerWidth < 768)
+    }
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+
+  // On tablet: sidebar rail is always icon-only; expands to full drawer when mobileOpen
+  // On mobile: sidebar is a full drawer (always expanded when open)
+  const c = isTablet ? !mobileOpen : (isMobile ? false : collapsed)
 
   const isActive = (path: string) =>
     path === '/' ? location.pathname === '/' : location.pathname.startsWith(path)
 
   const toggle = (id: string) =>
     setExpanded((s) => ({ ...s, [id]: !s[id] }))
+
+  const goTo = (path: string) => {
+    navigate(path)
+    // Close drawer on mobile/tablet after navigating
+    if (isMobile || isTablet) setMobileOpen(false)
+  }
 
   const switchUser = (uid: string) => {
     const u = APP_USERS.find(x => x.id === uid)
@@ -51,45 +77,59 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
     window.location.reload()
   }
 
-  // Collapsed icon size — bigger so they're readable
-  const icoSize = collapsed ? 18 : 14
+  const icoSize = c ? 18 : 14
+  const userMenuRef = useRef<HTMLDivElement>(null)
 
   return (
     <aside className={`app-sidebar${collapsed ? ' collapsed' : ''}`}>
       {/* Brand / header */}
-      <div className="sb-head" style={collapsed ? { justifyContent: 'center', padding: '14px 0 12px' } : {}}>
-        <span className="ot-logo" style={collapsed ? { width: 32, height: 32, borderRadius: 8, fontSize: 12 } : {}}>OT</span>
-        {!collapsed && <span className="ot-name">Operaciones Tropical</span>}
-        <button
-          className="btn btn-ghost btn-sm btn-icon"
-          style={{ marginLeft: collapsed ? 0 : 'auto', width: 22, height: 22 }}
-          onClick={onToggleCollapse}
-          title={collapsed ? 'Expandir' : 'Colapsar'}
-        >
-          {collapsed ? <PanelLeftOpen size={13} /> : <PanelLeftClose size={13} />}
-        </button>
+      <div className="sb-head" style={c ? { justifyContent: 'center', padding: '14px 0 12px' } : {}}>
+        <span className="ot-logo" style={c ? { width: 32, height: 32, borderRadius: 8, fontSize: 12 } : {}}>OT</span>
+        {!c && <span className="ot-name">Operaciones Tropical</span>}
+        {/* Hide collapse button on mobile/tablet (they use burger/back) */}
+        {!isMobile && !isTablet && (
+          <button
+            className="btn btn-ghost btn-sm btn-icon"
+            style={{ marginLeft: c ? 0 : 'auto', width: 22, height: 22 }}
+            onClick={onToggleCollapse}
+            title={c ? 'Expandir' : 'Colapsar'}
+          >
+            {c ? <PanelLeftOpen size={13} /> : <PanelLeftClose size={13} />}
+          </button>
+        )}
+        {/* On tablet drawer: show close X */}
+        {isTablet && mobileOpen && (
+          <button
+            className="btn btn-ghost btn-sm btn-icon"
+            style={{ marginLeft: 'auto', width: 22, height: 22 }}
+            onClick={() => setMobileOpen(false)}
+            title="Cerrar"
+          >
+            <PanelLeftClose size={13} />
+          </button>
+        )}
       </div>
 
       {/* Scroll area */}
       <div className="sb-scroll">
-        {!collapsed && <div className="sb-section">Workspace</div>}
-        {collapsed && <div style={{ height: 10 }} />}
+        {!c && <div className="sb-section">Workspace</div>}
+        {c && <div style={{ height: 10 }} />}
 
         {WS_ITEMS.map((it) => (
           <div
             key={it.id}
-            className={`sb-item${isActive(it.path) ? ' active' : ''}${collapsed ? ' sb-item-collapsed' : ''}`}
-            onClick={() => navigate(it.path)}
+            className={`sb-item${isActive(it.path) ? ' active' : ''}${c ? ' sb-item-collapsed' : ''}`}
+            onClick={() => goTo(it.path)}
             title={it.label}
-            style={collapsed ? { justifyContent: 'center', padding: '9px 0', margin: '2px 6px' } : {}}
+            style={c ? { justifyContent: 'center', padding: '9px 0', margin: '2px 6px' } : {}}
           >
             <it.Icon size={icoSize} style={{ flexShrink: 0 }} />
-            {!collapsed && <span>{it.label}</span>}
+            {!c && <span>{it.label}</span>}
           </div>
         ))}
 
-        {collapsed && <div style={{ height: 6, borderTop: '1px solid var(--border)', margin: '6px 8px' }} />}
-        {!collapsed && <div className="sb-section">Áreas</div>}
+        {c && <div style={{ height: 6, borderTop: '1px solid var(--border)', margin: '6px 8px' }} />}
+        {!c && <div className="sb-section">Áreas</div>}
 
         {areas.map((a) => {
           const areaProjects = projects.filter((p) => p.area === a.id)
@@ -99,13 +139,13 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
           return (
             <div key={a.id}>
               <div
-                className={`sb-item${isActive(areaPath) ? ' active' : ''}${collapsed ? ' sb-item-collapsed' : ''}`}
-                style={collapsed
+                className={`sb-item${isActive(areaPath) ? ' active' : ''}${c ? ' sb-item-collapsed' : ''}`}
+                style={c
                   ? { justifyContent: 'center', padding: '9px 0', margin: '2px 6px' }
                   : { paddingRight: 4 }}
                 title={a.name}
               >
-                {!collapsed && (
+                {!c && (
                   <span
                     style={{ display: 'inline-flex', cursor: 'pointer', padding: '2px 2px 2px 0' }}
                     onClick={(e) => { e.stopPropagation(); toggle(a.id) }}
@@ -117,13 +157,13 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                 )}
                 <span
                   className="sb-area-dot"
-                  style={{ background: a.color, width: collapsed ? 10 : 8, height: collapsed ? 10 : 8, borderRadius: collapsed ? 3 : 2 }}
-                  onClick={() => navigate(areaPath)}
+                  style={{ background: a.color, width: c ? 10 : 8, height: c ? 10 : 8, borderRadius: c ? 3 : 2 }}
+                  onClick={() => goTo(areaPath)}
                 />
-                {!collapsed && (
-                  <span style={{ flex: 1, cursor: 'pointer' }} onClick={() => navigate(areaPath)}>{a.name}</span>
+                {!c && (
+                  <span style={{ flex: 1, cursor: 'pointer' }} onClick={() => goTo(areaPath)}>{a.name}</span>
                 )}
-                {!collapsed && (
+                {!c && (
                   <span
                     className="btn btn-ghost btn-icon"
                     style={{ width: 18, height: 18, flexShrink: 0, opacity: 0.4 }}
@@ -133,10 +173,10 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                     <Plus size={11} />
                   </span>
                 )}
-                {!collapsed && <span className="sb-count">{areaProjects.length}</span>}
+                {!c && <span className="sb-count">{areaProjects.length}</span>}
               </div>
 
-              {!collapsed && isOpen && (
+              {!c && isOpen && (
                 <div className="sb-sub">
                   {areaProjects.map((p) => {
                     const projPath = `/proyecto/${p.id}`
@@ -144,7 +184,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                       <div
                         key={p.id}
                         className={`sb-item${isActive(projPath) ? ' active' : ''}`}
-                        onClick={() => navigate(projPath)}
+                        onClick={() => goTo(projPath)}
                       >
                         <span style={{ width: 6, height: 6, borderRadius: 1, background: a.color, flexShrink: 0 }} />
                         <span>{p.name}</span>
@@ -157,7 +197,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
           )
         })}
 
-        {!collapsed && (
+        {!c && (
           <div
             className="sb-item"
             style={{ color: 'var(--text-3)', marginTop: 4 }}
@@ -167,30 +207,30 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
           </div>
         )}
 
-        {!collapsed && (
+        {!c && (
           <>
             <div className="sb-section">Sistema</div>
             <div
               className={`sb-item${isActive('/configuracion') ? ' active' : ''}`}
-              onClick={() => navigate('/configuracion')}
+              onClick={() => goTo('/configuracion')}
             >
               <Settings size={14} /><span>Configuración</span>
             </div>
             <div
               className={`sb-item${isActive('/empty-states') ? ' active' : ''}`}
-              onClick={() => navigate('/empty-states')}
+              onClick={() => goTo('/empty-states')}
             >
               <LayoutTemplate size={14} /><span>Empty states</span>
             </div>
           </>
         )}
 
-        {collapsed && (
+        {c && (
           <>
             <div style={{ height: 6, borderTop: '1px solid var(--border)', margin: '6px 8px' }} />
             <div
               className={`sb-item${isActive('/configuracion') ? ' active' : ''} sb-item-collapsed`}
-              onClick={() => navigate('/configuracion')}
+              onClick={() => goTo('/configuracion')}
               title="Configuración"
               style={{ justifyContent: 'center', padding: '9px 0', margin: '2px 6px' }}
             >
@@ -201,8 +241,8 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
       </div>
 
       {/* Footer with user switcher */}
-      <div style={{ position: 'relative' }}>
-        {showUserMenu && !collapsed && (
+      <div style={{ position: 'relative' }} ref={userMenuRef}>
+        {showUserMenu && !c && (
           <div style={{
             position: 'absolute', bottom: '100%', left: 8, right: 8,
             background: 'var(--surface-2)', border: '1px solid var(--border)',
@@ -245,8 +285,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
           </div>
         )}
 
-        {collapsed ? (
-          /* Collapsed footer: just avatar + logout stacked */
+        {c ? (
           <div style={{ borderTop: '1px solid var(--border)', padding: '10px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
             <Avatar name={currentUser.name} size={32} />
             <button

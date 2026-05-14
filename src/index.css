@@ -519,17 +519,174 @@ kbd, .kbd { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; backgro
 .lp-foot { border-top: 1px solid var(--border); margin-top: 96px; }
 .lp-foot-inner { max-width: 1100px; margin: 0 auto; padding: 0 32px; height: 56px; display: flex; align-items: center; }
 
-/* ════════════ Mobile ════════════ */
+/* ════════════ Responsive — Tablet (768–1023px) ════════════ */
+@media (max-width: 1023px) and (min-width: 768px) {
+  /* Sidebar always 52px icon rail — ignore desktop collapsed class */
+  .app-shell,
+  .app-shell.collapsed { grid-template-columns: 52px 1fr; }
+  .app-sidebar { width: 52px; overflow: visible; }
+  /* When drawer is open on tablet, sidebar expands as overlay */
+  .app-shell.mopen .app-sidebar {
+    width: 260px;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    z-index: 80;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,.45);
+  }
+  .app-content { grid-column: 2; }
+  .page-head, .page-body { padding-left: 20px; padding-right: 20px; }
+  .slide-over { width: 420px; }
+  .tb-search { min-width: 180px; }
+  /* Hide breadcrumb label on tablet to save space */
+  .breadcrumb span:not(:last-child) { opacity: 0.6; }
+}
+
+/* ════════════ Responsive — Mobile (<768px) ════════════ */
 .mobile-burger { display: none; }
-@media (max-width: 860px) {
-  .app-shell { grid-template-columns: 1fr; }
-  .app-sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: 280px; z-index: 80; transform: translateX(-100%); transition: transform 0.22s ease; }
-  .app-shell.mopen .app-sidebar { transform: translateX(0); box-shadow: 0 0 0 9999px rgba(0,0,0,.55); }
-  .app-content { grid-column: 1; }
+.bottom-nav { display: none; }
+
+@media (max-width: 767px) {
+  /* No sidebar — full width layout */
+  .app-shell { grid-template-columns: 1fr; grid-template-rows: 48px 1fr; }
+  .app-sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 280px;
+    z-index: 80; transform: translateX(-100%);
+    transition: transform 0.22s cubic-bezier(.2,.8,.2,1);
+  }
+  .app-shell.mopen .app-sidebar {
+    transform: translateX(0);
+    box-shadow: 0 0 0 9999px rgba(0,0,0,.55);
+  }
+  .app-topbar { height: 48px; padding: 0 12px; gap: 8px; }
+  .app-content { grid-column: 1; padding-bottom: 56px; }
   .mobile-burger { display: inline-flex; }
   .tb-search { flex: 1; min-width: 0; }
-  .page-head, .page-body { padding-left: 18px; padding-right: 18px; }
-  .slide-over { width: 100%; }
+  .tb-search .kbd { display: none; }
+  .page-head { padding: 16px 16px 12px; }
+  .page-body { padding: 16px 16px 80px; }
+  .page-title { font-size: 20px; }
+  .slide-over { width: 100%; border-radius: 16px 16px 0 0; top: auto; animation: slideUp 240ms cubic-bezier(.2,.8,.2,1); }
+  @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  /* Bottom nav — visible on mobile */
+  .bottom-nav {
+    display: flex;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: 56px;
+    background: var(--surface-1);
+    border-top: 1px solid var(--border);
+    z-index: 70;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Modals become bottom sheets on mobile */
+  .modal-bd { align-items: flex-end; padding-top: 0; }
+  .modal {
+    position: relative; left: auto; top: auto;
+    transform: none;
+    width: 100%; max-width: 100%;
+    border-radius: 16px 16px 0 0;
+    max-height: 92vh;
+    animation: slideUp 240ms cubic-bezier(.2,.8,.2,1);
+  }
+
+  /* KPI grid → 2 columns on mobile */
+  .grid[style*="repeat(4,1fr)"] { grid-template-columns: repeat(2,1fr) !important; }
+  .grid[style*="repeat(3,1fr)"] { grid-template-columns: 1fr !important; }
+
+  /* Hide breadcrumb on mobile */
+  .hide-mob { display: none !important; }
+}
+
+/* Mobile page title — only visible on mobile */
+.mobile-page-title { display: none; }
+@media (max-width: 767px) {
+  .mobile-page-title { display: block; }
+}
+
+/* ════════════ Bottom Nav component ════════════ */
+.bottom-nav {
+  align-items: stretch;
+}
+.bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--text-3);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  font-size: 10px;
+  font-weight: 500;
+  font-family: inherit;
+  transition: color 0.12s;
+  padding: 0;
+  min-height: 44px;
+}
+.bottom-nav-item.active { color: var(--teal); }
+.bottom-nav-item:not(.active):hover { color: var(--text-2); }
+.bottom-nav-item svg { flex-shrink: 0; }
+
+/* ════════════ Bottom Sheet ════════════ */
+.bottom-sheet-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 75;
+  transition: opacity 0.2s;
+}
+.bottom-sheet {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 20px 20px 0 0;
+  z-index: 76;
+  display: flex; flex-direction: column;
+  max-height: 85vh;
+  transition: transform 0.25s cubic-bezier(.2,.8,.2,1);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.bottom-sheet-handle {
+  display: flex; justify-content: center;
+  padding: 10px 0 4px;
+  flex-shrink: 0;
+  cursor: grab;
+}
+.bottom-sheet-handle > div {
+  width: 36px; height: 4px;
+  border-radius: 2px;
+  background: var(--border-hover);
+}
+.bottom-sheet-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 16px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.bottom-sheet-head h2 {
+  font-size: 15px; font-weight: 600; margin: 0;
+}
+.bottom-sheet-body {
+  overflow-y: auto; flex: 1;
+  padding: 16px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ════════════ Touch-friendly sizing ════════════ */
+@media (max-width: 1023px) {
+  /* Larger touch targets on tablet + mobile */
+  .btn-sm { height: 32px; padding: 0 10px; }
+  .btn-icon.btn-sm { width: 32px; }
+  .tab { padding: 6px 12px; }
+  .sb-item { padding: 9px 10px; }
+}
+
+/* ════════════ Safe area + scroll improvements ════════════ */
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+@supports (-webkit-touch-callout: none) {
+  .app-content { -webkit-overflow-scrolling: touch; }
 }
 
 /* ════════════ Modal ════════════ */
