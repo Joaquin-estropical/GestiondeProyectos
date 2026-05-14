@@ -104,11 +104,11 @@ function groupByPhase(tasks: TemplateTask[]): { phase: string | null; tasks: Tem
 interface AddTaskState {
   title:    string;
   priority: TaskPriority;
-  dayOff:   number;
-  duration: number;
+  dayOff:   string;
+  duration: string;
   error:    string;
 }
-const INIT_TASK: AddTaskState = { title: '', priority: 'med', dayOff: 0, duration: 1, error: '' };
+const INIT_TASK: AddTaskState = { title: '', priority: 'med', dayOff: '', duration: '', error: '' };
 
 function PhaseSection({
   phase, tasks, onDeleteTask, templateId, totalTasks, onTaskAdded,
@@ -131,9 +131,11 @@ function PhaseSection({
     const t = form.title.trim();
     if (!t) { setForm(f => ({ ...f, error: 'El título es obligatorio' })); return; }
     setAdding(true);
-    await createTemplateTask(templateId, t, form.priority, form.dayOff, totalTasks, {
+    const dayOff = form.dayOff === '' ? totalTasks : Number(form.dayOff);
+    const dur    = form.duration === '' ? 1 : Math.max(1, Number(form.duration));
+    await createTemplateTask(templateId, t, form.priority, dayOff, totalTasks, {
       phaseName:    phase,
-      durationDays: form.duration,
+      durationDays: dur,
     });
     setForm(INIT_TASK);
     onTaskAdded();
@@ -196,8 +198,9 @@ function PhaseSection({
           ))}
 
           {/* Add task form inside this phase */}
-          <div style={{ padding: '12px 16px', background: 'var(--bg)', borderTop: tasks.length > 0 ? '1px solid var(--border)' : 'none' }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+          <div style={{ padding: '10px 16px', background: 'var(--bg)', borderTop: tasks.length > 0 ? '1px solid var(--border)' : 'none' }}>
+            {/* Row 1: title + add button */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
               <input
                 value={form.title}
                 onChange={e => setField('title', e.target.value)}
@@ -209,51 +212,51 @@ function PhaseSection({
                   borderRadius: 6, padding: '0 12px', height: 32, fontSize: 13, color: 'var(--text-1)', outline: 'none',
                 }}
               />
-              {/* Duration */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 6, padding: '0 8px', height: 32, flexShrink: 0 }}>
-                <span style={{ fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>Dur.</span>
-                <input
-                  type="number" min={1} max={365} value={form.duration}
-                  onChange={e => setField('duration', Number(e.target.value))}
-                  style={{ width: 36, background: 'transparent', border: 0, outline: 0, fontSize: 12, color: 'var(--text-1)', textAlign: 'center', fontFamily: 'JetBrains Mono, monospace' }}
-                />
-                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>d</span>
-              </div>
-              {/* Inicio */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 6, padding: '0 8px', height: 32, flexShrink: 0 }}>
-                <span style={{ fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>Día</span>
-                <input
-                  type="number" min={0} max={365} value={form.dayOff}
-                  onChange={e => setField('dayOff', Number(e.target.value))}
-                  style={{ width: 36, background: 'transparent', border: 0, outline: 0, fontSize: 12, color: 'var(--text-1)', textAlign: 'center', fontFamily: 'JetBrains Mono, monospace' }}
-                />
-              </div>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleAddTask}
+                disabled={adding || !form.title.trim()}
+                style={{ height: 32, flexShrink: 0 }}
+              >
+                {adding ? '...' : <><Check size={12} /> Agregar tarea</>}
+              </button>
             </div>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              {/* Priority buttons */}
+            {/* Row 2: priority + optional fields */}
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
               {(['urg','alta','med','baja'] as TaskPriority[]).map(p => (
                 <button
                   key={p}
                   onClick={() => setField('priority', p)}
                   style={{
-                    height: 26, padding: '0 9px', borderRadius: 5,
+                    height: 24, padding: '0 8px', borderRadius: 5,
                     border: `1px solid ${form.priority === p ? PRIORITY_COLORS[p] + '80' : 'var(--border)'}`,
                     background: form.priority === p ? PRIORITY_COLORS[p] + '18' : 'transparent',
                     color: form.priority === p ? PRIORITY_COLORS[p] : 'var(--text-3)',
-                    fontSize: 11.5, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                    fontSize: 11, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
                   }}
                 >
                   <Flag size={9} color={PRIORITY_COLORS[p]} />{PRIORITY_LABELS[p]}
                 </button>
               ))}
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={handleAddTask}
-                disabled={adding || !form.title.trim()}
-                style={{ marginLeft: 'auto', height: 28 }}
-              >
-                {adding ? '...' : <><Check size={12} /> Agregar tarea</>}
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 5, padding: '0 6px', height: 24 }}>
+                  <span style={{ fontSize: 10, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>Dur.</span>
+                  <input
+                    type="number" min={1} max={365} value={form.duration} placeholder="—"
+                    onChange={e => setField('duration', e.target.value)}
+                    style={{ width: 30, background: 'transparent', border: 0, outline: 0, fontSize: 11, color: 'var(--text-1)', textAlign: 'center', fontFamily: 'JetBrains Mono, monospace' }}
+                  />
+                  <span style={{ fontSize: 10, color: 'var(--text-3)' }}>d</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 5, padding: '0 6px', height: 24 }}>
+                  <span style={{ fontSize: 10, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>Día</span>
+                  <input
+                    type="number" min={0} max={365} value={form.dayOff} placeholder="auto"
+                    onChange={e => setField('dayOff', e.target.value)}
+                    style={{ width: 34, background: 'transparent', border: 0, outline: 0, fontSize: 11, color: 'var(--text-1)', textAlign: 'center', fontFamily: 'JetBrains Mono, monospace' }}
+                  />
+                </div>
+              </div>
             </div>
             {form.error && <div style={{ fontSize: 11.5, color: 'var(--red)', marginTop: 5 }}>{form.error}</div>}
           </div>
@@ -348,20 +351,24 @@ function TemplateEditor({ templateId, templateName, areaType, onClose }: {
   const { data: ttasks, reload } = useTemplateTasks(templateId);
 
   const [newPhaseName, setNewPhaseName] = useState('');
-  const [addingPhase,  setAddingPhase]  = useState(false);
   const [showPhaseForm, setShowPhaseForm] = useState(false);
+  // Phases created locally but with no tasks yet (not persisted until a task is added)
+  const [localPhases, setLocalPhases] = useState<string[]>([]);
 
-  const handleAddPhase = async () => {
+  const handleAddPhase = () => {
     const name = newPhaseName.trim();
     if (!name) return;
-    setAddingPhase(true);
-    // Create a placeholder task that defines the phase (it can be deleted later)
-    await createTemplateTask(templateId, '— (nueva tarea)', 'med', ttasks.length, ttasks.length, {
-      phaseName: name, durationDays: 1,
-    });
-    setNewPhaseName(''); setShowPhaseForm(false); reload();
-    setAddingPhase(false);
+    // Only add if not already in tasks or localPhases
+    const existing = groupByPhase(ttasks).map(g => g.phase).filter(Boolean);
+    if (!existing.includes(name) && !localPhases.includes(name)) {
+      setLocalPhases(prev => [...prev, name]);
+    }
+    setNewPhaseName(''); setShowPhaseForm(false);
   };
+
+  // Remove local phase once it has tasks in DB
+  const phasesWithTasks = new Set(ttasks.map(t => t.phase_name).filter(Boolean));
+  const filteredLocalPhases = localPhases.filter(p => !phasesWithTasks.has(p));
 
   const handleDeleteTask = async (id: string) => {
     await deleteTemplateTask(id);
@@ -411,7 +418,7 @@ function TemplateEditor({ templateId, templateName, areaType, onClose }: {
                 placeholder='Nombre de la fase (ej: "Área Legal", "Diseño", "RRHH")...'
                 style={{ flex: 1, background: 'transparent', border: 0, outline: 0, fontSize: 14, fontWeight: 500, color: 'var(--text-1)' }}
               />
-              <button className="btn btn-primary btn-sm" onClick={handleAddPhase} disabled={addingPhase || !newPhaseName.trim()}>
+              <button className="btn btn-primary btn-sm" onClick={handleAddPhase} disabled={!newPhaseName.trim()}>
                 Crear fase
               </button>
               <button className="btn btn-ghost btn-sm" onClick={() => { setShowPhaseForm(false); setNewPhaseName(''); }}>
@@ -420,24 +427,21 @@ function TemplateEditor({ templateId, templateName, areaType, onClose }: {
             </div>
           )}
 
-          {/* Phase sections */}
-          {groups.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-3)' }}>
-              <div style={{ width: 48, height: 48, borderRadius: 10, border: '1px dashed var(--border-hover)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-                <Layers size={20} color="var(--text-3)" />
+          {/* Empty state */}
+          {groups.length === 0 && filteredLocalPhases.length === 0 && (
+            <>
+              <div style={{ textAlign: 'center', padding: '32px 0 16px', color: 'var(--text-3)' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-2)', marginBottom: 4 }}>Plantilla vacía</div>
+                <div style={{ fontSize: 13 }}>Creá una fase primero o agregá tareas sueltas abajo.</div>
               </div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-2)', marginBottom: 6 }}>Plantilla vacía</div>
-              <div style={{ fontSize: 13, maxWidth: 320, margin: '0 auto' }}>
-                Agregá una <strong>fase</strong> (ej: "Área Legal") para organizar las tareas por departamento, o empezá directamente con tareas sueltas.
-              </div>
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 20 }}>
-                <button className="btn btn-primary btn-sm" onClick={() => setShowPhaseForm(true)}>
-                  <Layers size={13} /> Agregar fase
-                </button>
-              </div>
-            </div>
+              <PhaseSection
+                phase={null} tasks={[]} onDeleteTask={handleDeleteTask}
+                templateId={templateId} totalTasks={0} onTaskAdded={reload}
+              />
+            </>
           )}
 
+          {/* DB-backed phase sections */}
           {groups.map(({ phase, tasks }) => (
             <PhaseSection
               key={phase ?? '__none__'}
@@ -450,8 +454,21 @@ function TemplateEditor({ templateId, templateName, areaType, onClose }: {
             />
           ))}
 
-          {/* Add tasks with no phase (always visible if there are phases) */}
-          {groups.length > 0 && !groups.find(g => g.phase === null) && (
+          {/* Local-only phases (no tasks yet) */}
+          {filteredLocalPhases.map(p => (
+            <PhaseSection
+              key={`local-${p}`}
+              phase={p}
+              tasks={[]}
+              onDeleteTask={handleDeleteTask}
+              templateId={templateId}
+              totalTasks={ttasks.length}
+              onTaskAdded={reload}
+            />
+          ))}
+
+          {/* Always show "Sin fase" section if there are named phases */}
+          {(groups.length > 0 || filteredLocalPhases.length > 0) && !groups.find(g => g.phase === null) && (
             <PhaseSection
               phase={null}
               tasks={[]}
