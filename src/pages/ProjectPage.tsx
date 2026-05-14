@@ -549,18 +549,20 @@ export default function ProjectPage() {
       <ViewTabsBar view={view} setView={setView} />
 
       {/* Content */}
-      <div style={{ flex: 1, overflow: isFullHeight ? 'hidden' : 'auto' }}>
+      <div style={{ flex: 1, overflow: isFullHeight ? 'hidden' : 'auto', display: isFullHeight ? 'flex' : 'block', flexDirection: 'column' }}>
         {view === 'list'   && <ProjectList   tasks={tasks} openTask={openTask} projectId={id} />}
         {view === 'kanban' && <ProjectKanban tasks={tasks} openTask={openTask} projectId={id} />}
         {view === 'gantt'  && (
-          <GanttChart
-            tasks={tasks}
-            projectId={id}
-            projectName={project.name}
-            projectDue={project.due}
-            onOpenTask={openTask}
-            onTaskCreated={() => { /* opens new task modal */ }}
-          />
+          <div style={{ flex: 1, height: '100%', overflow: 'hidden', display: 'flex' }}>
+            <GanttChart
+              tasks={tasks}
+              projectId={id}
+              projectName={project.name}
+              projectDue={project.due}
+              onOpenTask={openTask}
+              onTaskCreated={() => { /* opens new task modal */ }}
+            />
+          </div>
         )}
         {view === 'table'  && <ProjectList   tasks={tasks} openTask={openTask} projectId={id} />}
         {view === 'cal'    && <ProjectCalendar tasks={tasks} openTask={openTask} />}
