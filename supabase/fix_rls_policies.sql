@@ -90,6 +90,9 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+-- ── Hacer due opcional en projects ───────────────────────────
+ALTER TABLE projects ALTER COLUMN due DROP NOT NULL;
+
 -- Verificación: lista todas las políticas creadas
 SELECT tablename, policyname, cmd
 FROM pg_policies

@@ -83,7 +83,7 @@ export async function createProject(input: {
   const id = 'p-' + Date.now().toString(36)
   const { data, error } = await supabaseWriter
     .from('projects')
-    .insert({ id, name: input.name, area: input.area, due: input.due || null, progress: 0, count: 0 })
+    .insert({ id, name: input.name, area: input.area, due: input.due || '2099-12-31', progress: 0, count: 0 })
     .select()
     .single()
   if (error) throw error
