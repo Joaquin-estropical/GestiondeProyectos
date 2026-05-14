@@ -136,29 +136,114 @@ const KAN_STATUS_BG: Record<string, string> = {
   curso: 'rgba(59,130,246,.08)', pend: 'transparent', rev: 'rgba(245,158,11,.08)', block: 'rgba(239,68,68,.08)', done: 'rgba(34,197,94,.08)',
 };
 
+// Mini modal that appears when dropping to 'rev' or 'block'
+function KanbanPromptModal({ type, members, onConfirm, onCancel }: {
+  type: 'rev' | 'block';
+  members: { id: string; name: string }[];
+  onConfirm: (data: { reviewer?: string; blockNote?: string }) => void;
+  onCancel: () => void;
+}) {
+  const [reviewer,  setReviewer]  = useState('');
+  const [blockNote, setBlockNote] = useState('');
+  const isRev = type === 'rev';
+
+  return (
+    <>
+      <div className="modal-bd" onClick={onCancel} />
+      <div className="modal" style={{ maxWidth: 400, zIndex: 310 }}>
+        <div className="modal-head">
+          <span className="fw-6" style={{ fontSize: 14 }}>
+            {isRev ? '¿Quién revisa esta tarea?' : '¿Por qué está bloqueada?'}
+          </span>
+          <button className="btn btn-ghost btn-sm btn-icon" style={{ marginLeft: 'auto' }} onClick={onCancel}>
+            <X size={13} />
+          </button>
+        </div>
+        <div className="modal-body">
+          {isRev ? (
+            <>
+              <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 14, marginTop: 0 }}>
+                Asigná un revisor para tener visibilidad de quién aprueba esta tarea.
+              </p>
+              <div className="form-group">
+                <label className="form-label">Revisor responsable</label>
+                <div className="input" style={{ padding: 0 }}>
+                  <select
+                    value={reviewer}
+                    onChange={e => setReviewer(e.target.value)}
+                    style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 12px', height: 36, color: reviewer ? 'var(--text-1)' : 'var(--text-3)', fontSize: 13, cursor: 'pointer' }}
+                  >
+                    <option value="">Seleccionar revisor...</option>
+                    {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 14, marginTop: 0 }}>
+                Explicá brevemente qué impide avanzar con esta tarea.
+              </p>
+              <div className="form-group">
+                <label className="form-label">Motivo del bloqueo <span style={{ color: 'var(--red)' }}>*</span></label>
+                <div className="input" style={{ height: 'auto' }}>
+                  <textarea
+                    autoFocus
+                    value={blockNote}
+                    onChange={e => setBlockNote(e.target.value)}
+                    placeholder="Ej: Esperando aprobación del proveedor, falta material, sin presupuesto..."
+                    style={{ resize: 'vertical', minHeight: 80, background: 'transparent', border: 'none', outline: 'none', width: '100%', color: 'var(--text-1)', fontSize: 13 }}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+        <div className="modal-foot">
+          <button className="btn btn-secondary btn-md" onClick={onCancel}>Cancelar</button>
+          <button
+            className="btn btn-primary btn-md"
+            disabled={isRev ? false : !blockNote.trim()}
+            onClick={() => onConfirm(isRev ? { reviewer } : { blockNote: blockNote.trim() })}
+          >
+            {isRev ? 'Mover a revisión' : 'Marcar bloqueada'}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function ProjectKanban({ tasks, openTask, projectId }: { tasks: Task[]; openTask: (id: string) => void; projectId: string }) {
   const { updateTaskStatus, openNewTask } = useAppStore();
-  const [localTasks, setLocalTasks] = useReducer(
-    (_: Task[], next: Task[]) => next,
-    tasks
-  );
-  // keep localTasks in sync with incoming tasks (e.g. after reload)
+  const { data: members = [] } = useMembers();
+
+  const [localTasks, setLocalTasks] = useReducer((_: Task[], next: Task[]) => next, tasks);
   useEffect(() => { setLocalTasks(tasks); }, [tasks]);
 
-  const [drag,    setDrag]    = useState<string | null>(null);
-  const [over,    setOver]    = useState<string | null>(null);
-  const [saving,  setSaving]  = useState<string | null>(null);
+  const [drag,   setDrag]   = useState<string | null>(null);
+  const [over,   setOver]   = useState<string | null>(null);
+  const [saving, setSaving] = useState<string | null>(null);
+
+  // Pending prompt when dropping to rev or block
+  const [prompt, setPrompt] = useState<{ taskId: string; newStatus: TaskStatus } | null>(null);
 
   const onDragStart = (e: React.DragEvent, id: string) => {
-    setDrag(id);
-    e.dataTransfer.setData('text/plain', id);
-    e.dataTransfer.effectAllowed = 'move';
+    setDrag(id); e.dataTransfer.setData('text/plain', id); e.dataTransfer.effectAllowed = 'move';
   };
-  const onDragEnd  = () => { setDrag(null); setOver(null); };
-  const onDragOver = (e: React.DragEvent, s: string) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setOver(s); };
+  const onDragEnd   = () => { setDrag(null); setOver(null); };
+  const onDragOver  = (e: React.DragEvent, s: string) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setOver(s); };
   const onDragLeave = (e: React.DragEvent) => {
     if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) setOver(null);
   };
+
+  const commitMove = async (id: string, newStatus: TaskStatus) => {
+    setLocalTasks(localTasks.map(t => t.id === id ? { ...t, status: newStatus } : t));
+    setSaving(id);
+    await updateTaskStatus(id, newStatus);
+    setSaving(null);
+  };
+
   const onDrop = async (e: React.DragEvent, newStatus: TaskStatus) => {
     e.preventDefault();
     const id = e.dataTransfer.getData('text/plain') || drag;
@@ -166,112 +251,129 @@ function ProjectKanban({ tasks, openTask, projectId }: { tasks: Task[]; openTask
     if (!id) return;
     const task = localTasks.find(t => t.id === id);
     if (!task || task.status === newStatus) return;
-    // Optimistic update
-    setLocalTasks(localTasks.map(t => t.id === id ? { ...t, status: newStatus } : t));
-    setSaving(id);
-    updateTaskStatus(id, newStatus);
-    setSaving(null);
+    if (newStatus === 'rev' || newStatus === 'block') {
+      setPrompt({ taskId: id, newStatus });
+    } else {
+      commitMove(id, newStatus);
+    }
+  };
+
+  const handlePromptConfirm = async (_data: { reviewer?: string; blockNote?: string }) => {
+    if (!prompt) return;
+    await commitMove(prompt.taskId, prompt.newStatus);
+    // TODO: persist reviewer/blockNote to task notes when that field exists
+    setPrompt(null);
   };
 
   return (
-    <div className="kanban">
-      {STATUS_ORDER.map(s => {
-        const list = localTasks.filter(t => t.status === s);
-        const col  = KAN_STATUS_COLORS[s];
-        const bg   = KAN_STATUS_BG[s];
-        return (
-          <div key={s} className="kan-col">
-            {/* Column header */}
-            <div className="kan-col-head" style={{ borderTop: `2px solid ${col}`, borderRadius: '4px 4px 0 0', background: bg, padding: '10px 12px 10px' }}>
-              <span style={{ width: 7, height: 7, borderRadius: 999, background: col, flexShrink: 0 }}></span>
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)', letterSpacing: '.01em' }}>{STATUS_LABELS[s]}</span>
-              <span style={{ marginLeft: 6, fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: col, background: col + '20', padding: '1px 6px', borderRadius: 999 }}>{list.length}</span>
-              <button
-                className="btn btn-ghost btn-sm btn-icon"
-                style={{ width: 22, height: 22, marginLeft: 'auto' }}
-                onClick={() => openNewTask(projectId)}
-                title="Agregar tarea"
+    <>
+      {prompt && (
+        <KanbanPromptModal
+          type={prompt.newStatus as 'rev' | 'block'}
+          members={members}
+          onConfirm={handlePromptConfirm}
+          onCancel={() => setPrompt(null)}
+        />
+      )}
+      <div className="kanban">
+        {STATUS_ORDER.map(s => {
+          const list = localTasks.filter(t => t.status === s);
+          const col  = KAN_STATUS_COLORS[s];
+          const bg   = KAN_STATUS_BG[s];
+          return (
+            <div key={s} className="kan-col">
+              <div className="kan-col-head" style={{ borderTop: `3px solid ${col}`, borderRadius: '6px 6px 0 0', background: bg, padding: '12px 14px 12px' }}>
+                <span style={{ width: 8, height: 8, borderRadius: 999, background: col, flexShrink: 0 }}></span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{STATUS_LABELS[s]}</span>
+                <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: col, background: col + '20', padding: '1px 7px', borderRadius: 999 }}>{list.length}</span>
+                <button
+                  className="btn btn-ghost btn-sm btn-icon"
+                  style={{ width: 24, height: 24, marginLeft: 'auto' }}
+                  onClick={() => openNewTask(projectId)}
+                  title="Agregar tarea"
+                >
+                  <Plus size={13} />
+                </button>
+              </div>
+
+              <div
+                className={`kan-col-body ${over === s ? 'dragover' : ''}`}
+                style={{ minHeight: 100 }}
+                onDragOver={e => onDragOver(e, s)}
+                onDrop={e => onDrop(e, s as TaskStatus)}
+                onDragLeave={onDragLeave}
               >
-                <Plus size={12} />
-              </button>
-            </div>
-
-            {/* Drop zone */}
-            <div
-              className={`kan-col-body ${over === s ? 'dragover' : ''}`}
-              style={{ minHeight: 80 }}
-              onDragOver={e => onDragOver(e, s)}
-              onDrop={e => onDrop(e, s as TaskStatus)}
-              onDragLeave={onDragLeave}
-            >
-              {list.map(t => {
-                const m = getMember(t.assignee);
-                const isDragging = drag === t.id;
-                const isSaving   = saving === t.id;
-                return (
-                  <div
-                    key={t.id}
-                    className={`kan-card ${isDragging ? 'dragging' : ''}`}
-                    draggable
-                    onDragStart={e => onDragStart(e, t.id)}
-                    onDragEnd={onDragEnd}
-                    onClick={() => openTask(t.id)}
-                    style={{ opacity: isSaving ? 0.6 : 1, borderLeft: `3px solid ${col}` }}
-                  >
-                    {/* Top row: priority + code */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-                      <PriorityPill priority={t.priority} iconOnly />
-                      <span className="mono" style={{ fontSize: 10.5, color: 'var(--text-3)' }}>{t.code}</span>
-                      {t.status === 'done' && <CheckSquare size={11} color="var(--green)" style={{ marginLeft: 'auto' }} />}
-                    </div>
-
-                    {/* Title */}
-                    <div style={{
-                      fontSize: 13.5, fontWeight: 500, lineHeight: 1.45,
-                      color: t.status === 'done' ? 'var(--text-3)' : 'var(--text-1)',
-                      textDecoration: t.status === 'done' ? 'line-through' : 'none',
-                      marginBottom: 12,
-                    }}>
-                      {t.title}
-                    </div>
-
-                    {/* Subtasks progress */}
-                    {t.subtasks.total > 0 && (
-                      <div style={{ marginBottom: 10 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                          <CheckSquare size={10} color="var(--text-3)" />
-                          <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'JetBrains Mono, monospace' }}>{t.subtasks.done}/{t.subtasks.total}</span>
-                        </div>
-                        <div className="progress">
-                          <div style={{ width: (t.subtasks.done / t.subtasks.total * 100) + '%', background: col }}></div>
-                        </div>
+                {list.map(t => {
+                  const m = getMember(t.assignee);
+                  const isDragging = drag === t.id;
+                  const isSaving   = saving === t.id;
+                  const isDone     = t.status === 'done';
+                  return (
+                    <div
+                      key={t.id}
+                      className={`kan-card ${isDragging ? 'dragging' : ''}`}
+                      draggable
+                      onDragStart={e => onDragStart(e, t.id)}
+                      onDragEnd={onDragEnd}
+                      onClick={() => openTask(t.id)}
+                      style={{ opacity: isSaving ? 0.6 : 1, borderLeft: `4px solid ${col}` }}
+                    >
+                      {/* Top row */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                        <PriorityPill priority={t.priority} iconOnly />
+                        <span className="mono" style={{ fontSize: 10, color: 'var(--text-3)' }}>{t.code}</span>
+                        {isDone && <CheckSquare size={12} color="var(--green)" style={{ marginLeft: 'auto' }} />}
                       </div>
-                    )}
 
-                    {/* Bottom meta */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
-                      {m && <Avatar name={m.name} size={20} title={m.name} />}
-                      <span style={{ flex: 1, fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: dueColor(t.due) }}>{fmtDate(t.due)}</span>
-                      {t.comments > 0 && (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--text-3)' }}>
-                          <MessageSquare size={10} />{t.comments}
-                        </span>
+                      {/* Title */}
+                      <div style={{
+                        fontSize: 14, fontWeight: 500, lineHeight: 1.5,
+                        color: isDone ? 'var(--text-3)' : 'var(--text-1)',
+                        textDecoration: isDone ? 'line-through' : 'none',
+                        marginBottom: 12,
+                        wordBreak: 'break-word',
+                      }}>
+                        {t.title}
+                      </div>
+
+                      {/* Subtasks */}
+                      {t.subtasks.total > 0 && (
+                        <div style={{ marginBottom: 10 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                            <CheckSquare size={10} color="var(--text-3)" />
+                            <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'JetBrains Mono, monospace' }}>{t.subtasks.done}/{t.subtasks.total}</span>
+                          </div>
+                          <div className="progress">
+                            <div style={{ width: (t.subtasks.done / t.subtasks.total * 100) + '%', background: col }}></div>
+                          </div>
+                        </div>
                       )}
-                    </div>
-                  </div>
-                );
-              })}
 
-              {list.length === 0 && over !== s && (
-                <div style={{ padding: '16px 12px', color: 'var(--text-3)', fontSize: 12, textAlign: 'center', borderRadius: 4, border: '1px dashed var(--border)' }}>
-                  Sin tareas
-                </div>
-              )}
+                      {/* Bottom meta */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                        {m && <Avatar name={m.name} size={22} title={m.name} />}
+                        <span style={{ flex: 1, fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: dueColor(t.due) }}>{fmtDate(t.due)}</span>
+                        {t.comments > 0 && (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--text-3)' }}>
+                            <MessageSquare size={10} />{t.comments}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {list.length === 0 && over !== s && (
+                  <div style={{ padding: '20px 12px', color: 'var(--text-3)', fontSize: 12, textAlign: 'center', borderRadius: 6, border: '1px dashed var(--border)', margin: '0 2px' }}>
+                    Sin tareas
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+    </>
   );
 }
 

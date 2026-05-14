@@ -425,18 +425,18 @@ a { color: inherit; text-decoration: none; }
 kbd, .kbd { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; background: var(--surface-2); border: 1px solid var(--border); border-bottom-width: 2px; color: var(--text-2); padding: 1px 5px; border-radius: 3px; display: inline-block; }
 
 /* ════════════ Kanban ════════════ */
-.kanban { display: flex; gap: 12px; padding: 16px 24px 32px; overflow-x: auto; height: 100%; }
-.kan-col { width: 280px; flex: none; display: flex; flex-direction: column; max-height: 100%; }
-.kan-col-head { display: flex; align-items: center; gap: 8px; padding: 6px 4px 12px; }
+.kanban { display: flex; gap: 16px; padding: 20px 28px 40px; overflow-x: auto; height: 100%; }
+.kan-col { width: 320px; flex: none; display: flex; flex-direction: column; max-height: 100%; }
+.kan-col-head { display: flex; align-items: center; gap: 8px; padding: 8px 6px 14px; }
 .kan-col-head .cnt { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-3); padding: 1px 6px; background: var(--surface-2); border-radius: 999px; }
-.kan-col-body { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding-bottom: 24px; }
-.kan-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 6px; padding: 12px; cursor: pointer; transition: border-color 0.12s; }
-.kan-card:hover  { border-color: var(--border-hover); }
-.kan-card .title { font-size: 13px; font-weight: 500; color: var(--text-1); line-height: 1.4; }
+.kan-col-body { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding-bottom: 24px; }
+.kan-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 14px 14px 12px; cursor: pointer; transition: border-color 0.12s, box-shadow 0.12s; }
+.kan-card:hover  { border-color: var(--border-hover); box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+.kan-card .title { font-size: 14px; font-weight: 500; color: var(--text-1); line-height: 1.45; }
 .kan-card .meta  { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 11.5px; color: var(--text-2); }
 .kan-card .meta .right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
-.kan-col-body.dragover { background: rgba(20,184,166,.05); border-radius: 6px; outline: 1px dashed var(--teal); outline-offset: -2px; }
-.kan-card.dragging { opacity: 0.4; }
+.kan-col-body.dragover { background: rgba(20,184,166,.05); border-radius: 8px; outline: 2px dashed var(--teal); outline-offset: -2px; }
+.kan-card.dragging { opacity: 0.35; }
 
 /* ════════════ Gantt ════════════ */
 .gantt-shell { display: grid; grid-template-columns: 280px 1fr; border-top: 1px solid var(--border); }

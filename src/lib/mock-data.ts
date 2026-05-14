@@ -76,10 +76,10 @@ export const DAYS_ES      = ['lun','mar','mié','jue','vie','sáb','dom']
 
 export const STATUS_LABELS: Record<string, string> = {
   curso: 'En curso',
-  pend:  'Pendiente',
+  pend:  'Sin iniciar',
   rev:   'En revisión',
   block: 'Bloqueado',
-  done:  'Hecho',
+  done:  'Completado',
 }
 export const STATUS_ORDER = ['curso', 'pend', 'rev', 'block', 'done'] as const
 export const PRIORITY_LABELS: Record<string, string> = {
