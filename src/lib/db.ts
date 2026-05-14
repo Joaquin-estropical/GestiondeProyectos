@@ -89,7 +89,7 @@ export async function createProject(input: {
     .insert({ id, name: input.name, area: input.area, due: input.due || '2099-12-31', progress: 0, count: 0 })
     .select()
     .single()
-  if (error) throw error
+  if (error) throw new Error(`${error.message} | code:${error.code} | hint:${error.hint ?? ''} | details:${error.details ?? ''}`)
   const project = data as Project
 
   if (input.templateId) {
@@ -180,7 +180,7 @@ export async function createTask(input: {
     tags:        encodeHelper(input.helper, []),
   }
   const { data, error } = await supabaseWriter.from('tasks').insert(row).select().single()
-  if (error) throw error
+  if (error) throw new Error(`${error.message} | code:${error.code} | hint:${error.hint ?? ''} | details:${error.details ?? ''}`)
   await supabaseWriter.rpc('increment_project_count', { pid: input.project }).then(() => {}, () => {})
   return normaliseTask(data as Record<string, unknown>)
 }
