@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
-import { Plus, ZoomIn, ZoomOut, Target, Printer, AlertTriangle, ChevronDown, ChevronRight, X, Calendar, Milestone } from 'lucide-react'
+import { Plus, ZoomIn, ZoomOut, Target, Printer, AlertTriangle, ChevronDown, ChevronRight, X, Calendar, Milestone, GripVertical } from 'lucide-react'
 import type { Task, TaskDependency, GanttTask } from '@/types'
 import { fetchTaskDependencies, createTaskDependency, deleteTaskDependency, updateTaskGantt } from '@/lib/db'
 import { format, addDays, differenceInCalendarDays, parseISO, isValid } from 'date-fns'
@@ -435,6 +435,10 @@ export function GanttChart({ tasks, projectId, projectName = '', onTaskCreated }
   const [critCol, setCritCol] = useState(false)
   const [drag,   setDrag]   = useState<{ id: string; startX: number; origDur: number; curDur: number } | null>(null)
   const [localDur, setLocalDur] = useState<Record<string, number>>({})
+  // Drag-to-reorder
+  const [sortOverride, setSortOverride] = useState<string[] | null>(null)
+  const dragRowRef = useRef<string | null>(null)
+  const dragOverRef = useRef<string | null>(null)
 
   const rightRef = useRef<HTMLDivElement>(null)
   const leftRef  = useRef<HTMLDivElement>(null)
@@ -454,14 +458,22 @@ export function GanttChart({ tasks, projectId, projectName = '', onTaskCreated }
   const ganttTasks = useMemo(() => {
     const dm = new Map<string, string[]>()
     deps.forEach(d => { dm.set(d.successor_id, [...(dm.get(d.successor_id) ?? []), d.predecessor_id]) })
-    const gt = tasks.slice().sort((a, b) => a.sort_order - b.sort_order || a.due.localeCompare(b.due))
-      .map(t => {
+    const taskMap = new Map(tasks.map(t => [t.id, t]))
+    let sorted: Task[]
+    if (sortOverride) {
+      sorted = sortOverride.map(id => taskMap.get(id)).filter(Boolean) as Task[]
+      // append any tasks not in sortOverride (e.g., newly added)
+      tasks.forEach(t => { if (!sortOverride.includes(t.id)) sorted.push(t) })
+    } else {
+      sorted = tasks.slice().sort((a, b) => a.sort_order - b.sort_order || a.due.localeCompare(b.due))
+    }
+    const gt = sorted.map(t => {
         const g = toGantt(t, dm.get(t.id) ?? [], origin)
         if (localDur[t.id] !== undefined) { g.duration = localDur[t.id]; g.ef = g.es + g.duration }
         return g
       })
     return calcCPM(gt)
-  }, [tasks, deps, origin, localDur])
+  }, [tasks, deps, origin, localDur, sortOverride])
 
   const totalDays = useMemo(() => Math.max(...ganttTasks.map(t => t.ef), 60) + 14, [ganttTasks])
   const totalW    = totalDays * dw
@@ -544,6 +556,40 @@ export function GanttChart({ tasks, projectId, projectName = '', onTaskCreated }
     catch (e) { console.error(e) }
   }, [])
 
+  // ── Drag-to-reorder handlers ──
+  const onRowDragStart = useCallback((id: string) => {
+    dragRowRef.current = id
+  }, [])
+
+  const onRowDragOver = useCallback((id: string) => {
+    if (!dragRowRef.current || dragRowRef.current === id) return
+    dragOverRef.current = id
+    setSortOverride(prev => {
+      const base = prev ?? ganttTasks.map(t => t.id)
+      const from = base.indexOf(dragRowRef.current!)
+      const to   = base.indexOf(id)
+      if (from === -1 || to === -1) return prev
+      const next = [...base]
+      next.splice(from, 1)
+      next.splice(to, 0, dragRowRef.current!)
+      return next
+    })
+  }, [ganttTasks])
+
+  const onRowDrop = useCallback(async () => {
+    if (!sortOverride) return
+    // Persist new sort_order to DB
+    const updates = sortOverride.map((id, i) => updateTaskGantt(id, { sort_order: i }))
+    await Promise.all(updates).catch(console.error)
+    dragRowRef.current = null
+    dragOverRef.current = null
+  }, [sortOverride])
+
+  const onRowDragEnd = useCallback(() => {
+    dragRowRef.current = null
+    dragOverRef.current = null
+  }, [])
+
   const selTask = ganttTasks.find(t => t.id === selId) ?? null
   const color   = (gt: GanttTask) => gt.originalTask.status === 'done' ? C.done : gt.critical ? C.critical : C.normal
 
@@ -623,17 +669,29 @@ export function GanttChart({ tasks, projectId, projectName = '', onTaskCreated }
           </div>
           {/* Rows */}
           <div ref={leftRef} style={{ flex: 1, overflowY: 'hidden' }}>
-            {ganttTasks.map(gt => (
+            {ganttTasks.map((gt, _ri) => (
               <div key={gt.id}
+                draggable
+                onDragStart={() => onRowDragStart(gt.id)}
+                onDragOver={e => { e.preventDefault(); onRowDragOver(gt.id) }}
+                onDrop={onRowDrop}
+                onDragEnd={onRowDragEnd}
                 style={{
-                  height: ROW_H, display: 'flex', alignItems: 'center', padding: '0 14px',
-                  borderBottom: '1px solid #141418', cursor: 'pointer', gap: 9, transition: 'background .1s',
-                  background: selId === gt.id ? '#1A1A26' : 'transparent',
+                  height: ROW_H, display: 'flex', alignItems: 'center', padding: '0 8px 0 6px',
+                  borderBottom: '1px solid #141418', cursor: 'pointer', gap: 6, transition: 'background .1s',
+                  background: selId === gt.id ? '#1A1A26' : dragOverRef.current === gt.id ? '#1E1E2E' : 'transparent',
                 }}
                 onClick={() => setSelId(id => id === gt.id ? null : gt.id)}
                 onMouseEnter={e => { if (selId !== gt.id) (e.currentTarget as HTMLElement).style.background = '#141418' }}
                 onMouseLeave={e => { if (selId !== gt.id) (e.currentTarget as HTMLElement).style.background = 'transparent' }}
               >
+                {/* Drag handle */}
+                <span
+                  style={{ color: '#3A3A4A', flexShrink: 0, display: 'flex', alignItems: 'center', cursor: 'grab', padding: '0 2px' }}
+                  onMouseDown={e => e.stopPropagation()}
+                >
+                  <GripVertical size={12} />
+                </span>
                 <span style={{
                   width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
                   background: gt.critical ? C.critical : '#2A2A35',
