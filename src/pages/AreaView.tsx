@@ -114,14 +114,14 @@ export default function AreaView() {
         subtitle={`${projects.length} proyectos activos · ${open} tareas abiertas`}
         right={
           <div className="row gap-8">
-            <button className="btn btn-ghost btn-md" onClick={() => openNewArea(a.id)}><Pencil size={14} /> Editar</button>
-            <button className="btn btn-secondary btn-md"><UserPlus size={14} /> Invitar</button>
-            <button className="btn btn-primary btn-md" onClick={() => openNewProject(a.id)}><Plus size={14} /> Nuevo proyecto</button>
+            <button className="btn btn-ghost btn-md" onClick={() => openNewArea(a.id)}><Pencil size={14} /> <span className="hide-mob">Editar</span></button>
+            <button className="btn btn-secondary btn-md hide-mob"><UserPlus size={14} /> Invitar</button>
+            <button className="btn btn-primary btn-md" onClick={() => openNewProject(a.id)}><Plus size={14} /> <span className="hide-mob">Nuevo proyecto</span></button>
           </div>
         }
       />
       <div className="page-body">
-        <div className="grid mb-24" style={{ gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+        <div className="grid mb-24" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 12 }}>
           <div className="card kpi">
             <div className="lbl"><Folder size={13} /> Proyectos activos</div>
             <div className="val">{projects.length}</div>
@@ -141,7 +141,7 @@ export default function AreaView() {
         </div>
 
         <div className="section-title">Proyectos</div>
-        <div className="grid mb-24" style={{ gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+        <div className="grid mb-24" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 12 }}>
           {projects.map(p => (
             <div
               key={p.id}
@@ -165,8 +165,8 @@ export default function AreaView() {
         </div>
 
         <div className="section-title">Tareas críticas</div>
-        <div className="card">
-          <table className="table">
+        <div className="card area-tasks-card" style={{ overflowX: 'auto' }}>
+          <table className="table" style={{ minWidth: 460 }}>
             <tbody>
               {critical.map(t => (
                 <tr key={t.id} onClick={() => openTask(t.id)}>

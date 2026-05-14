@@ -86,11 +86,11 @@ function ProjectHeader({ project, tasks, onNewTask }: { project: NonNullable<Ret
   const { data: members = [] } = useMembers();
   const assigneeIds = [...new Set(tasks.map(t => t.assignee))].slice(0, 5);
   return (
-    <div style={{ padding: '20px 32px 12px' }}>
-      <div className="row gap-12 items-center">
+    <div className="proj-header" style={{ padding: '20px 32px 12px' }}>
+      <div className="row gap-12 items-center proj-header-row">
         <AreaPill areaId={project.area} />
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-.005em' }}>{project.name}</h1>
-        <span className="pill pill-status-curso" style={{ marginLeft: 4 }}><span className="dot"></span>En curso</span>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: '-.005em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '40vw' }}>{project.name}</h1>
+        <span className="pill pill-status-curso" style={{ marginLeft: 4, flexShrink: 0 }}><span className="dot"></span>En curso</span>
         <span style={{ marginLeft: 'auto' }} className="avatar-stack avatar-stack-bordered">
           {assigneeIds.map(id => {
             const m = members.find(x => x.id === id) ?? getMember(id);
@@ -99,7 +99,7 @@ function ProjectHeader({ project, tasks, onNewTask }: { project: NonNullable<Ret
         </span>
         <button className="btn btn-secondary btn-sm"><UserPlus size={14} /></button>
         <button className="btn btn-primary btn-sm" onClick={onNewTask}>
-          <Plus size={14} /> Nueva tarea
+          <Plus size={14} /> <span className="view-tab-label">Nueva tarea</span>
         </button>
         <ProjectActionsMenu projectId={project.id} projectName={project.name} />
       </div>
@@ -122,22 +122,22 @@ const VIEW_TABS = [
 ];
 function ViewTabsBar({ view, setView }: { view: string; setView: (v: string) => void }) {
   return (
-    <div className="row gap-12 items-center" style={{ borderBottom: '1px solid var(--border)', padding: '0 32px', flexShrink: 0, background: 'var(--bg)' }}>
-      <div style={{ display: 'flex', gap: 0 }}>
+    <div className="proj-tabs row gap-12 items-center" style={{ borderBottom: '1px solid var(--border)', padding: '0 32px', flexShrink: 0, background: 'var(--bg)' }}>
+      <div style={{ display: 'flex', gap: 0, flexShrink: 0 }}>
         {VIEW_TABS.map(v => (
           <button
             key={v.id}
             onClick={() => setView(v.id)}
             className={`tab ${view === v.id ? 'active' : ''}`}
-            style={{ borderRadius: 0, padding: '8px 12px', color: view === v.id ? 'var(--text-1)' : 'var(--text-2)', background: 'transparent', border: 0, borderBottom: view === v.id ? '2px solid var(--teal)' : '2px solid transparent' }}
+            style={{ borderRadius: 0, padding: '8px 10px', color: view === v.id ? 'var(--text-1)' : 'var(--text-2)', background: 'transparent', border: 0, borderBottom: view === v.id ? '2px solid var(--teal)' : '2px solid transparent', whiteSpace: 'nowrap' }}
           >
-            <v.Icon size={13} /> {v.label}
+            <v.Icon size={13} /> <span className="view-tab-label">{v.label}</span>
           </button>
         ))}
       </div>
-      <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, paddingBottom: 0 }}>
-        <button className="btn btn-secondary btn-sm"><Filter size={14} /> Filtros</button>
-        <button className="btn btn-secondary btn-sm"><ArrowDownWideNarrow size={14} /> Agrupar</button>
+      <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexShrink: 0 }}>
+        <button className="btn btn-secondary btn-sm hide-mob"><Filter size={14} /> Filtros</button>
+        <button className="btn btn-secondary btn-sm hide-mob"><ArrowDownWideNarrow size={14} /> Agrupar</button>
       </div>
     </div>
   );
@@ -152,18 +152,18 @@ function ProjectList({ tasks, openTask, projectId }: { tasks: Task[]; openTask: 
     s === 'done' ? 'var(--green)' : s === 'block' ? 'var(--red)' : s === 'rev' ? 'var(--amber)' : s === 'curso' ? 'var(--blue)' : 'var(--text-3)';
 
   return (
-    <div style={{ padding: '8px 32px 48px' }}>
-      <table className="table">
+    <div className="proj-list" style={{ padding: '8px 32px 48px', overflowX: 'auto' }}>
+      <table className="table" style={{ minWidth: 480 }}>
         <thead>
           <tr>
             <th style={{ width: 32 }}></th>
             <th>Nombre</th>
-            <th style={{ width: 130 }}>Asignado</th>
+            <th className="table-col-assignee" style={{ width: 130 }}>Asignado</th>
             <th style={{ width: 100 }}>Fecha</th>
             <th style={{ width: 90 }}>Prioridad</th>
             <th style={{ width: 120 }}>Estado</th>
-            <th style={{ width: 70 }}>Tiempo</th>
-            <th style={{ width: 60 }}><MessageSquare size={12} /></th>
+            <th className="table-col-time" style={{ width: 70 }}>Tiempo</th>
+            <th className="table-col-comments" style={{ width: 60 }}><MessageSquare size={12} /></th>
           </tr>
         </thead>
         <tbody>
@@ -184,7 +184,7 @@ function ProjectList({ tasks, openTask, projectId }: { tasks: Task[]; openTask: 
                   <tr key={t.id} onClick={() => openTask(t.id)}>
                     <td><span className={`check ${done ? 'done' : ''}`}></span></td>
                     <td><span style={done ? { textDecoration: 'line-through', color: 'var(--text-2)' } : {}}>{t.title}</span></td>
-                    <td>
+                    <td className="table-col-assignee">
                       <div className="row gap-8 items-center">
                         <Avatar name={m.name} size={22} />
                         <span className="f-xs text-2">{m.short}</span>
@@ -193,8 +193,8 @@ function ProjectList({ tasks, openTask, projectId }: { tasks: Task[]; openTask: 
                     <td><span className="mono f-xs" style={{ color: dueColor(t.due) }}>{fmtDate(t.due)}</span></td>
                     <td><PriorityPill priority={t.priority} /></td>
                     <td><StatusPill status={t.status} /></td>
-                    <td><span className="mono f-xs text-2">{t.time !== '0h' ? t.time : '—'}</span></td>
-                    <td><span className="f-xs text-3 mono">{t.comments > 0 ? t.comments : ''}</span></td>
+                    <td className="table-col-time"><span className="mono f-xs text-2">{t.time !== '0h' ? t.time : '—'}</span></td>
+                    <td className="table-col-comments"><span className="f-xs text-3 mono">{t.comments > 0 ? t.comments : ''}</span></td>
                   </tr>
                 );
               })}

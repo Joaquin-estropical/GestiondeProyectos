@@ -542,8 +542,13 @@ kbd, .kbd { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; backgro
 }
 
 /* ════════════ Responsive — Mobile (<768px) ════════════ */
+/* burger also visible on tablet (to open drawer) */
 .mobile-burger { display: none; }
 .bottom-nav { display: none; }
+
+@media (max-width: 1023px) {
+  .mobile-burger { display: inline-flex; }
+}
 
 @media (max-width: 767px) {
   /* No sidebar — full width layout */
@@ -681,6 +686,82 @@ kbd, .kbd { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; backgro
   .btn-icon.btn-sm { width: 32px; }
   .tab { padding: 6px 12px; }
   .sb-item { padding: 9px 10px; }
+}
+
+/* ════════════ Tablet responsive (768-1023px) ════════════ */
+@media (max-width: 1023px) and (min-width: 768px) {
+  /* Project page inline padding overrides */
+  .proj-header  { padding: 16px 20px 10px !important; }
+  .proj-tabs    { padding: 0 12px !important; }
+  .proj-list    { padding: 8px 16px 32px !important; }
+  /* Dashboard two-col → stack */
+  .dash-two-col { grid-template-columns: 1fr !important; }
+  /* Filter bar search width */
+  .filter-search { flex: 1 0 140px !important; }
+  /* View tabs: hide text, show only icon on tablet */
+  .view-tab-label { display: none; }
+}
+
+/* ════════════ Mobile responsive (<768px) ════════════ */
+@media (max-width: 767px) {
+  /* Project page inline padding overrides */
+  .proj-header  { padding: 12px 16px 8px !important; }
+  .proj-tabs    { padding: 0 8px !important; overflow-x: auto; }
+  .proj-list    { padding: 6px 12px 80px !important; }
+
+  /* Dashboard two-col → single col */
+  .dash-two-col { grid-template-columns: 1fr !important; }
+
+  /* Areas grid: min 140px on mobile */
+  .areas-grid   { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important; }
+
+  /* Filter bar wraps properly */
+  .filter-bar   { gap: 6px !important; }
+  .filter-search { flex: 1 0 100% !important; min-width: 0 !important; }
+
+  /* Date min-width collapses on mobile */
+  .date-badge   { min-width: 0 !important; }
+
+  /* Project header: stack actions on second row */
+  .proj-header-row { flex-wrap: wrap !important; gap: 8px !important; }
+  .proj-header-actions { margin-left: 0 !important; width: 100%; justify-content: flex-end; }
+
+  /* Table: hide secondary columns, show only name + status */
+  .table-col-assignee,
+  .table-col-time,
+  .table-col-comments { display: none !important; }
+
+  /* List table scrollable on mobile */
+  .proj-list table { min-width: 500px; }
+  .proj-list { overflow-x: auto !important; }
+
+  /* View tabs scrollable on mobile */
+  .proj-tabs { scrollbar-width: none; }
+  .proj-tabs::-webkit-scrollbar { display: none; }
+
+  /* Task list row padding */
+  .task-row { padding: 10px 12px !important; }
+
+  /* AI summary max-width collapses */
+  .ai-summary { max-width: 100% !important; }
+
+  /* Page head action buttons: icon-only on mobile */
+  .page-head-btn-label { display: none; }
+
+  /* Slide-over: full-width bottom sheet already via .slide-over */
+  /* Modal: ensure it's within viewport */
+  .modal-body { padding: 16px !important; }
+  .modal-head { padding: 14px 16px 12px !important; }
+  .modal-foot { padding: 12px 16px !important; }
+
+  /* MyDay schedule: week view becomes single day list on mobile */
+  .schedule-week-cols { grid-template-columns: 1fr !important; }
+  .schedule-week-cols > *:not(.schedule-today-col) { display: none; }
+  .schedule-today-col { display: flex !important; }
+
+  /* AreaView critical tasks table: horizontal scroll */
+  .area-tasks-card { overflow-x: auto; }
+  .area-tasks-card table { min-width: 480px; }
 }
 
 /* ════════════ Safe area + scroll improvements ════════════ */

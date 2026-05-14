@@ -73,19 +73,19 @@ function ScheduleView({ tasks, todayIso, onOpenTask, onNewTask, areas }: {
             <button className={`tab${view === 'month' ? ' active' : ''}`} onClick={() => setView('month')}>Mes</button>
           </div>
           <button className="btn btn-ghost btn-sm btn-icon" onClick={prevPeriod}>‹</button>
-          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-2)', minWidth: 140, textAlign: 'center' }}>{periodLabel}</span>
+          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-2)', minWidth: 0, textAlign: 'center' }}>{periodLabel}</span>
           <button className="btn btn-ghost btn-sm btn-icon" onClick={nextPeriod}>›</button>
           <button className="btn btn-ghost btn-sm" onClick={goToday}>Hoy</button>
         </div>
 
-        {/* Week grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 8, flex: 1 }}>
+        {/* Week grid — scrollable on mobile, 7 cols on desktop */}
+        <div className="schedule-week-cols" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(120px, 1fr))', gap: 8, flex: 1, overflowX: 'auto', minWidth: 0 }}>
           {days.map((d, i) => {
             const iso     = isoDate(d);
             const isToday = iso === todayIso;
             const evts    = taskByDay[iso] || [];
             return (
-              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div key={i} className={isToday ? 'schedule-today-col' : ''} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
                 {/* Day header */}
                 <div style={{ textAlign: 'center', paddingBottom: 6 }}>
                   <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text-3)', fontWeight: 600 }}>{DAYS_ES[i]}</div>
@@ -161,7 +161,7 @@ function ScheduleView({ tasks, todayIso, onOpenTask, onNewTask, areas }: {
           <button className={`tab${view === 'month' ? ' active' : ''}`} onClick={() => setView('month')}>Mes</button>
         </div>
         <button className="btn btn-ghost btn-sm btn-icon" onClick={prevPeriod}>‹</button>
-        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-2)', minWidth: 140, textAlign: 'center' }}>{periodLabel}</span>
+        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-2)', minWidth: 0, textAlign: 'center' }}>{periodLabel}</span>
         <button className="btn btn-ghost btn-sm btn-icon" onClick={nextPeriod}>›</button>
         <button className="btn btn-ghost btn-sm" onClick={goToday}>Hoy</button>
       </div>
@@ -285,7 +285,7 @@ export default function MyDay() {
         </div>
       ) : (
         /* ── Lista ── */
-        <div className="page-body" style={{ maxWidth: 980 }}>
+        <div className="page-body" style={{ maxWidth: '100%' }}>
           <div className="card mb-16">
             <div className="card-head">
               <span className="title">Para hoy</span>

@@ -36,8 +36,8 @@ function FilterBar({ filters, setFilters }: { filters: Filters; setFilters: (f: 
     setFilters({ ...filters, [k]: e.target.value });
 
   return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 6, padding: '0 10px', height: 30, flex: '0 0 220px' }}>
+    <div className="filter-bar" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div className="filter-search" style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 6, padding: '0 10px', height: 30, flex: '0 0 200px', minWidth: 0 }}>
         <Search size={12} color="var(--text-3)" />
         <input
           value={filters.search}
@@ -175,7 +175,7 @@ export default function Dashboard() {
                   <span style={{ flex: 1, fontSize: 13.5 }}>{t.title}</span>
                   <AreaPill areaId={t.area} mini />
                   {member && <Avatar name={member.name} size={20} />}
-                  <span className="mono" style={{ fontSize: 12, color: dueColor(t.due), minWidth: 80, textAlign: 'right' }}>{dueLbl}</span>
+                  <span className="mono" style={{ fontSize: 12, color: dueColor(t.due), minWidth: 0, textAlign: 'right' }}>{dueLbl}</span>
                   <StatusPill status={t.status} />
                 </div>
               );
@@ -220,7 +220,7 @@ export default function Dashboard() {
                 <div className="fw-6">Resumen IA del día</div>
                 <span className="micro" style={{ marginLeft: 'auto' }}>Datos en tiempo real</span>
               </div>
-              <p style={{ margin: '14px 0 0', color: 'var(--text-1)', fontSize: 14, lineHeight: 1.6, maxWidth: 780 }}>
+              <p className="ai-summary" style={{ margin: '14px 0 0', color: 'var(--text-1)', fontSize: 14, lineHeight: 1.6, maxWidth: 780 }}>
                 {overdue.length > 0
                   ? <>Tenés <span className="fw-6">{overdue.length} tarea{overdue.length > 1 ? 's' : ''} vencida{overdue.length > 1 ? 's' : ''}</span> que requieren atención.</>
                   : 'Todas las tareas están al día.'}
@@ -233,7 +233,7 @@ export default function Dashboard() {
 
         {/* Two columns */}
         {!hasFilter && (
-          <div className="grid" style={{ gridTemplateColumns: '1.4fr 1fr', gap: 16 }}>
+          <div className="grid dash-two-col" style={{ gridTemplateColumns: '1.4fr 1fr', gap: 16 }}>
             <div className="card">
               <div className="card-head">
                 <span className="title">Mis tareas</span>
@@ -252,7 +252,7 @@ export default function Dashboard() {
                       <span className="check"></span>
                       <span style={{ flex: 1, fontSize: 13.5 }}>{t.title}</span>
                       <AreaPill areaId={t.area} mini />
-                      <span className="mono" style={{ fontSize: 12, color: dueColor(t.due), minWidth: 80, textAlign: 'right' }}>{dueLbl}</span>
+                      <span className="mono" style={{ fontSize: 12, color: dueColor(t.due), minWidth: 0, textAlign: 'right' }}>{dueLbl}</span>
                       <StatusPill status={t.status} />
                     </div>
                   );
@@ -298,7 +298,7 @@ export default function Dashboard() {
         {!hasFilter && areaLoad.length > 0 && (
           <div>
             <div className="section-title">Áreas más activas</div>
-            <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+            <div className="grid areas-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
               {areaLoad.map(a => (
                 <div
                   key={a.id}
