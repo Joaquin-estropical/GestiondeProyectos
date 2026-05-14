@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Calendar, Flag } from 'lucide-react'
+import { X, Calendar, Flag, List } from 'lucide-react'
 import { useAppStore } from '@/stores/app'
 import { createTask } from '@/lib/db'
 import { useMembers } from '@/hooks/useSupabase'
@@ -31,6 +31,8 @@ export function NewTaskModal() {
   const [desc,      setDesc]      = useState('')
   const [saving,    setSaving]    = useState(false)
   const [error,     setError]     = useState('')
+  const [bulkMode,  setBulkMode]  = useState(false)
+  const [bulkText,  setBulkText]  = useState('')
 
   // Get "Generales" project for a given area
   const getGeneralesProject = (aid: string) =>
@@ -44,7 +46,7 @@ export function NewTaskModal() {
 
   useEffect(() => {
     if (newTaskOpen) {
-      setTitle(''); setDesc(''); setError(''); setHelper('')
+      setTitle(''); setDesc(''); setError(''); setHelper(''); setBulkText(''); setBulkMode(false)
       setDue(newTaskDate ?? '')
       setPriority('med')
       setAssignee(currentUser.id)
@@ -107,6 +109,32 @@ export function NewTaskModal() {
     }
   }
 
+  const handleBulkSave = async () => {
+    const lines = bulkText.split('\n').map(l => l.trim()).filter(Boolean)
+    if (lines.length === 0) { setError('Escribí al menos una tarea'); return }
+    const finalProjectId = resolveProject(areaId, projectId)
+    if (!finalProjectId) { setError('Seleccioná un proyecto o crea uno primero'); return }
+    if (!due) { setError('La fecha límite es obligatoria'); return }
+    const finalProj = projects.find(p => p.id === finalProjectId)
+    const finalArea = finalProj?.area ?? areaId
+    setSaving(true); setError('')
+    try {
+      for (const line of lines) {
+        const task = await createTask({
+          title: line, project: finalProjectId, area: finalArea,
+          assignee, due, priority, helper: helper || undefined,
+        })
+        addTask(task)
+      }
+      await refreshAll()
+      closeNewTask()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error al guardar')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (!newTaskOpen) return null
 
   const areaProjects = areaId ? projects.filter(p => p.area === areaId) : projects
@@ -118,12 +146,26 @@ export function NewTaskModal() {
       <div className="modal" style={{ maxWidth: 540 }}>
         <div className="modal-head">
           <span className="fw-6" style={{ fontSize: 15 }}>Nueva tarea</span>
-          <button className="btn btn-ghost btn-sm btn-icon" style={{ marginLeft: 'auto' }} onClick={closeNewTask}>
+          <button
+            onClick={() => { setBulkMode(v => !v); setError('') }}
+            style={{
+              marginLeft: 'auto', marginRight: 8,
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)',
+              background: bulkMode ? 'var(--teal)' : 'transparent',
+              color: bulkMode ? '#fff' : 'var(--text-2)',
+              fontSize: 12, cursor: 'pointer', fontWeight: bulkMode ? 600 : 400,
+            }}
+          >
+            <List size={13} /> {bulkMode ? 'Modo lista' : 'Carga masiva'}
+          </button>
+          <button className="btn btn-ghost btn-sm btn-icon" onClick={closeNewTask}>
             <X size={14} />
           </button>
         </div>
         <div className="modal-body">
-          {/* Título */}
+          {/* Título — solo en modo individual */}
+          {!bulkMode && (
           <div className="form-group">
             <label className="form-label">Título <span style={{ color: 'var(--red)' }}>*</span></label>
             <div className="input">
@@ -136,6 +178,31 @@ export function NewTaskModal() {
               />
             </div>
           </div>
+          )}
+
+          {/* Bulk textarea */}
+          {bulkMode && (
+          <div className="form-group">
+            <label className="form-label">
+              Tareas <span style={{ color: 'var(--red)' }}>*</span>
+              <span style={{ fontWeight: 400, color: 'var(--text-3)', marginLeft: 8, fontSize: 11 }}>una por línea</span>
+            </label>
+            <div className="input" style={{ height: 'auto', alignItems: 'flex-start', padding: '8px 12px' }}>
+              <textarea
+                autoFocus
+                value={bulkText}
+                onChange={e => setBulkText(e.target.value)}
+                placeholder={"Inspeccionar losa\nLimpiar zona afectada\nAplicar impermeabilizante\nVerificar sellado"}
+                style={{ resize: 'vertical', minHeight: 120, background: 'transparent', border: 'none', outline: 'none', width: '100%', color: 'var(--text-1)', fontSize: 13, lineHeight: 1.6 }}
+              />
+            </div>
+            {bulkText.split('\n').filter(l => l.trim()).length > 0 && (
+              <div style={{ fontSize: 11, color: 'var(--teal)', marginTop: 4 }}>
+                {bulkText.split('\n').filter(l => l.trim()).length} tarea{bulkText.split('\n').filter(l => l.trim()).length !== 1 ? 's' : ''} para crear
+              </div>
+            )}
+          </div>
+          )}
 
           {/* Área + Proyecto */}
           <div className="row gap-12 mt-16">
@@ -273,8 +340,17 @@ export function NewTaskModal() {
         </div>
         <div className="modal-foot">
           <button className="btn btn-secondary btn-md" onClick={closeNewTask}>Cancelar</button>
-          <button className="btn btn-primary btn-md" onClick={handleSave} disabled={saving}>
-            {saving ? 'Creando...' : 'Crear tarea'}
+          <button
+            className="btn btn-primary btn-md"
+            onClick={bulkMode ? handleBulkSave : handleSave}
+            disabled={saving}
+          >
+            {saving
+              ? 'Creando...'
+              : bulkMode
+                ? `Crear ${bulkText.split('\n').filter(l => l.trim()).length || ''} tareas`
+                : 'Crear tarea'
+            }
           </button>
         </div>
       </div>
