@@ -15,13 +15,13 @@ import { useAppStore } from '@/stores/app'
 
 const CONDITIONS: ItemCondition[] = ['good', 'fair', 'poor']
 
-function ConditionPicker({ value, onChange }: { value: ItemCondition | null; onChange: (v: ItemCondition) => void }) {
+function ConditionPicker({ value, onChange }: { value: ItemCondition | null; onChange: (v: ItemCondition | null) => void }) {
   return (
     <div style={{ display: 'flex', gap: 4 }}>
       {CONDITIONS.map(c => (
         <button
           key={c}
-          onClick={() => onChange(c)}
+          onClick={() => onChange(value === c ? null : c)}
           style={{
             fontSize: 11, padding: '3px 9px', borderRadius: 5, border: '1px solid',
             cursor: 'pointer', fontWeight: value === c ? 600 : 400,
@@ -79,7 +79,7 @@ export default function ChecklistDetailPage() {
 
   useEffect(() => { load() }, [load])
 
-  async function setCondition(itemId: string, field: 'condition_in' | 'condition_out', value: ItemCondition) {
+  async function setCondition(itemId: string, field: 'condition_in' | 'condition_out', value: ItemCondition | null) {
     setSaving(itemId)
     await updateChecklistItem(itemId, { [field]: value })
     setItems(prev => prev.map(it => it.id === itemId ? { ...it, [field]: value } : it))
