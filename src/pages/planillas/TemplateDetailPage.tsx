@@ -99,12 +99,6 @@ export default function TemplateDetailPage() {
     </div>
   )
 
-  const grouped = ITEM_CATEGORIES.reduce<Record<string, TemplateItem[]>>((acc, cat) => {
-    acc[cat] = items.filter(i => i.category === cat)
-    return acc
-  }, {} as Record<string, TemplateItem[]>)
-  const uncategorized = items.filter(i => !i.category)
-
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '28px 24px' }}>
       {/* Back */}

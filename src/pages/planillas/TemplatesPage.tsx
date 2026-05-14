@@ -4,7 +4,7 @@ import { Plus, Copy, Trash2, ChevronRight, Layers } from 'lucide-react'
 import type { ChecklistTemplate } from '@/types'
 import {
   fetchChecklistTemplates, createChecklistTemplate,
-  updateChecklistTemplate, deleteChecklistTemplate, duplicateChecklistTemplate,
+  deleteChecklistTemplate, duplicateChecklistTemplate,
 } from '@/lib/planillas'
 
 export default function TemplatesPage() {

@@ -390,7 +390,7 @@ export default function ChecklistDetailPage() {
                           placeholder="Observaciones…"
                           value={item.notes ?? ''}
                           onChange={e => handleNoteChange(item.id, e.target.value)}
-                          onBlur={e => handleNoteBlur(item.id)}
+                          onBlur={() => handleNoteBlur(item.id)}
                           style={{
                             width: '100%', marginTop: 10, fontSize: 12, boxSizing: 'border-box',
                             background: 'var(--surface-2)', border: '1px solid var(--border)',
