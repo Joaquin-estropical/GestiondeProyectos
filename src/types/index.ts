@@ -1,5 +1,5 @@
 // ── Primitivos ────────────────────────────────────────────
-export type AreaType     = 'sucursal' | 'outlet' | 'edificio' | 'bodega' | 'general'
+export type AreaType     = 'sucursal' | 'outlet' | 'edificio' | 'bodega' | 'general' | 'otros'
 export type TaskStatus   = 'curso' | 'pend' | 'rev' | 'block' | 'done'
 export type TaskPriority = 'urg' | 'alta' | 'med' | 'baja'
 export type ActivityKind = 'done' | 'comment' | 'block' | 'assign' | 'create' | 'move'

@@ -15,7 +15,7 @@ const TABS = [
 ];
 
 const AREA_TYPE_LABELS: Record<AreaType, string> = {
-  sucursal: 'Sucursal', outlet: 'Outlet', edificio: 'Edificio', bodega: 'Bodega', general: 'General',
+  sucursal: 'Sucursal', outlet: 'Outlet', edificio: 'Edificio', bodega: 'Bodega', general: 'General', otros: 'Otros',
 };
 const PRIORITY_COLORS: Record<TaskPriority, string> = {
   urg: '#EF4444', alta: '#F59E0B', med: '#3B82F6', baja: '#5A5A60',
