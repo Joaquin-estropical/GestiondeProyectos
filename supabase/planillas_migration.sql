@@ -7,6 +7,11 @@
 -- ── 1. Agregar 'otros' al enum area_type ──────────────────────
 ALTER TYPE public.area_type ADD VALUE IF NOT EXISTS 'otros';
 
+-- ── 1b. Columnas faltantes en template_tasks ──────────────────
+-- (el código las usa pero nunca se crearon en la DB)
+ALTER TABLE template_tasks ADD COLUMN IF NOT EXISTS phase_name    text;
+ALTER TABLE template_tasks ADD COLUMN IF NOT EXISTS duration_days integer NOT NULL DEFAULT 1;
+
 -- ── 2. Tabla: plantillas de planillas ─────────────────────────
 CREATE TABLE IF NOT EXISTS checklist_templates (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
