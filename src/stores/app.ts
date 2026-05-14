@@ -39,6 +39,7 @@ interface AppState {
   addArea:      (a: Area)    => void
   addProject:   (p: Project) => void
   updateTaskStatus: (id: string, status: TaskStatus) => void
+  patchTask:    (id: string, patch: Partial<Task>) => void
   removeArea:   (id: string) => void
   removeProject:(id: string) => void
   // actions: ui
@@ -110,6 +111,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   updateTaskStatus: (id, status) => {
     set(s => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, status } : t) }))
     dbUpdateTaskStatus(id, status).catch(console.error)
+  },
+  patchTask: (id, patch) => {
+    set(s => ({ tasks: s.tasks.map(t => t.id === id ? { ...t, ...patch } : t) }))
   },
 
   setCollapsed:   (v) => set({ collapsed:   v }),

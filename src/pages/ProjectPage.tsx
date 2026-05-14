@@ -1,9 +1,10 @@
-import { useState, useReducer, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { List, Kanban, GanttChart as GanttIcon, Calendar, Table, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, ChevronLeft, ChevronRight, X, Pen, Trash2 } from 'lucide-react';
+import { List, Kanban, GanttChart as GanttIcon, Calendar, Table, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, ChevronLeft, ChevronRight, X, Pen, Trash2, User, AlertTriangle } from 'lucide-react';
 import { useProjects, useTasks, useMembers } from '@/hooks/useSupabase';
 import { getMember, STATUS_ORDER, STATUS_LABELS, fmtDate, dueColor } from '@/lib/mock-data';
 import { useAppStore } from '@/stores/app';
+import { updateTask } from '@/lib/db';
 import { Avatar } from '@/components/shared/Avatar';
 import { StatusPill, PriorityPill, AreaPill } from '@/components/shared/Badges';
 import { GanttChart } from '@/components/shared/GanttChart';
@@ -279,18 +280,23 @@ function KanbanPromptModal({ type, members, onConfirm, onCancel }: {
   );
 }
 
-function ProjectKanban({ tasks, openTask, projectId }: { tasks: Task[]; openTask: (id: string) => void; projectId: string }) {
-  const { updateTaskStatus, openNewTask } = useAppStore();
+// Extract block-note tag from task tags array
+function getBlockNote(t: Task): string | null {
+  const tag = t.tags.find(x => x.startsWith('block-note:'));
+  return tag ? tag.slice(11) : null;
+}
+
+function ProjectKanban({ tasks: _tasksProp, openTask, projectId }: { tasks: Task[]; openTask: (id: string) => void; projectId: string }) {
+  // Read from global store — survives view switches without re-fetching
+  const { tasks: storeTasks, updateTaskStatus, patchTask, openNewTask } = useAppStore();
   const { data: members = [] } = useMembers();
 
-  const [localTasks, setLocalTasks] = useReducer((_: Task[], next: Task[]) => next, tasks);
-  useEffect(() => { setLocalTasks(tasks); }, [tasks]);
+  const tasks = storeTasks.filter(t => t.project === projectId);
 
   const [drag,   setDrag]   = useState<string | null>(null);
   const [over,   setOver]   = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
 
-  // Pending prompt when dropping to rev or block
   const [prompt, setPrompt] = useState<{ taskId: string; newStatus: TaskStatus } | null>(null);
 
   const onDragStart = (e: React.DragEvent, id: string) => {
@@ -302,10 +308,13 @@ function ProjectKanban({ tasks, openTask, projectId }: { tasks: Task[]; openTask
     if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) setOver(null);
   };
 
-  const commitMove = async (id: string, newStatus: TaskStatus) => {
-    setLocalTasks(localTasks.map(t => t.id === id ? { ...t, status: newStatus } : t));
+  const commitMove = async (id: string, newStatus: TaskStatus, patch?: { helper?: string | null; tags?: string[] }) => {
+    // Update store immediately — this is what all views read from
+    updateTaskStatus(id, newStatus);
+    if (patch) patchTask(id, patch);
     setSaving(id);
-    await updateTaskStatus(id, newStatus);
+    // Persist to DB with any extra fields (reviewer, block note)
+    await updateTask(id, { status: newStatus, ...patch }).catch(console.error);
     setSaving(null);
   };
 
@@ -314,19 +323,27 @@ function ProjectKanban({ tasks, openTask, projectId }: { tasks: Task[]; openTask
     const id = e.dataTransfer.getData('text/plain') || drag;
     setDrag(null); setOver(null);
     if (!id) return;
-    const task = localTasks.find(t => t.id === id);
+    const task = tasks.find(t => t.id === id);
     if (!task || task.status === newStatus) return;
     if (newStatus === 'rev' || newStatus === 'block') {
       setPrompt({ taskId: id, newStatus });
     } else {
-      commitMove(id, newStatus);
+      // Clear reviewer/block-note when moving out of rev/block
+      const cleanTags = task.tags.filter(x => !x.startsWith('block-note:'));
+      commitMove(id, newStatus, { tags: cleanTags });
     }
   };
 
-  const handlePromptConfirm = async (_data: { reviewer?: string; blockNote?: string }) => {
+  const handlePromptConfirm = async (data: { reviewer?: string; blockNote?: string }) => {
     if (!prompt) return;
-    await commitMove(prompt.taskId, prompt.newStatus);
-    // TODO: persist reviewer/blockNote to task notes when that field exists
+    const task = tasks.find(t => t.id === prompt.taskId);
+    if (!task) { setPrompt(null); return; }
+    const cleanTags = task.tags.filter(x => !x.startsWith('block-note:'));
+    const newTags   = data.blockNote ? [...cleanTags, `block-note:${data.blockNote}`] : cleanTags;
+    await commitMove(prompt.taskId, prompt.newStatus, {
+      helper: data.reviewer !== undefined ? data.reviewer : task.helper,
+      tags:   newTags,
+    });
     setPrompt(null);
   };
 
@@ -342,7 +359,7 @@ function ProjectKanban({ tasks, openTask, projectId }: { tasks: Task[]; openTask
       )}
       <div className="kanban">
         {STATUS_ORDER.map(s => {
-          const list = localTasks.filter(t => t.status === s);
+          const list = tasks.filter(t => t.status === s);
           const col  = KAN_STATUS_COLORS[s];
           const bg   = KAN_STATUS_BG[s];
           return (
@@ -369,10 +386,15 @@ function ProjectKanban({ tasks, openTask, projectId }: { tasks: Task[]; openTask
                 onDragLeave={onDragLeave}
               >
                 {list.map(t => {
-                  const m = getMember(t.assignee);
+                  const m          = getMember(t.assignee);
                   const isDragging = drag === t.id;
                   const isSaving   = saving === t.id;
                   const isDone     = t.status === 'done';
+                  const blockNote  = getBlockNote(t);
+                  const reviewer   = t.status === 'rev' && t.helper
+                    ? (members.find(x => x.id === t.helper) ?? getMember(t.helper))
+                    : null;
+
                   return (
                     <div
                       key={t.id}
@@ -395,11 +417,40 @@ function ProjectKanban({ tasks, openTask, projectId }: { tasks: Task[]; openTask
                         fontSize: 14, fontWeight: 500, lineHeight: 1.5,
                         color: isDone ? 'var(--text-3)' : 'var(--text-1)',
                         textDecoration: isDone ? 'line-through' : 'none',
-                        marginBottom: 12,
+                        marginBottom: 10,
                         wordBreak: 'break-word',
                       }}>
                         {t.title}
                       </div>
+
+                      {/* Reviewer badge — visible when status = 'rev' and reviewer set */}
+                      {reviewer && (
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          padding: '5px 8px', borderRadius: 5, marginBottom: 8,
+                          background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.2)',
+                        }}>
+                          <User size={11} color="var(--amber)" />
+                          <span style={{ fontSize: 11, color: 'var(--amber)', fontWeight: 500, flex: 1 }}>
+                            Revisor: {reviewer.name.split(' ')[0]} {reviewer.name.split(' ')[1] ?? ''}
+                          </span>
+                          <Avatar name={reviewer.name} size={16} />
+                        </div>
+                      )}
+
+                      {/* Block note badge — visible when status = 'block' */}
+                      {t.status === 'block' && blockNote && (
+                        <div style={{
+                          display: 'flex', alignItems: 'flex-start', gap: 6,
+                          padding: '5px 8px', borderRadius: 5, marginBottom: 8,
+                          background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)',
+                        }}>
+                          <AlertTriangle size={11} color="var(--red)" style={{ flexShrink: 0, marginTop: 1 }} />
+                          <span style={{ fontSize: 11, color: 'var(--red)', lineHeight: 1.4 }}>
+                            {blockNote}
+                          </span>
+                        </div>
+                      )}
 
                       {/* Subtasks */}
                       {t.subtasks.total > 0 && (
