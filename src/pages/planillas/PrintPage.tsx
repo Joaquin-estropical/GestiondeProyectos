@@ -16,6 +16,12 @@ export default function PrintPage() {
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState<string | null>(null)
 
+  // Editable header fields
+  const [customProject, setCustomProject] = useState('')
+  const [customType,    setCustomType]    = useState('')
+  const [customStatus,  setCustomStatus]  = useState('')
+  const [editingHeader, setEditingHeader] = useState(false)
+
   useEffect(() => {
     if (!checklistId) return
     ;(async () => {
@@ -33,15 +39,28 @@ export default function PrintPage() {
     })()
   }, [checklistId])
 
+  // Init editable fields once checklist loads
+  useEffect(() => {
+    if (!checklist || projects.length === 0) return
+    const pName = projects.find(p => p.id === checklist.event_id)?.name ?? checklist.event_id
+    setCustomProject(pName)
+    setCustomType(checklist.type === 'reception' ? 'Recepción de local' : 'Entrega de local')
+    setCustomStatus(checklist.status === 'completed' ? 'Cerrada' : 'Abierta')
+  }, [checklist, projects])
+
   if (loading) return <div style={{ padding: 40, textAlign: 'center', fontFamily: 'Arial, sans-serif' }}>Cargando…</div>
   if (error || !checklist) return <div style={{ padding: 40, textAlign: 'center', color: '#dc2626', fontFamily: 'Arial, sans-serif' }}>{error ?? 'Error'}</div>
 
-  const projectName = projects.find(p => p.id === checklist.event_id)?.name ?? checklist.event_id
   const isReception = checklist.type === 'reception'
   const date = new Date(checklist.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-
-  // Group items by category for printing
   const categories = Array.from(new Set(items.map(i => i.category)))
+
+  const inputStyle: React.CSSProperties = {
+    border: 'none', borderBottom: '1px dashed #94a3b8', outline: 'none',
+    background: 'transparent', fontSize: 'inherit', fontWeight: 'inherit',
+    color: 'inherit', fontFamily: 'Arial, sans-serif', width: '100%',
+    padding: '1px 2px',
+  }
 
   return (
     <>
@@ -50,6 +69,7 @@ export default function PrintPage() {
           .no-print { display: none !important; }
           body { margin: 0; background: #fff; }
           @page { margin: 18mm 15mm; }
+          input { border-bottom: none !important; }
         }
         * { box-sizing: border-box; }
         body { font-family: Arial, sans-serif; font-size: 11px; color: #111; background: #fff; margin: 0; }
@@ -63,10 +83,14 @@ export default function PrintPage() {
         .sig-box strong { display: block; font-size: 11px; color: #1e293b; margin-bottom: 24px; }
       `}</style>
 
-      {/* Toolbar — hidden in print */}
-      <div className="no-print" style={{ padding: '10px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: 8, background: '#f8fafc', position: 'sticky', top: 0, zIndex: 10 }}>
+      {/* Toolbar */}
+      <div className="no-print" style={{
+        padding: '10px 20px', borderBottom: '1px solid #e2e8f0',
+        display: 'flex', gap: 8, background: '#f8fafc',
+        position: 'sticky', top: 0, zIndex: 10, alignItems: 'center', flexWrap: 'wrap',
+      }}>
         <button
-          onClick={() => window.print()}
+          onClick={() => setTimeout(() => window.print(), 50)}
           style={{ padding: '6px 16px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}
         >
           Imprimir / PDF
@@ -77,6 +101,24 @@ export default function PrintPage() {
         >
           ← Volver
         </button>
+        <div style={{ width: 1, height: 24, background: '#e2e8f0', margin: '0 4px' }} />
+        <button
+          onClick={() => setEditingHeader(v => !v)}
+          style={{
+            padding: '6px 14px', fontSize: 13, borderRadius: 6, cursor: 'pointer',
+            background: editingHeader ? '#0d9488' : '#f1f5f9',
+            color: editingHeader ? '#fff' : '#374151',
+            border: `1px solid ${editingHeader ? '#0d9488' : '#e2e8f0'}`,
+            fontWeight: editingHeader ? 600 : 400,
+          }}
+        >
+          {editingHeader ? '✓ Listo' : '✏ Personalizar encabezado'}
+        </button>
+        {editingHeader && (
+          <span style={{ fontSize: 12, color: '#64748b' }}>
+            Los cambios solo afectan la impresión, no la planilla.
+          </span>
+        )}
       </div>
 
       <div style={{ padding: '28px 40px', maxWidth: 920, margin: '0 auto' }}>
@@ -94,17 +136,25 @@ export default function PrintPage() {
           </div>
         </div>
 
-        {/* Event info box */}
+        {/* Info box — editable fields */}
         <div style={{ display: 'flex', gap: 0, marginBottom: 20, border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
           {[
-            ['Evento / Proyecto', projectName],
-            ['Tipo de acta', isReception ? 'Recepción de local' : 'Entrega de local'],
-            ['Estado', checklist.status === 'completed' ? 'Cerrada' : 'Abierta'],
-            ['Total ítems', String(items.length)],
-          ].map(([label, val], i) => (
+            { label: 'Evento / Proyecto', val: customProject, set: setCustomProject },
+            { label: 'Tipo de acta',      val: customType,    set: setCustomType    },
+            { label: 'Estado',            val: customStatus,  set: setCustomStatus  },
+            { label: 'Total ítems',       val: String(items.length), set: null      },
+          ].map(({ label, val, set }, i) => (
             <div key={label} style={{ flex: 1, padding: '10px 14px', borderLeft: i > 0 ? '1px solid #e2e8f0' : 'none' }}>
               <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#64748b', marginBottom: 3 }}>{label}</div>
-              <div style={{ fontWeight: 700, fontSize: 12, color: '#0f172a' }}>{val}</div>
+              {editingHeader && set ? (
+                <input
+                  value={val}
+                  onChange={e => set(e.target.value)}
+                  style={{ ...inputStyle, fontWeight: 700, fontSize: 12, color: '#0f172a' }}
+                />
+              ) : (
+                <div style={{ fontWeight: 700, fontSize: 12, color: '#0f172a' }}>{val}</div>
+              )}
             </div>
           ))}
         </div>
@@ -139,17 +189,20 @@ export default function PrintPage() {
                         </span>
                       )}
                     </td>
-                    <td style={{ textAlign: 'center' }}>{item.qty ?? '—'}</td>
-                    <td style={{ textAlign: 'center', fontWeight: 700, color: item.condition_in ? COND_COLOR[item.condition_in] : '#94a3b8' }}>
-                      {conditionLabel(item.condition_in)}
+                    {/* Cantidad — blank if null */}
+                    <td style={{ textAlign: 'center' }}>{item.qty ?? ''}</td>
+                    {/* Condición recepción — blank if null */}
+                    <td style={{ textAlign: 'center', fontWeight: 700, color: item.condition_in ? COND_COLOR[item.condition_in] : 'transparent' }}>
+                      {item.condition_in ? conditionLabel(item.condition_in) : ''}
                     </td>
                     {!isReception && (
-                      <td style={{ textAlign: 'center', fontWeight: 700, color: item.condition_out ? COND_COLOR[item.condition_out] : '#94a3b8' }}>
-                        {conditionLabel(item.condition_out)}
+                      <td style={{ textAlign: 'center', fontWeight: 700, color: item.condition_out ? COND_COLOR[item.condition_out] : 'transparent' }}>
+                        {item.condition_out ? conditionLabel(item.condition_out) : ''}
                       </td>
                     )}
-                    <td style={{ color: item.notes ? '#0f172a' : '#cbd5e1', fontStyle: item.notes ? 'normal' : 'italic', fontSize: 10 }}>
-                      {item.notes || '—'}
+                    {/* Observaciones — blank if null */}
+                    <td style={{ color: '#0f172a', fontSize: 10 }}>
+                      {item.notes ?? ''}
                     </td>
                   </tr>
                 )),
