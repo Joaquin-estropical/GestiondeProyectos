@@ -692,10 +692,15 @@ function ProjectCalendar({ tasks, openTask }: { tasks: Task[]; openTask: (id: st
 }
 
 // ─── Main export ───
+const HEADER_MIN = 80;
+const HEADER_MAX = 320;
+const HEADER_DEFAULT = 210;
+
 export default function ProjectPage() {
   const { projectId }       = useParams<{ projectId: string }>();
   const { openTask }        = useAppStore();
   const [view, setView]     = useState('list');
+  const [headerH, setHeaderH] = useState(HEADER_DEFAULT);
   const id                  = projectId ?? '';
 
   const { data: projects = [], loading } = useProjects();
@@ -703,14 +708,50 @@ export default function ProjectPage() {
 
   const project = projects.find(p => p.id === id);
 
+  // Drag-to-resize divider
+  const onDividerMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startH = headerH;
+    const onMove = (ev: MouseEvent) => {
+      const next = Math.min(HEADER_MAX, Math.max(HEADER_MIN, startH + ev.clientY - startY));
+      setHeaderH(next);
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [headerH]);
+
   if (loading) return <div className="page-body" style={{ color: 'var(--text-3)', fontSize: 13 }}>Cargando proyecto...</div>;
   if (!project) return <div className="page-body">Proyecto no encontrado.</div>;
 
   const isFullHeight = view === 'gantt' || view === 'kanban' || view === 'cal';
 
   return (
-    <div style={{ height: '100%', overflow: isFullHeight ? 'hidden' : 'auto', display: 'flex', flexDirection: 'column' }}>
-      <ProjectHeader project={project} tasks={tasks} view={view} setView={setView} />
+    <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', userSelect: 'none' }}>
+      {/* Header — height controlled by drag */}
+      <div style={{ height: headerH, flexShrink: 0, overflow: 'hidden' }}>
+        <ProjectHeader project={project} tasks={tasks} view={view} setView={setView} />
+      </div>
+
+      {/* Resize divider */}
+      <div
+        onMouseDown={onDividerMouseDown}
+        style={{
+          height: 6, flexShrink: 0, cursor: 'row-resize',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'var(--surface-1)',
+          borderTop: '1px solid var(--border)',
+          borderBottom: '1px solid var(--border)',
+        }}
+      >
+        <div style={{ width: 40, height: 3, borderRadius: 99, background: 'var(--border-hover)' }} />
+      </div>
+
+      {/* Content */}
       <div style={{ flex: 1, overflow: isFullHeight ? 'hidden' : 'auto' }}>
         {view === 'list'   && <ProjectList   tasks={tasks} openTask={openTask} projectId={id} />}
         {view === 'kanban' && <ProjectKanban tasks={tasks} openTask={openTask} projectId={id} />}
