@@ -1,11 +1,12 @@
 import { useState, useReducer, useCallback, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { List, Kanban, GanttChart, Calendar, Table, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, ChevronLeft, ChevronRight, Maximize2, Minimize2, X } from 'lucide-react';
+import { List, Kanban, GanttChart as GanttIcon, Calendar, Table, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useProjects, useTasks, useMembers } from '@/hooks/useSupabase';
-import { getMember, STATUS_ORDER, STATUS_LABELS, MONTHS_ES, fmtDate, dueColor } from '@/lib/mock-data';
+import { getMember, STATUS_ORDER, STATUS_LABELS, fmtDate, dueColor } from '@/lib/mock-data';
 import { useAppStore } from '@/stores/app';
 import { Avatar } from '@/components/shared/Avatar';
 import { StatusPill, PriorityPill, AreaPill } from '@/components/shared/Badges';
+import { GanttChart } from '@/components/shared/GanttChart';
 import type { Task, TaskStatus } from '@/types';
 
 // ─── Project Header (info only, no tabs) ───
@@ -40,7 +41,7 @@ function ProjectHeader({ project, tasks }: { project: NonNullable<ReturnType<typ
 const VIEW_TABS = [
   { id: 'list',   label: 'Lista',      Icon: List },
   { id: 'kanban', label: 'Kanban',     Icon: Kanban },
-  { id: 'gantt',  label: 'Gantt',      Icon: GanttChart },
+  { id: 'gantt',  label: 'Gantt',      Icon: GanttIcon },
   { id: 'cal',    label: 'Calendario', Icon: Calendar },
   { id: 'table',  label: 'Tabla',      Icon: Table },
 ];
@@ -382,224 +383,6 @@ function ProjectKanban({ tasks, openTask, projectId }: { tasks: Task[]; openTask
   );
 }
 
-// ─── Project Gantt ───
-const ROW_H = 48;
-const COL_W = 36;
-
-function ProjectGantt({ project, tasks, openTask }: { project: NonNullable<ReturnType<typeof useProjects>['data']>[0]; tasks: Task[]; openTask: (id: string) => void }) {
-  const [fullscreen, setFullscreen] = useState(false);
-
-  // Derive time range from actual task due dates + 3 weeks padding
-  const allMs  = tasks.map(t => new Date(t.due + 'T12:00:00').getTime());
-  const minDate = new Date(allMs.length ? Math.min(...allMs) : Date.now());
-  const maxDate = new Date(allMs.length ? Math.max(...allMs) : Date.now());
-  minDate.setDate(minDate.getDate() - 21);
-  maxDate.setDate(maxDate.getDate() + 21);
-  const totalDays = Math.max(Math.round((maxDate.getTime() - minDate.getTime()) / 86400000), 60);
-  const totalW    = totalDays * COL_W;
-
-  const [offsets,  setOffsets]  = useState<Record<string, number>>({});
-  const [dragging, setDragging] = useState<string | null>(null);
-
-  const taskBars = tasks.map((t, i) => {
-    const dueD = new Date(t.due + 'T12:00:00');
-    const len  = t.start_date
-      ? Math.max(1, Math.round((dueD.getTime() - new Date(t.start_date + 'T12:00:00').getTime()) / 86400000))
-      : 5 + (i % 6) * 2;
-    const ts = t.start_date ? new Date(t.start_date + 'T12:00:00') : new Date(dueD.getTime() - len * 86400000);
-    return { t, start: ts, end: dueD, len };
-  });
-
-  const xOf    = useCallback((d: Date) => Math.round((d.getTime() - minDate.getTime()) / 86400000) * COL_W, [minDate]);
-  const todayX = xOf(new Date()) + COL_W / 2;
-  const dueX   = xOf(new Date(project.due + 'T12:00:00'));
-
-  // Build week headers
-  const weeks: { label: string; day: number }[] = [];
-  for (let i = 0; i < totalDays; i += 7) {
-    const d = new Date(minDate);
-    d.setDate(minDate.getDate() + i);
-    weeks.push({ label: `${d.getDate()} ${MONTHS_ES[d.getMonth()]}`, day: i });
-  }
-
-  const statusColor = (s: string) =>
-    s === 'done' ? '#22C55E' : s === 'block' ? '#EF4444' : s === 'rev' ? '#F59E0B' : s === 'curso' ? '#3B82F6' : '#5A5A60';
-
-  const onBarMouseDown = useCallback((e: React.MouseEvent, taskId: string) => {
-    e.stopPropagation(); e.preventDefault();
-    const startX   = e.clientX;
-    const startOff = offsets[taskId] ?? 0;
-    setDragging(taskId);
-    let rafId = 0;
-    const move = (ev: MouseEvent) => {
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
-        const delta = Math.round((ev.clientX - startX) / COL_W);
-        setOffsets(o => ({ ...o, [taskId]: startOff + delta }));
-      });
-    };
-    const up = () => {
-      cancelAnimationFrame(rafId);
-      setDragging(null);
-      window.removeEventListener('mousemove', move);
-      window.removeEventListener('mouseup', up);
-    };
-    window.addEventListener('mousemove', move, { passive: true });
-    window.addEventListener('mouseup', up);
-  }, [offsets]);
-
-  if (tasks.length === 0) {
-    return (
-      <div className="empty" style={{ marginTop: 48 }}>
-        <div className="ill"><GanttChart size={24} /></div>
-        <p className="t">Sin tareas para mostrar</p>
-        <p className="d">Agregá tareas al proyecto para visualizarlas en el Gantt.</p>
-      </div>
-    );
-  }
-
-  const ganttContent = (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', background: 'var(--bg)' }}>
-      {/* Toolbar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 24px', borderBottom: '1px solid var(--border)', flexShrink: 0, background: 'var(--surface-1)' }}>
-        <span style={{ fontSize: 12.5, color: 'var(--text-2)' }}>
-          {tasks.length} tareas · Entrega <span style={{ color: 'var(--text-1)', fontWeight: 500 }}>{fmtDate(project.due)}</span>
-        </span>
-        <div style={{ display: 'flex', gap: 12, fontSize: 11.5, color: 'var(--text-3)' }}>
-          {(['curso','rev','block','done'] as const).map(s => (
-            <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 8, height: 8, borderRadius: 2, background: statusColor(s) }} />
-              {STATUS_LABELS[s]}
-            </span>
-          ))}
-        </div>
-        <button
-          className="btn btn-secondary btn-sm"
-          style={{ marginLeft: 'auto' }}
-          onClick={() => setFullscreen(v => !v)}
-          title={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
-        >
-          {fullscreen ? <><Minimize2 size={13} /> Salir</>  : <><Maximize2 size={13} /> Pantalla completa</>}
-        </button>
-        {fullscreen && (
-          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setFullscreen(false)}>
-            <X size={15} />
-          </button>
-        )}
-      </div>
-
-      {/* Gantt body — fixed left panel + scrollable right */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* Left: task list (fixed) */}
-        <div style={{ width: 320, flexShrink: 0, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflowY: 'hidden' }}>
-          {/* Header */}
-          <div style={{ height: ROW_H, display: 'flex', alignItems: 'center', padding: '0 16px', background: 'var(--surface-1)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)' }}>Tarea</span>
-          </div>
-          {/* Rows */}
-          <div style={{ overflowY: 'auto', flex: 1 }}>
-            {taskBars.map(({ t }) => {
-              const sc = statusColor(t.status);
-              return (
-                <div
-                  key={t.id}
-                  style={{ height: ROW_H, display: 'flex', alignItems: 'center', padding: '0 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer', gap: 10 }}
-                  onClick={() => openTask(t.id)}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-1)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = '')}
-                >
-                  <span style={{ width: 3, height: 24, borderRadius: 2, background: sc, flexShrink: 0 }} />
-                  <PriorityPill priority={t.priority} iconOnly />
-                  <span style={{ flex: 1, fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
-                  <Avatar name={getMember(t.assignee)?.name ?? ''} size={22} />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Right: scrollable timeline */}
-        <div style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', position: 'relative' }}>
-          <div style={{ width: totalW, position: 'relative', minHeight: '100%' }}>
-            {/* Week headers (sticky) */}
-            <div style={{ position: 'sticky', top: 0, height: ROW_H, display: 'flex', alignItems: 'flex-end', background: 'var(--surface-1)', borderBottom: '1px solid var(--border)', zIndex: 4 }}>
-              {weeks.map((w, i) => (
-                <div key={i} style={{ width: 7 * COL_W, flexShrink: 0, borderRight: '1px solid var(--border)', padding: '0 10px 8px', fontSize: 11, color: 'var(--text-3)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.04em', height: '100%', display: 'flex', alignItems: 'flex-end' }}>
-                  {w.label}
-                </div>
-              ))}
-            </div>
-
-            {/* Today marker */}
-            <div style={{ position: 'absolute', left: todayX, top: 0, bottom: 0, width: 2, background: 'var(--teal)', zIndex: 3, pointerEvents: 'none' }}>
-              <span style={{ position: 'absolute', top: ROW_H + 4, left: 4, fontSize: 9, fontWeight: 700, color: 'var(--teal)', fontFamily: 'JetBrains Mono, monospace', letterSpacing: '.05em' }}>HOY</span>
-            </div>
-
-            {/* Alternating week bands */}
-            {weeks.map((w, i) => (
-              i % 2 === 0 ? null :
-              <div key={i} style={{ position: 'absolute', left: w.day * COL_W, top: ROW_H, width: 7 * COL_W, bottom: 0, background: 'rgba(255,255,255,.015)', pointerEvents: 'none' }} />
-            ))}
-
-            {/* Vertical day lines */}
-            {Array.from({ length: Math.ceil(totalDays / 7) }).map((_, i) => (
-              <div key={i} style={{ position: 'absolute', left: i * 7 * COL_W, top: ROW_H, bottom: 0, width: 1, background: 'var(--border)', pointerEvents: 'none' }} />
-            ))}
-
-            {/* Task bars */}
-            {taskBars.map(({ t, start: ts, len }, rowIdx) => {
-              const off = offsets[t.id] ?? 0;
-              const x   = xOf(ts) + off * COL_W;
-              const w   = Math.max(len * COL_W, COL_W);
-              const sc  = statusColor(t.status);
-              return (
-                <div
-                  key={t.id}
-                  style={{ position: 'absolute', top: ROW_H + rowIdx * ROW_H, height: ROW_H, width: totalW, pointerEvents: 'none' }}
-                >
-                  <div
-                    className={`gantt-bar ${dragging === t.id ? 'dragging' : ''}`}
-                    onMouseDown={e => onBarMouseDown(e, t.id)}
-                    onClick={e => { if (!dragging) openTask(t.id); else e.preventDefault(); }}
-                    style={{
-                      left: x, width: w,
-                      top: 8, height: ROW_H - 16,
-                      borderRadius: 5,
-                      background: t.status === 'done' ? sc : sc + '28',
-                      borderLeft: `4px solid ${sc}`,
-                      color: t.status === 'done' ? '#0A0A0B' : 'var(--text-1)',
-                      fontSize: 12, fontWeight: 500,
-                      pointerEvents: 'all',
-                      boxShadow: dragging === t.id ? `0 4px 16px ${sc}50` : 'none',
-                    }}
-                  >
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
-                    <span style={{ marginLeft: 'auto', fontSize: 10, opacity: 0.7, flexShrink: 0 }}>{fmtDate(t.due)}</span>
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Project due milestone */}
-            {allMs.length > 0 && (
-              <div style={{ position: 'absolute', left: dueX - 10, top: ROW_H + taskBars.length * ROW_H + 6, width: 20, height: 20, transform: 'rotate(45deg)', border: '2px solid var(--teal)', background: 'var(--bg)', borderRadius: 2 }} title={`Entrega: ${fmtDate(project.due)}`} />
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  if (fullscreen) {
-    return (
-      <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'var(--bg)' }}>
-        {ganttContent}
-      </div>
-    );
-  }
-  return ganttContent;
-}
-
 // ─── Project Calendar ───
 function ProjectCalendar({ tasks, openTask }: { tasks: Task[]; openTask: (id: string) => void }) {
   const today = new Date();
@@ -769,7 +552,16 @@ export default function ProjectPage() {
       <div style={{ flex: 1, overflow: isFullHeight ? 'hidden' : 'auto' }}>
         {view === 'list'   && <ProjectList   tasks={tasks} openTask={openTask} projectId={id} />}
         {view === 'kanban' && <ProjectKanban tasks={tasks} openTask={openTask} projectId={id} />}
-        {view === 'gantt'  && <ProjectGantt  project={project} tasks={tasks} openTask={openTask} />}
+        {view === 'gantt'  && (
+          <GanttChart
+            tasks={tasks}
+            projectId={id}
+            projectName={project.name}
+            projectDue={project.due}
+            onOpenTask={openTask}
+            onTaskCreated={() => { /* opens new task modal */ }}
+          />
+        )}
         {view === 'table'  && <ProjectList   tasks={tasks} openTask={openTask} projectId={id} />}
         {view === 'cal'    && <ProjectCalendar tasks={tasks} openTask={openTask} />}
       </div>

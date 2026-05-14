@@ -1,18 +1,21 @@
 import { supabase, supabaseWriter } from './supabase'
-import type { Area, Member, Project, Task, Template, TemplateTask, Subtask, Comment, AreaType, TaskPriority, TaskStatus } from '@/types'
+import type { Area, Member, Project, Task, Template, TemplateTask, Subtask, Comment, TaskDependency, DependencyType, AreaType, TaskPriority, TaskStatus } from '@/types'
 
 // ── helpers ───────────────────────────────────────────────
 function normaliseTask(row: Record<string, unknown>): Task {
   const tags = (row.tags as string[]) ?? []
-  // helper is stored as "helper:memberId" in tags array for DB compatibility
   const helperTag = tags.find(t => t.startsWith('helper:'))
   const helper    = helperTag ? helperTag.slice(7) : null
   const cleanTags = tags.filter(t => !t.startsWith('helper:'))
   return {
     ...row,
-    subtasks:    { done: row.subtasks_done as number, total: row.subtasks_total as number },
-    description: (row.description as string | null) ?? null,
-    start_date:  (row.start_date  as string | null) ?? null,
+    subtasks:     { done: row.subtasks_done as number, total: row.subtasks_total as number },
+    description:  (row.description  as string | null) ?? null,
+    start_date:   (row.start_date   as string | null) ?? null,
+    end_date:     (row.end_date     as string | null) ?? null,
+    progress:     (row.progress     as number)        ?? 0,
+    is_milestone: (row.is_milestone as boolean)       ?? false,
+    sort_order:   (row.sort_order   as number)        ?? 0,
     helper,
     tags: cleanTags,
   } as Task
@@ -184,7 +187,8 @@ export async function createTask(input: {
 
 export async function updateTask(id: string, patch: Partial<{
   title: string; assignee: string; helper: string | null; due: string; priority: TaskPriority
-  status: TaskStatus; description: string; start_date: string; tags: string[]
+  status: TaskStatus; description: string; start_date: string; end_date: string
+  progress: number; is_milestone: boolean; sort_order: number; tags: string[]
 }>): Promise<void> {
   const { helper, tags, ...rest } = patch
   // encode helper into tags if either is being updated
@@ -319,5 +323,49 @@ export async function deleteTemplate(id: string): Promise<void> {
 
 export async function deleteTemplateTask(id: string): Promise<void> {
   const { error } = await supabaseWriter.from('template_tasks').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ═══════════════════════════════════════════════════════════
+// TASK DEPENDENCIES
+// ═══════════════════════════════════════════════════════════
+export async function fetchTaskDependencies(projectId: string): Promise<TaskDependency[]> {
+  const { data, error } = await supabase
+    .from('task_dependencies')
+    .select('*')
+    .eq('project_id', projectId)
+  if (error) throw error
+  return data as TaskDependency[]
+}
+
+export async function createTaskDependency(
+  projectId: string,
+  predecessorId: string,
+  successorId: string,
+  type: DependencyType = 'finish_to_start'
+): Promise<TaskDependency> {
+  const { data, error } = await supabaseWriter
+    .from('task_dependencies')
+    .insert({ project_id: projectId, predecessor_id: predecessorId, successor_id: successorId, type })
+    .select()
+    .single()
+  if (error) throw error
+  return data as TaskDependency
+}
+
+export async function deleteTaskDependency(predecessorId: string, successorId: string): Promise<void> {
+  const { error } = await supabaseWriter
+    .from('task_dependencies')
+    .delete()
+    .eq('predecessor_id', predecessorId)
+    .eq('successor_id', successorId)
+  if (error) throw error
+}
+
+export async function updateTaskGantt(
+  id: string,
+  patch: { start_date?: string; end_date?: string; progress?: number; is_milestone?: boolean; sort_order?: number }
+): Promise<void> {
+  const { error } = await supabaseWriter.from('tasks').update(patch).eq('id', id)
   if (error) throw error
 }

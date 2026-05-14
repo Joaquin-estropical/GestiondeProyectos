@@ -39,22 +39,55 @@ export interface Project {
 }
 
 export interface Task {
+  id:           string
+  code:         string
+  title:        string
+  project:      string
+  area:         string
+  assignee:     string
+  helper:       string | null
+  due:          string
+  priority:     TaskPriority
+  status:       TaskStatus
+  time:         string
+  comments:     number
+  subtasks:     { done: number; total: number }
+  description:  string | null
+  start_date:   string | null
+  end_date:     string | null
+  progress:     number        // 0–100
+  is_milestone: boolean
+  sort_order:   number
+  tags:         string[]
+}
+
+export type DependencyType = 'finish_to_start' | 'start_to_start' | 'finish_to_finish'
+
+export interface TaskDependency {
+  id:             string
+  project_id:     string
+  predecessor_id: string
+  successor_id:   string
+  type:           DependencyType
+  created_at:     string
+}
+
+// ── Gantt CPM types ───────────────────────────────────────
+export interface GanttTask {
   id:          string
-  code:        string
-  title:       string
-  project:     string
-  area:        string
-  assignee:    string
-  helper:      string | null   // auxiliar/ayudante opcional
-  due:         string
-  priority:    TaskPriority
-  status:      TaskStatus
-  time:        string
-  comments:    number
-  subtasks:    { done: number; total: number }
-  description: string | null
-  start_date:  string | null
-  tags:        string[]
+  name:        string
+  start:       number   // days from project start (day 0)
+  duration:    number   // days
+  deps:        string[] // predecessor ids
+  // computed by CPM:
+  es:          number
+  ef:          number
+  ls:          number
+  lf:          number
+  float:       number
+  critical:    boolean
+  // display metadata
+  originalTask: Task
 }
 
 // ── Plantillas ────────────────────────────────────────────

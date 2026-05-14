@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Plus, GanttChart } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, GanttChart as GanttIcon } from 'lucide-react';
 import { DAYS_ES } from '@/lib/mock-data';
 import { useAreas, useTasks, useMembers, useProjects } from '@/hooks/useSupabase';
 import { APP_USER_IDS, sortedMembers } from '@/lib/auth';
@@ -231,7 +231,7 @@ function GanttView({
   if (allDates.length === 0) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-3)', gap: 8 }}>
-        <GanttChart size={32} />
+        <GanttIcon size={32} />
         <div style={{ fontSize: 14, fontWeight: 500 }}>Sin tareas para mostrar en el Gantt</div>
         <div style={{ fontSize: 12 }}>Crea tareas con fechas de inicio y vencimiento para verlas aquí.</div>
       </div>
@@ -533,7 +533,7 @@ export default function CalendarView() {
                 onClick={() => setView('gantt')}
                 style={{ gap: 5 }}
               >
-                <GanttChart size={12} /> Gantt
+                <GanttIcon size={12} /> Gantt
               </button>
             </div>
             {!isGantt && (
