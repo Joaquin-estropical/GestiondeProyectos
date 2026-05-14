@@ -1,54 +1,64 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Trash2, GripVertical, Pencil, Check, X } from 'lucide-react'
-import type { ChecklistTemplate, TemplateItem, ItemCategory } from '@/types'
-import { ITEM_CATEGORIES } from '@/types'
+import { ArrowLeft, Plus, Trash2, Pencil, Check, X, ChevronDown, ChevronRight } from 'lucide-react'
+import type { ChecklistTemplate, TemplateItem } from '@/types'
+import { DEFAULT_CATEGORIES } from '@/types'
 import {
   fetchChecklistTemplates, updateChecklistTemplate,
   fetchTemplateItems, createTemplateItem, updateTemplateItem, deleteTemplateItem,
+  renameCategory, deleteCategoryItems,
 } from '@/lib/planillas'
 
 const CAT_COLORS: Record<string, string> = {
-  Mobiliario:   '#6366f1',
-  Telas:        '#ec4899',
-  Pintura:      '#f59e0b',
-  Iluminación:  '#eab308',
-  Audiovisual:  '#3b82f6',
-  Instalaciones:'#10b981',
-  Otro:         '#6b7280',
+  'Mobiliario': '#6366f1', 'Telas y textiles': '#ec4899', 'Decoración': '#f59e0b',
+  'Iluminación': '#eab308', 'Audiovisual': '#3b82f6', 'Instalaciones': '#10b981',
 }
+function catColor(cat: string) { return CAT_COLORS[cat] ?? '#6b7280' }
 
 export default function TemplateDetailPage() {
   const { templateId } = useParams<{ templateId: string }>()
-  const navigate = useNavigate()
+  const navigate       = useNavigate()
 
-  const [template, setTemplate] = useState<ChecklistTemplate | null>(null)
-  const [items, setItems]       = useState<TemplateItem[]>([])
-  const [loading, setLoading]   = useState(true)
+  const [template, setTemplate]     = useState<ChecklistTemplate | null>(null)
+  const [items, setItems]           = useState<TemplateItem[]>([])
+  const [loading, setLoading]       = useState(true)
 
+  // template name editing
   const [editingName, setEditingName] = useState(false)
   const [nameVal, setNameVal]         = useState('')
 
-  const [newItem, setNewItem]  = useState({ name: '', category: '' as ItemCategory | '', qty: 1 })
-  const [addingItem, setAddingItem] = useState(false)
+  // category editing
+  const [editingCat, setEditingCat]   = useState<string | null>(null)
+  const [catVal, setCatVal]           = useState('')
+  const [collapsed, setCollapsed]     = useState<Record<string, boolean>>({})
 
-  const [editingItem, setEditingItem] = useState<string | null>(null)
-  const [editVal, setEditVal] = useState({ name: '', category: '' as ItemCategory | '', qty: 1 })
+  // new category
+  const [addingCat, setAddingCat]     = useState(false)
+  const [newCatName, setNewCatName]   = useState('')
 
-  useEffect(() => { if (templateId) load() }, [templateId])
+  // item editing
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [editItemVal, setEditItemVal]     = useState({ name: '', category: '' })
 
-  async function load() {
+  // new item per category
+  const [addingItemCat, setAddingItemCat] = useState<string | null>(null)
+  const [newItemName, setNewItemName]     = useState('')
+
+  const load = useCallback(async () => {
+    if (!templateId) return
     setLoading(true)
     try {
       const [tpls, its] = await Promise.all([
         fetchChecklistTemplates(),
-        fetchTemplateItems(templateId!),
+        fetchTemplateItems(templateId),
       ])
       const tpl = tpls.find(t => t.id === templateId)
       if (tpl) { setTemplate(tpl); setNameVal(tpl.name) }
       setItems(its)
     } finally { setLoading(false) }
-  }
+  }, [templateId])
+
+  useEffect(() => { load() }, [load])
 
   async function saveName() {
     if (!template || !nameVal.trim()) return
@@ -57,66 +67,77 @@ export default function TemplateDetailPage() {
     setEditingName(false)
   }
 
-  async function handleAddItem() {
-    if (!newItem.name.trim() || !templateId) return
-    const order = items.length
-    await createTemplateItem({
-      template_id: templateId,
-      name:        newItem.name.trim(),
-      category:    newItem.category || undefined,
-      default_qty: newItem.qty,
-      sort_order:  order,
-    })
-    setNewItem({ name: '', category: '', qty: 1 })
-    setAddingItem(false)
+  // derive ordered category list from items + defaults
+  const categories = Array.from(new Set([
+    ...DEFAULT_CATEGORIES,
+    ...items.map(i => i.category),
+  ])).filter(cat => items.some(i => i.category === cat))
+
+  // All unique categories including ones with no items (so user can add to them)
+  const allCategories = Array.from(new Set([
+    ...DEFAULT_CATEGORIES,
+    ...items.map(i => i.category),
+  ]))
+
+  async function handleSaveCat(oldCat: string) {
+    if (!catVal.trim() || !templateId) return
+    await renameCategory(templateId, oldCat, catVal.trim())
+    setEditingCat(null)
     load()
   }
 
-  async function handleSaveItem(id: string) {
-    await updateTemplateItem(id, {
-      name:        editVal.name.trim(),
-      category:    (editVal.category || null) as ItemCategory | null,
-      default_qty: editVal.qty,
-    })
-    setEditingItem(null)
+  async function handleDeleteCat(cat: string) {
+    const count = items.filter(i => i.category === cat).length
+    if (!confirm(`¿Eliminar categoría "${cat}"${count > 0 ? ` y sus ${count} ítem${count !== 1 ? 's' : ''}` : ''}?`)) return
+    if (!templateId) return
+    await deleteCategoryItems(templateId, cat)
     load()
+  }
+
+  async function handleAddItemToCategory(cat: string) {
+    if (!newItemName.trim() || !templateId) return
+    const catItems = items.filter(i => i.category === cat)
+    await createTemplateItem({
+      template_id: templateId, name: newItemName.trim(),
+      category: cat, sort_order: catItems.length,
+    })
+    setNewItemName(''); setAddingItemCat(null); load()
+  }
+
+  async function handleAddNewCategory() {
+    if (!newCatName.trim() || !templateId) return
+    // Create a placeholder item to establish the category
+    await createTemplateItem({ template_id: templateId, name: 'Nuevo ítem', category: newCatName.trim(), sort_order: 0 })
+    setNewCatName(''); setAddingCat(false); load()
+  }
+
+  async function handleSaveItem(id: string) {
+    if (!editItemVal.name.trim()) return
+    await updateTemplateItem(id, { name: editItemVal.name.trim(), category: editItemVal.category })
+    setEditingItemId(null); load()
   }
 
   async function handleDeleteItem(id: string) {
     if (!confirm('¿Eliminar este ítem de la plantilla?')) return
-    await deleteTemplateItem(id)
-    load()
+    await deleteTemplateItem(id); load()
   }
 
-  if (loading) return (
-    <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: '64px 0', fontSize: 14 }}>
-      Cargando…
-    </div>
-  )
-  if (!template) return (
-    <div style={{ textAlign: 'center', color: 'var(--red)', padding: '64px 0', fontSize: 14 }}>
-      Plantilla no encontrada.
-    </div>
-  )
+  if (loading) return <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: '64px 0', fontSize: 14 }}>Cargando…</div>
+  if (!template) return <div style={{ textAlign: 'center', color: 'var(--red)', padding: '64px 0', fontSize: 14 }}>Plantilla no encontrada.</div>
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: '28px 24px' }}>
+    <div style={{ maxWidth: 740, margin: '0 auto', padding: '28px 24px' }}>
       {/* Back */}
-      <button
-        className="btn btn-ghost btn-sm"
-        onClick={() => navigate('/planillas/plantillas')}
-        style={{ marginBottom: 20, color: 'var(--text-3)' }}
-      >
+      <button className="btn btn-ghost btn-sm" onClick={() => navigate('/planillas/plantillas')} style={{ marginBottom: 20, color: 'var(--text-3)' }}>
         <ArrowLeft size={14} /> Plantillas
       </button>
 
-      {/* Header */}
+      {/* Template name */}
       <div style={{ marginBottom: 28 }}>
         {editingName ? (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input
-              autoFocus className="input"
-              value={nameVal}
+              autoFocus className="input" value={nameVal}
               onChange={e => setNameVal(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') setEditingName(false) }}
               style={{ fontSize: 20, fontWeight: 700, flex: 1 }}
@@ -127,138 +148,172 @@ export default function TemplateDetailPage() {
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>{template.name}</h1>
-            <button
-              className="btn btn-ghost btn-sm btn-icon"
-              onClick={() => setEditingName(true)}
-              style={{ color: 'var(--text-3)' }}
-            >
+            <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setEditingName(true)} style={{ color: 'var(--text-3)' }}>
               <Pencil size={13} />
             </button>
           </div>
         )}
         <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '6px 0 0' }}>
-          {items.length} ítem{items.length !== 1 ? 's' : ''} · Edita la lista base de esta plantilla
+          {items.length} ítem{items.length !== 1 ? 's' : ''} · Editá la lista base de esta plantilla en línea
         </p>
       </div>
 
-      {/* Items list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 16 }}>
-        {items.length === 0 && !addingItem && (
-          <div style={{ textAlign: 'center', color: 'var(--text-3)', fontSize: 13, padding: '24px 0' }}>
-            Sin ítems todavía. Agrega el primero abajo.
-          </div>
-        )}
-
-        {items.map(item => (
-          <div
-            key={item.id}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              background: 'var(--surface)', border: '1px solid var(--border)',
-              borderRadius: 7, padding: '9px 12px',
-            }}
-          >
-            <GripVertical size={14} style={{ color: 'var(--text-3)', flexShrink: 0, cursor: 'grab' }} />
-
-            {editingItem === item.id ? (
-              <>
-                <input
-                  autoFocus className="input"
-                  value={editVal.name}
-                  onChange={e => setEditVal(v => ({ ...v, name: e.target.value }))}
-                  style={{ flex: 1, fontSize: 13 }}
+      {/* Categories + items */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {categories.map(cat => {
+          const catItems   = items.filter(i => i.category === cat)
+          const isCollapsed = collapsed[cat] ?? false
+          return (
+            <div key={cat} style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+              {/* Category header */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '10px 14px', background: 'var(--surface-2)',
+                borderBottom: isCollapsed ? 'none' : '1px solid var(--border)',
+              }}>
+                <span
+                  style={{ width: 8, height: 8, borderRadius: 2, background: catColor(cat), flexShrink: 0 }}
                 />
-                <select
-                  className="input"
-                  value={editVal.category}
-                  onChange={e => setEditVal(v => ({ ...v, category: e.target.value as ItemCategory }))}
-                  style={{ width: 140, fontSize: 12 }}
-                >
-                  <option value="">Sin categoría</option>
-                  {ITEM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <input
-                  type="number" min={1} className="input"
-                  value={editVal.qty}
-                  onChange={e => setEditVal(v => ({ ...v, qty: Number(e.target.value) }))}
-                  style={{ width: 64, fontSize: 13, textAlign: 'center' }}
-                />
-                <button className="btn btn-primary btn-sm btn-icon" onClick={() => handleSaveItem(item.id)}><Check size={13} /></button>
-                <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setEditingItem(null)}><X size={13} /></button>
-              </>
-            ) : (
-              <>
-                {item.category && (
-                  <span style={{
-                    fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4,
-                    background: CAT_COLORS[item.category] + '22', color: CAT_COLORS[item.category],
-                  }}>{item.category}</span>
+
+                {editingCat === cat ? (
+                  <>
+                    <input
+                      autoFocus className="input" value={catVal}
+                      onChange={e => setCatVal(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleSaveCat(cat); if (e.key === 'Escape') setEditingCat(null) }}
+                      style={{ flex: 1, fontSize: 13, fontWeight: 600 }}
+                    />
+                    <button className="btn btn-primary btn-sm btn-icon" onClick={() => handleSaveCat(cat)}><Check size={12} /></button>
+                    <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setEditingCat(null)}><X size={12} /></button>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text-2)' }}>
+                      {cat}
+                    </span>
+                    <span style={{ fontSize: 11, color: 'var(--text-3)', marginRight: 4 }}>{catItems.length}</span>
+                    <button
+                      className="btn btn-ghost btn-sm btn-icon" title="Renombrar categoría"
+                      onClick={() => { setEditingCat(cat); setCatVal(cat) }}
+                    >
+                      <Pencil size={12} />
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-sm btn-icon" title="Eliminar categoría"
+                      style={{ color: 'var(--red)' }}
+                      onClick={() => handleDeleteCat(cat)}
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-sm btn-icon"
+                      onClick={() => setCollapsed(c => ({ ...c, [cat]: !c[cat] }))}
+                    >
+                      {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                    </button>
+                  </>
                 )}
-                <span style={{ flex: 1, fontSize: 13 }}>{item.name}</span>
-                <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 40, textAlign: 'right' }}>
-                  ×{item.default_qty}
-                </span>
-                <button
-                  className="btn btn-ghost btn-sm btn-icon"
-                  onClick={() => { setEditingItem(item.id); setEditVal({ name: item.name, category: (item.category as ItemCategory) ?? '', qty: item.default_qty }) }}
-                >
-                  <Pencil size={12} />
-                </button>
-                <button
-                  className="btn btn-ghost btn-sm btn-icon"
-                  style={{ color: 'var(--red)' }}
-                  onClick={() => handleDeleteItem(item.id)}
-                >
-                  <Trash2 size={12} />
-                </button>
-              </>
-            )}
-          </div>
-        ))}
+              </div>
 
-        {/* Add item inline */}
-        {addingItem ? (
+              {!isCollapsed && (
+                <div>
+                  {catItems.map(item => (
+                    <div
+                      key={item.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '8px 14px', borderBottom: '1px solid var(--border)',
+                      }}
+                    >
+                      {editingItemId === item.id ? (
+                        <>
+                          <input
+                            autoFocus className="input" value={editItemVal.name}
+                            onChange={e => setEditItemVal(v => ({ ...v, name: e.target.value }))}
+                            onKeyDown={e => { if (e.key === 'Enter') handleSaveItem(item.id); if (e.key === 'Escape') setEditingItemId(null) }}
+                            style={{ flex: 1, fontSize: 13 }}
+                          />
+                          <select
+                            className="input"
+                            value={editItemVal.category}
+                            onChange={e => setEditItemVal(v => ({ ...v, category: e.target.value }))}
+                            style={{ width: 160, fontSize: 12 }}
+                          >
+                            {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                          <button className="btn btn-primary btn-sm btn-icon" onClick={() => handleSaveItem(item.id)}><Check size={12} /></button>
+                          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setEditingItemId(null)}><X size={12} /></button>
+                        </>
+                      ) : (
+                        <>
+                          <span style={{ flex: 1, fontSize: 13 }}>{item.name}</span>
+                          <button
+                            className="btn btn-ghost btn-sm btn-icon"
+                            onClick={() => { setEditingItemId(item.id); setEditItemVal({ name: item.name, category: item.category }) }}
+                          >
+                            <Pencil size={12} />
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm btn-icon" style={{ color: 'var(--red)' }}
+                            onClick={() => handleDeleteItem(item.id)}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Add item to this category */}
+                  {addingItemCat === cat ? (
+                    <div style={{ display: 'flex', gap: 8, padding: '8px 14px', alignItems: 'center' }}>
+                      <input
+                        autoFocus className="input" placeholder="Nombre del ítem…"
+                        value={newItemName} onChange={e => setNewItemName(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleAddItemToCategory(cat); if (e.key === 'Escape') setAddingItemCat(null) }}
+                        style={{ flex: 1, fontSize: 13 }}
+                      />
+                      <button className="btn btn-primary btn-sm" onClick={() => handleAddItemToCategory(cat)} disabled={!newItemName.trim()}>Agregar</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => { setAddingItemCat(null); setNewItemName('') }}>Cancelar</button>
+                    </div>
+                  ) : (
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => { setAddingItemCat(cat); setNewItemName('') }}
+                      style={{ color: 'var(--teal)', margin: '6px 14px', alignSelf: 'flex-start' }}
+                    >
+                      <Plus size={12} /> Agregar ítem
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+
+        {/* Add new category */}
+        {addingCat ? (
           <div style={{
             display: 'flex', gap: 8, alignItems: 'center',
-            background: 'var(--surface-2)', border: '1px solid var(--teal)',
-            borderRadius: 7, padding: '9px 12px',
+            border: '1px solid var(--teal)', borderRadius: 8, padding: '10px 14px',
+            background: 'var(--surface-2)',
           }}>
             <input
-              autoFocus className="input"
-              placeholder="Nombre del ítem…"
-              value={newItem.name}
-              onChange={e => setNewItem(v => ({ ...v, name: e.target.value }))}
-              onKeyDown={e => { if (e.key === 'Enter') handleAddItem(); if (e.key === 'Escape') setAddingItem(false) }}
+              autoFocus className="input" placeholder="Nombre de la nueva categoría…"
+              value={newCatName} onChange={e => setNewCatName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleAddNewCategory(); if (e.key === 'Escape') setAddingCat(false) }}
               style={{ flex: 1, fontSize: 13 }}
             />
-            <select
-              className="input"
-              value={newItem.category}
-              onChange={e => setNewItem(v => ({ ...v, category: e.target.value as ItemCategory }))}
-              style={{ width: 140, fontSize: 12 }}
-            >
-              <option value="">Sin categoría</option>
-              {ITEM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <input
-              type="number" min={1} className="input"
-              value={newItem.qty}
-              onChange={e => setNewItem(v => ({ ...v, qty: Number(e.target.value) }))}
-              style={{ width: 64, fontSize: 13, textAlign: 'center' }}
-              title="Cantidad por defecto"
-            />
-            <button className="btn btn-primary btn-sm" onClick={handleAddItem} disabled={!newItem.name.trim()}>
-              Agregar
-            </button>
-            <button className="btn btn-ghost btn-sm" onClick={() => setAddingItem(false)}>Cancelar</button>
+            <button className="btn btn-primary btn-sm" onClick={handleAddNewCategory} disabled={!newCatName.trim()}>Crear</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setAddingCat(false)}>Cancelar</button>
           </div>
         ) : (
           <button
             className="btn btn-ghost btn-sm"
-            onClick={() => setAddingItem(true)}
-            style={{ alignSelf: 'flex-start', color: 'var(--teal)', marginTop: 4 }}
+            onClick={() => setAddingCat(true)}
+            style={{ color: 'var(--text-2)', alignSelf: 'flex-start' }}
           >
-            <Plus size={13} /> Agregar ítem
+            <Plus size={13} /> Agregar categoría
           </button>
         )}
       </div>

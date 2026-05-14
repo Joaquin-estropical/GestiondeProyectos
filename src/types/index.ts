@@ -119,33 +119,30 @@ export interface InboxItem {
 export type ChecklistType      = 'reception' | 'delivery'
 export type ChecklistStatus    = 'pending' | 'in_progress' | 'completed'
 export type ItemCondition      = 'good' | 'fair' | 'poor'
-export type ChecklistItemDelta = 'improved' | 'same' | 'worsened' | 'not_reviewed'
+export type ChecklistItemDelta = 'improved' | 'same' | 'worsened' | 'pending'
 
-export const ITEM_CATEGORIES = [
+export const DEFAULT_CATEGORIES = [
   'Mobiliario',
-  'Telas',
-  'Pintura',
+  'Telas y textiles',
+  'Decoración',
   'Iluminación',
   'Audiovisual',
   'Instalaciones',
-  'Otro',
 ] as const
-export type ItemCategory = typeof ITEM_CATEGORIES[number]
 
 export interface ChecklistTemplate {
-  id:         string
-  name:       string
-  category:   string | null
-  created_at: string
-  updated_at: string
+  id:          string
+  name:        string
+  description: string | null
+  created_at:  string
+  updated_at:  string
 }
 
 export interface TemplateItem {
   id:          string
   template_id: string
   name:        string
-  category:    ItemCategory | null
-  default_qty: number
+  category:    string
   sort_order:  number
   created_at:  string
 }
@@ -164,8 +161,8 @@ export interface ChecklistItem {
   id:            string
   checklist_id:  string
   name:          string
-  category:      ItemCategory | null
-  qty:           number
+  category:      string
+  qty:           number | null
   condition_in:  ItemCondition | null
   condition_out: ItemCondition | null
   notes:         string | null
