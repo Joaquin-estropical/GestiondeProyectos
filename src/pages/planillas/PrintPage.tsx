@@ -7,6 +7,27 @@ import type { Project } from '@/types'
 
 const COND_COLOR: Record<string, string> = { good: '#059669', fair: '#d97706', poor: '#dc2626' }
 
+// Estropical logo — inline SVG matching the brand (map pin heart + wordmark)
+function EstropicalLogo() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      {/* Icon: map pin with heart */}
+      <svg width="36" height="40" viewBox="0 0 36 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 0C8.06 0 0 8.06 0 18c0 13.5 18 26 18 26S36 31.5 36 18C36 8.06 27.94 0 18 0z" fill="#003DA5"/>
+        <path d="M18 10c-2.76 0-5 2.24-5 5 0 1.38.56 2.63 1.46 3.54L18 22l3.54-3.46A4.97 4.97 0 0023 15c0-2.76-2.24-5-5-5z" fill="#E31837"/>
+        <path d="M18 13a2 2 0 110 4 2 2 0 010-4z" fill="white"/>
+      </svg>
+      {/* Wordmark */}
+      <div>
+        <div style={{ fontSize: 22, fontWeight: 800, color: '#003DA5', letterSpacing: -0.5, lineHeight: 1 }}>
+          es<span style={{ color: '#E31837' }}>tropical</span>
+          <span style={{ color: '#003DA5' }}>.com</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function PrintPage() {
   const { checklistId } = useParams<{ checklistId: string }>()
 
@@ -16,7 +37,6 @@ export default function PrintPage() {
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState<string | null>(null)
 
-  // Editable header fields
   const [customProject, setCustomProject] = useState('')
   const [customType,    setCustomType]    = useState('')
   const [customStatus,  setCustomStatus]  = useState('')
@@ -39,135 +59,155 @@ export default function PrintPage() {
     })()
   }, [checklistId])
 
-  // Init editable fields once checklist loads
   useEffect(() => {
-    if (!checklist || projects.length === 0) return
+    if (!checklist) return
     const pName = projects.find(p => p.id === checklist.event_id)?.name ?? checklist.event_id
     setCustomProject(pName)
     setCustomType(checklist.type === 'reception' ? 'Recepción de local' : 'Entrega de local')
     setCustomStatus(checklist.status === 'completed' ? 'Cerrada' : 'Abierta')
   }, [checklist, projects])
 
-  if (loading) return <div style={{ padding: 40, textAlign: 'center', fontFamily: 'Arial, sans-serif' }}>Cargando…</div>
-  if (error || !checklist) return <div style={{ padding: 40, textAlign: 'center', color: '#dc2626', fontFamily: 'Arial, sans-serif' }}>{error ?? 'Error'}</div>
+  const S: React.CSSProperties = {
+    position: 'fixed', inset: 0, overflowY: 'auto',
+    background: '#ffffff', color: '#111111',
+    fontFamily: "'Segoe UI', Arial, sans-serif", fontSize: 12,
+  }
+
+  if (loading) return <div style={S}><div style={{ padding: 40, textAlign: 'center' }}>Cargando…</div></div>
+  if (error || !checklist) return <div style={S}><div style={{ padding: 40, textAlign: 'center', color: '#dc2626' }}>{error ?? 'Error'}</div></div>
 
   const isReception = checklist.type === 'reception'
   const date = new Date(checklist.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
   const categories = Array.from(new Set(items.map(i => i.category)))
 
-  const inputStyle: React.CSSProperties = {
-    border: 'none', borderBottom: '1px dashed #94a3b8', outline: 'none',
+  const editInput: React.CSSProperties = {
+    border: 'none', borderBottom: '1.5px dashed #94a3b8', outline: 'none',
     background: 'transparent', fontSize: 'inherit', fontWeight: 'inherit',
-    color: 'inherit', fontFamily: 'Arial, sans-serif', width: '100%',
-    padding: '1px 2px',
+    color: 'inherit', fontFamily: 'inherit', width: '100%', padding: '1px 2px',
   }
 
   return (
-    <>
+    <div style={S}>
       <style>{`
         @media print {
           .no-print { display: none !important; }
-          body { margin: 0; background: #fff; }
-          @page { margin: 18mm 15mm; }
+          @page { margin: 15mm 14mm; size: A4; }
           input { border-bottom: none !important; }
         }
-        * { box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; font-size: 11px; color: #111; background: #fff; margin: 0; }
-        table { width: 100%; border-collapse: collapse; }
-        th { background: #f1f5f9; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; padding: 6px 8px; border: 1px solid #cbd5e1; text-align: left; }
-        td { padding: 6px 8px; border: 1px solid #e2e8f0; vertical-align: top; }
-        tr:nth-child(even) td { background: #f8fafc; }
-        .cat-row td { background: #f1f5f9 !important; font-weight: 700; font-size: 10px; letter-spacing: .04em; color: #475569; }
-        .sig-row { display: flex; gap: 32px; margin-top: 48px; }
+        .print-root { background: #fff !important; color: #111 !important; }
+        .print-table { width: 100%; border-collapse: collapse; }
+        .print-table th {
+          background: #f1f5f9; font-weight: 700; font-size: 10px;
+          text-transform: uppercase; letter-spacing: .05em;
+          padding: 7px 9px; border: 1px solid #cbd5e1; text-align: left;
+          color: #334155;
+        }
+        .print-table td { padding: 7px 9px; border: 1px solid #e2e8f0; vertical-align: middle; }
+        .print-table tr:nth-child(even) td { background: #f8fafc; }
+        .cat-row td {
+          background: #e8f0f7 !important; font-weight: 700;
+          font-size: 10px; letter-spacing: .05em; color: #1e3a5f;
+          text-transform: uppercase; border-color: #bfcfdf !important;
+        }
+        .sig-row { display: flex; gap: 28px; margin-top: 44px; }
         .sig-box { flex: 1; border-top: 1.5px solid #94a3b8; padding-top: 8px; font-size: 10px; color: #64748b; }
-        .sig-box strong { display: block; font-size: 11px; color: #1e293b; margin-bottom: 24px; }
+        .sig-box strong { display: block; font-size: 11px; color: #1e293b; margin-bottom: 22px; }
       `}</style>
 
-      {/* Toolbar */}
+      {/* ── Toolbar (hidden on print) ── */}
       <div className="no-print" style={{
-        padding: '10px 20px', borderBottom: '1px solid #e2e8f0',
-        display: 'flex', gap: 8, background: '#f8fafc',
-        position: 'sticky', top: 0, zIndex: 10, alignItems: 'center', flexWrap: 'wrap',
+        background: '#f8fafc', borderBottom: '1px solid #e2e8f0',
+        padding: '10px 24px', display: 'flex', gap: 8, alignItems: 'center',
+        position: 'sticky', top: 0, zIndex: 20, flexWrap: 'wrap',
       }}>
         <button
           onClick={() => setTimeout(() => window.print(), 50)}
-          style={{ padding: '6px 16px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}
+          style={{ padding: '7px 18px', background: '#003DA5', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}
         >
           Imprimir / PDF
         </button>
         <button
           onClick={() => window.history.back()}
-          style={{ padding: '6px 16px', background: '#f1f5f9', color: '#374151', border: '1px solid #e2e8f0', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}
+          style={{ padding: '7px 14px', background: '#fff', color: '#374151', border: '1px solid #e2e8f0', borderRadius: 7, cursor: 'pointer', fontSize: 13 }}
         >
           ← Volver
         </button>
-        <div style={{ width: 1, height: 24, background: '#e2e8f0', margin: '0 4px' }} />
+        <div style={{ width: 1, height: 22, background: '#e2e8f0', margin: '0 2px' }} />
         <button
           onClick={() => setEditingHeader(v => !v)}
           style={{
-            padding: '6px 14px', fontSize: 13, borderRadius: 6, cursor: 'pointer',
-            background: editingHeader ? '#0d9488' : '#f1f5f9',
+            padding: '7px 14px', fontSize: 13, borderRadius: 7, cursor: 'pointer',
+            background: editingHeader ? '#003DA5' : '#fff',
             color: editingHeader ? '#fff' : '#374151',
-            border: `1px solid ${editingHeader ? '#0d9488' : '#e2e8f0'}`,
-            fontWeight: editingHeader ? 600 : 400,
+            border: `1px solid ${editingHeader ? '#003DA5' : '#e2e8f0'}`,
+            fontWeight: editingHeader ? 700 : 400,
           }}
         >
           {editingHeader ? '✓ Listo' : '✏ Personalizar encabezado'}
         </button>
         {editingHeader && (
-          <span style={{ fontSize: 12, color: '#64748b' }}>
-            Los cambios solo afectan la impresión, no la planilla.
+          <span style={{ fontSize: 12, color: '#64748b', fontStyle: 'italic' }}>
+            Los cambios son solo para esta impresión.
           </span>
         )}
       </div>
 
-      <div style={{ padding: '28px 40px', maxWidth: 920, margin: '0 auto' }}>
+      {/* ── Document ── */}
+      <div className="print-root" style={{ padding: '32px 44px', maxWidth: 900, margin: '0 auto' }}>
+
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, paddingBottom: 16, borderBottom: '2px solid #0d9488' }}>
-          <div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#0d9488', letterSpacing: -0.5 }}>Operaciones Tropical</div>
-            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Sistema de gestión de locales y eventos</div>
-          </div>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+          marginBottom: 22, paddingBottom: 16,
+          borderBottom: '3px solid #003DA5',
+        }}>
+          <EstropicalLogo />
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontWeight: 800, fontSize: 16, color: '#0f172a' }}>
+            <div style={{ fontWeight: 800, fontSize: 17, color: '#0f172a', letterSpacing: 1 }}>
               ACTA DE {isReception ? 'RECEPCIÓN' : 'ENTREGA'}
             </div>
-            <div style={{ color: '#64748b', marginTop: 4, fontSize: 11 }}>{date}</div>
+            <div style={{ color: '#64748b', marginTop: 5, fontSize: 11 }}>{date}</div>
           </div>
         </div>
 
-        {/* Info box — editable fields */}
-        <div style={{ display: 'flex', gap: 0, marginBottom: 20, border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
-          {[
+        {/* Info strip — editable */}
+        <div style={{
+          display: 'flex', marginBottom: 20,
+          border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden',
+        }}>
+          {([
             { label: 'Evento / Proyecto', val: customProject, set: setCustomProject },
             { label: 'Tipo de acta',      val: customType,    set: setCustomType    },
             { label: 'Estado',            val: customStatus,  set: setCustomStatus  },
             { label: 'Total ítems',       val: String(items.length), set: null      },
-          ].map(({ label, val, set }, i) => (
-            <div key={label} style={{ flex: 1, padding: '10px 14px', borderLeft: i > 0 ? '1px solid #e2e8f0' : 'none' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: '#64748b', marginBottom: 3 }}>{label}</div>
+          ] as { label: string; val: string; set: ((v: string) => void) | null }[]).map(({ label, val, set }, i) => (
+            <div key={label} style={{
+              flex: 1, padding: '10px 14px',
+              borderLeft: i > 0 ? '1px solid #e2e8f0' : 'none',
+              background: '#fff',
+            }}>
+              <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: '#94a3b8', marginBottom: 4 }}>
+                {label}
+              </div>
               {editingHeader && set ? (
-                <input
-                  value={val}
-                  onChange={e => set(e.target.value)}
-                  style={{ ...inputStyle, fontWeight: 700, fontSize: 12, color: '#0f172a' }}
-                />
+                <input value={val} onChange={e => set(e.target.value)}
+                  style={{ ...editInput, fontWeight: 600, fontSize: 12, color: '#0f172a' }} />
               ) : (
-                <div style={{ fontWeight: 700, fontSize: 12, color: '#0f172a' }}>{val}</div>
+                <div style={{ fontWeight: 600, fontSize: 12, color: '#0f172a' }}>{val}</div>
               )}
             </div>
           ))}
         </div>
 
-        {/* Items table */}
-        <table>
+        {/* Table */}
+        <table className="print-table">
           <thead>
             <tr>
               <th style={{ width: 28 }}>#</th>
               <th>Ítem</th>
-              <th style={{ width: 56, textAlign: 'center' }}>Cant.</th>
-              <th style={{ width: 96, textAlign: 'center' }}>Cond. recepción</th>
-              {!isReception && <th style={{ width: 96, textAlign: 'center' }}>Cond. entrega</th>}
+              <th style={{ width: 52, textAlign: 'center' }}>Cant.</th>
+              <th style={{ width: 90, textAlign: 'center' }}>Cond. recepción</th>
+              {!isReception && <th style={{ width: 90, textAlign: 'center' }}>Cond. entrega</th>}
               <th>Observaciones</th>
             </tr>
           </thead>
@@ -181,29 +221,24 @@ export default function PrintPage() {
                 ...catItems.map((item, idx) => (
                   <tr key={item.id}>
                     <td style={{ color: '#94a3b8', textAlign: 'center', fontSize: 10 }}>{idx + 1}</td>
-                    <td style={{ fontWeight: 500 }}>
+                    <td style={{ fontWeight: 500, fontSize: 11 }}>
                       {item.name}
                       {item.photos.length > 0 && (
-                        <span style={{ fontSize: 9, color: '#64748b', marginLeft: 6, fontStyle: 'italic' }}>
-                          [{item.photos.length} foto{item.photos.length !== 1 ? 's' : ''} en sistema]
+                        <span style={{ fontSize: 9, color: '#94a3b8', marginLeft: 6, fontStyle: 'italic' }}>
+                          [{item.photos.length} foto{item.photos.length !== 1 ? 's' : ''}]
                         </span>
                       )}
                     </td>
-                    {/* Cantidad — blank if null */}
-                    <td style={{ textAlign: 'center' }}>{item.qty ?? ''}</td>
-                    {/* Condición recepción — blank if null */}
-                    <td style={{ textAlign: 'center', fontWeight: 700, color: item.condition_in ? COND_COLOR[item.condition_in] : 'transparent' }}>
+                    <td style={{ textAlign: 'center', fontSize: 11 }}>{item.qty ?? ''}</td>
+                    <td style={{ textAlign: 'center', fontWeight: 700, fontSize: 11, color: item.condition_in ? COND_COLOR[item.condition_in] : 'inherit' }}>
                       {item.condition_in ? conditionLabel(item.condition_in) : ''}
                     </td>
                     {!isReception && (
-                      <td style={{ textAlign: 'center', fontWeight: 700, color: item.condition_out ? COND_COLOR[item.condition_out] : 'transparent' }}>
+                      <td style={{ textAlign: 'center', fontWeight: 700, fontSize: 11, color: item.condition_out ? COND_COLOR[item.condition_out] : 'inherit' }}>
                         {item.condition_out ? conditionLabel(item.condition_out) : ''}
                       </td>
                     )}
-                    {/* Observaciones — blank if null */}
-                    <td style={{ color: '#0f172a', fontSize: 10 }}>
-                      {item.notes ?? ''}
-                    </td>
+                    <td style={{ fontSize: 10, color: '#0f172a' }}>{item.notes ?? ''}</td>
                   </tr>
                 )),
               ]
@@ -223,14 +258,15 @@ export default function PrintPage() {
           </div>
           <div className="sig-box">
             <strong>Fecha y hora</strong>
-            _____ / _____ / _________ &nbsp;&nbsp; _____ : _____
+            _____ / _____ / _________&nbsp;&nbsp;_____:_____
           </div>
         </div>
 
-        <div style={{ marginTop: 36, fontSize: 9, color: '#94a3b8', borderTop: '1px solid #e2e8f0', paddingTop: 10, textAlign: 'center' }}>
-          Documento generado automáticamente · Operaciones Tropical · Las fotos adjuntas se encuentran en el sistema digital.
+        {/* Footer */}
+        <div style={{ marginTop: 32, fontSize: 9, color: '#94a3b8', borderTop: '1px solid #e2e8f0', paddingTop: 10, textAlign: 'center' }}>
+          Documento generado automáticamente · estropical.com · Las fotos adjuntas se encuentran en el sistema digital.
         </div>
       </div>
-    </>
+    </div>
   )
 }
