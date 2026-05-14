@@ -26,6 +26,8 @@ export function NewTaskModal() {
   const [projectId, setProjectId] = useState('')
   const [assignee,  setAssignee]  = useState(currentUser.id)
   const [helper,    setHelper]    = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [duration,  setDuration]  = useState('')
   const [due,       setDue]       = useState('')
   const [priority,  setPriority]  = useState<TaskPriority>('med')
   const [desc,      setDesc]      = useState('')
@@ -33,6 +35,39 @@ export function NewTaskModal() {
   const [error,     setError]     = useState('')
   const [bulkMode,  setBulkMode]  = useState(false)
   const [bulkText,  setBulkText]  = useState('')
+
+  // Auto-calc due from startDate + duration, or startDate from due - duration
+  const handleStartChange = (v: string) => {
+    setStartDate(v)
+    if (v && duration) {
+      const d = new Date(v + 'T12:00:00')
+      d.setDate(d.getDate() + Number(duration))
+      setDue(d.toISOString().slice(0, 10))
+    }
+  }
+  const handleDurationChange = (v: string) => {
+    setDuration(v)
+    if (startDate && v) {
+      const d = new Date(startDate + 'T12:00:00')
+      d.setDate(d.getDate() + Number(v))
+      setDue(d.toISOString().slice(0, 10))
+    } else if (due && v) {
+      const d = new Date(due + 'T12:00:00')
+      d.setDate(d.getDate() - Number(v))
+      setStartDate(d.toISOString().slice(0, 10))
+    }
+  }
+  const handleDueChange = (v: string) => {
+    setDue(v)
+    if (startDate && v) {
+      const diff = Math.round((new Date(v + 'T12:00:00').getTime() - new Date(startDate + 'T12:00:00').getTime()) / 86400000)
+      if (diff > 0) setDuration(String(diff))
+    } else if (duration && v) {
+      const d = new Date(v + 'T12:00:00')
+      d.setDate(d.getDate() - Number(duration))
+      setStartDate(d.toISOString().slice(0, 10))
+    }
+  }
 
   // Get "Generales" project for a given area
   const getGeneralesProject = (aid: string) =>
@@ -47,7 +82,7 @@ export function NewTaskModal() {
   useEffect(() => {
     if (newTaskOpen) {
       setTitle(''); setDesc(''); setError(''); setHelper(''); setBulkText(''); setBulkMode(false)
-      setDue(newTaskDate ?? '')
+      setStartDate(''); setDuration(''); setDue(newTaskDate ?? '')
       setPriority('med')
       setAssignee(currentUser.id)
 
@@ -97,7 +132,8 @@ export function NewTaskModal() {
         due,
         priority,
         description: desc || undefined,
-        helper: helper || undefined,
+        helper:      helper || undefined,
+        start_date:  startDate || undefined,
       })
       addTask(task)
       await refreshAll()
@@ -297,12 +333,29 @@ export function NewTaskModal() {
             </div>
           </div>
 
-          {/* Fecha */}
-          <div className="form-group mt-16">
-            <label className="form-label">Fecha límite <span style={{ color: 'var(--red)' }}>*</span></label>
-            <div className="input">
-              <Calendar size={13} color="var(--text-3)" />
-              <input type="date" value={due} onChange={e => setDue(e.target.value)} style={{ colorScheme: 'dark' }} />
+          {/* Fechas + Duración */}
+          <div className="row gap-12 mt-16">
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label"><Calendar size={11} style={{ marginRight: 4 }} />Inicio <span className="micro" style={{ color: 'var(--text-3)', marginLeft: 4 }}>opcional</span></label>
+              <div className="input">
+                <input type="date" value={startDate} onChange={e => handleStartChange(e.target.value)} style={{ colorScheme: 'dark', width: '100%' }} />
+              </div>
+            </div>
+            <div className="form-group" style={{ width: 90, flexShrink: 0 }}>
+              <label className="form-label">Duración <span className="micro" style={{ color: 'var(--text-3)', marginLeft: 4 }}>días</span></label>
+              <div className="input">
+                <input
+                  type="number" min={1} max={365} value={duration} placeholder="—"
+                  onChange={e => handleDurationChange(e.target.value)}
+                  style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-1)', fontSize: 13 }}
+                />
+              </div>
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label className="form-label"><Calendar size={11} style={{ marginRight: 4 }} />Límite <span style={{ color: 'var(--red)' }}>*</span></label>
+              <div className="input">
+                <input type="date" value={due} onChange={e => handleDueChange(e.target.value)} style={{ colorScheme: 'dark', width: '100%' }} />
+              </div>
             </div>
           </div>
 
