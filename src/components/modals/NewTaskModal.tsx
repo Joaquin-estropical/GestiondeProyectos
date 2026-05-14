@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X, Calendar, Flag, List } from 'lucide-react'
 import { useAppStore } from '@/stores/app'
 import { createTask } from '@/lib/db'
@@ -80,28 +80,37 @@ export function NewTaskModal() {
     return gen?.id ?? ''
   }
 
+  // Keep a ref to the latest projects/areas so the effect can read them
+  // without listing them as dependencies (avoids resetting the form on store updates)
+  const projectsRef = useRef(projects)
+  const areasRef    = useRef(areas)
+  useEffect(() => { projectsRef.current = projects }, [projects])
+  useEffect(() => { areasRef.current   = areas    }, [areas])
+
   useEffect(() => {
-    if (newTaskOpen) {
-      setTitle(''); setDesc(''); setError(''); setHelper(''); setBulkText(''); setBulkMode(false)
-      setStartDate(''); setDuration(''); setDue(newTaskDate ?? '')
-      setPriority('med')
-      setAssignee(currentUser.id)
+    if (!newTaskOpen) return;
+    const _projects = projectsRef.current
+    const _areas    = areasRef.current
 
-      const pid = newTaskProjectId ?? ''
-      const proj = projects.find(p => p.id === pid)
-      const aid = proj?.area ?? newTaskAreaId ?? areas[0]?.id ?? ''
-      setAreaId(aid)
+    setTitle(''); setDesc(''); setError(''); setHelper(''); setBulkText(''); setBulkMode(false)
+    setStartDate(''); setDuration(''); setDue(newTaskDate ?? '')
+    setPriority('med')
+    setAssignee(currentUser.id)
 
-      if (pid) {
-        // Use the explicit projectId directly — even if not yet in local list
-        setProjectId(pid)
-      } else {
-        const gen = getGeneralesProject(aid)
-        setProjectId(gen?.id ?? projects.filter(p => p.area === aid)[0]?.id ?? '')
-      }
+    const pid  = newTaskProjectId ?? ''
+    const proj = _projects.find(p => p.id === pid)
+    const aid  = proj?.area ?? newTaskAreaId ?? _areas[0]?.id ?? ''
+    setAreaId(aid)
+
+    if (pid) {
+      setProjectId(pid)
+    } else {
+      const gen = _projects.find(p => p.area === aid && p.name === 'Generales')
+      setProjectId(gen?.id ?? _projects.filter(p => p.area === aid)[0]?.id ?? '')
     }
+  // Only re-initialize when the modal opens or its pre-filled values change
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [newTaskOpen, newTaskProjectId, newTaskAreaId, newTaskDate, projects, areas, currentUser.id])
+  }, [newTaskOpen, newTaskProjectId, newTaskAreaId, newTaskDate, currentUser.id])
 
   const handleAreaChange = (aid: string) => {
     setAreaId(aid)

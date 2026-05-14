@@ -9,9 +9,11 @@ import { PageHead } from '@/components/shared/PageHead';
 import { useAppStore } from '@/stores/app';
 
 // ── Dropdown menu for project cards ──
-function ProjectMenu({ projectId: _projectId, onEdit }: { projectId: string; onEdit: () => void }) {
+function ProjectMenu({ projectId, projectName, onEdit }: { projectId: string; projectName: string; onEdit: () => void }) {
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const { removeProject, refreshAll } = useAppStore();
+  const navigate = useNavigate();
   const open = pos !== null;
 
   useEffect(() => {
@@ -30,10 +32,25 @@ function ProjectMenu({ projectId: _projectId, onEdit }: { projectId: string; onE
     if (r) setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
   };
 
-  const menuItem = (icon: React.ReactNode, label: string, color: string, onClick: () => void) => (
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPos(null);
+    if (!confirm(`¿Eliminar el proyecto "${projectName}" y todas sus tareas? Esta acción no se puede deshacer.`)) return;
+    try {
+      const { deleteProject } = await import('@/lib/db');
+      await deleteProject(projectId);
+      removeProject(projectId);
+      await refreshAll();
+      navigate(window.location.pathname); // stay on area page
+    } catch (err) {
+      alert('Error al eliminar: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
+  const menuItem = (icon: React.ReactNode, label: string, color: string, onClick: (e: React.MouseEvent) => void) => (
     <button
       style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 14px', background: 'none', border: 'none', color, fontSize: 13, cursor: 'pointer', textAlign: 'left' }}
-      onClick={e => { e.stopPropagation(); setPos(null); onClick(); }}
+      onClick={e => { e.stopPropagation(); setPos(null); onClick(e); }}
       onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
       onMouseLeave={e => (e.currentTarget.style.background = 'none')}
     >
@@ -58,9 +75,9 @@ function ProjectMenu({ projectId: _projectId, onEdit }: { projectId: string; onE
           borderRadius: 8, padding: '4px 0', minWidth: 180,
           boxShadow: '0 8px 24px rgba(0,0,0,.5)',
         }}>
-          {menuItem(<Pen size={13} color="var(--text-2)" />, 'Renombrar / editar', 'var(--text-1)', onEdit)}
+          {menuItem(<Pen size={13} color="var(--text-2)" />, 'Renombrar / editar', 'var(--text-1)', (_e) => onEdit())}
           <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-          {menuItem(<Trash2 size={13} color="var(--red)" />, 'Eliminar proyecto', 'var(--red)', onEdit)}
+          {menuItem(<Trash2 size={13} color="var(--red)" />, 'Eliminar proyecto', 'var(--red)', handleDelete)}
         </div>
       )}
     </>
@@ -136,7 +153,7 @@ export default function AreaView() {
                 <div className="row between items-center">
                   <span className="fw-6" style={{ fontSize: 14, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 8 }}>{p.name}</span>
                   <span className="micro mono" style={{ flexShrink: 0 }}>{p.progress}%</span>
-                  <ProjectMenu projectId={p.id} onEdit={() => openEditProject(p.id)} />
+                  <ProjectMenu projectId={p.id} projectName={p.name} onEdit={() => openEditProject(p.id)} />
                 </div>
                 <div className="text-2 f-xs mt-4">Entrega {fmtDate(p.due)} · {p.count} tareas</div>
                 <div className="progress mt-16">

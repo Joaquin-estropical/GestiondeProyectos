@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link2, MoreHorizontal, X, Plus, AtSign, ArrowUp, Check, Flag, Calendar, ChevronRight, Trash2, AlertTriangle, User } from 'lucide-react';
 import { useAppStore } from '@/stores/app';
 import { getMember, getProject, fmtDate, dueColor, STATUS_LABELS } from '@/lib/mock-data';
-import { updateTask, createSubtask, toggleSubtask, createComment, createTaskDependency } from '@/lib/db';
+import { updateTask, deleteTask, createSubtask, toggleSubtask, createComment, createTaskDependency } from '@/lib/db';
 import { useSubtasks, useComments, useMembers } from '@/hooks/useSupabase';
 import { Avatar } from '@/components/shared/Avatar';
 import { StatusPill, PriorityPill } from '@/components/shared/Badges';
@@ -159,7 +159,7 @@ function MemberPicker({ value, members, onSelect, placeholder = 'Sin asignar' }:
 }
 
 export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
-  const { tasks, projects, areas, updateTaskStatus, patchTask, currentUser } = useAppStore();
+  const { tasks, projects, areas, updateTaskStatus, patchTask, removeTask, currentUser } = useAppStore();
   const { data: membersFromDB = [] } = useMembers();
   const allMembers = sortedMembers(membersFromDB.length > 0 ? membersFromDB : APP_USERS.map(u => ({ id: u.id, name: u.name, role: u.role, short: u.short })));
 
@@ -596,9 +596,14 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
             <button
               className="btn btn-destructive btn-sm"
               style={{ fontSize: 12, gap: 6 }}
-              onClick={() => {
-                if (confirm(`¿Eliminar "${t.title}"? Esta acción no se puede deshacer.`)) {
-                  import('@/lib/db').then(m => m.deleteTask(t.id)).then(onClose);
+              onClick={async () => {
+                if (!confirm(`¿Eliminar "${t.title}"? Esta acción no se puede deshacer.`)) return;
+                try {
+                  await deleteTask(t.id);
+                  removeTask(t.id);
+                  onClose();
+                } catch (e) {
+                  alert('Error al eliminar: ' + (e instanceof Error ? e.message : String(e)));
                 }
               }}
             >

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { List, Kanban, GanttChart as GanttIcon, Calendar, Table, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, ChevronLeft, ChevronRight, X, Pen, Trash2, User, AlertTriangle } from 'lucide-react';
 import { useProjects, useTasks, useMembers } from '@/hooks/useSupabase';
 import { getMember, STATUS_ORDER, STATUS_LABELS, fmtDate, dueColor } from '@/lib/mock-data';
@@ -11,10 +11,11 @@ import { GanttChart } from '@/components/shared/GanttChart';
 import type { Task, TaskStatus } from '@/types';
 
 // ─── Project actions dropdown ───
-function ProjectActionsMenu({ projectId }: { projectId: string }) {
+function ProjectActionsMenu({ projectId, projectName }: { projectId: string; projectName: string }) {
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
-  const { openEditProject } = useAppStore();
+  const { openEditProject, removeProject, refreshAll } = useAppStore();
+  const navigate = useNavigate();
 
   const open = pos !== null;
 
@@ -32,6 +33,20 @@ function ProjectActionsMenu({ projectId }: { projectId: string }) {
     if (open) { setPos(null); return; }
     const r = btnRef.current?.getBoundingClientRect();
     if (r) setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+  };
+
+  const handleDelete = async () => {
+    setPos(null);
+    if (!confirm(`¿Eliminar el proyecto "${projectName}" y todas sus tareas? Esta acción no se puede deshacer.`)) return;
+    try {
+      const { deleteProject } = await import('@/lib/db');
+      await deleteProject(projectId);
+      removeProject(projectId);
+      await refreshAll();
+      navigate('/');
+    } catch (e) {
+      alert('Error al eliminar el proyecto: ' + (e instanceof Error ? e.message : String(e)));
+    }
   };
 
   const item = (icon: React.ReactNode, label: string, color: string, onClick: () => void) => (
@@ -59,7 +74,7 @@ function ProjectActionsMenu({ projectId }: { projectId: string }) {
         }}>
           {item(<Pen size={13} color="var(--text-2)" />, 'Renombrar / editar', 'var(--text-1)', () => openEditProject(projectId))}
           <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-          {item(<Trash2 size={13} color="var(--red)" />, 'Eliminar proyecto', 'var(--red)', () => openEditProject(projectId))}
+          {item(<Trash2 size={13} color="var(--red)" />, 'Eliminar proyecto', 'var(--red)', handleDelete)}
         </div>
       )}
     </>
@@ -86,7 +101,7 @@ function ProjectHeader({ project, tasks, onNewTask }: { project: NonNullable<Ret
         <button className="btn btn-primary btn-sm" onClick={onNewTask}>
           <Plus size={14} /> Nueva tarea
         </button>
-        <ProjectActionsMenu projectId={project.id} />
+        <ProjectActionsMenu projectId={project.id} projectName={project.name} />
       </div>
       <div className="row gap-16 items-center mt-12 f-xs text-2">
         <span><Calendar size={12} /> Entrega {fmtDate(project.due)}</span>
