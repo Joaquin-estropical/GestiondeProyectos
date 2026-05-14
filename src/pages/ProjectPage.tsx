@@ -740,15 +740,21 @@ export default function ProjectPage() {
       {/* Resize divider */}
       <div
         onMouseDown={onDividerMouseDown}
+        title="Arrastrá para redimensionar"
         style={{
-          height: 6, flexShrink: 0, cursor: 'row-resize',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'var(--surface-1)',
+          height: 14, flexShrink: 0, cursor: 'row-resize',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+          background: 'var(--surface-2)',
           borderTop: '1px solid var(--border)',
           borderBottom: '1px solid var(--border)',
+          transition: 'background 0.15s',
         }}
+        onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-1)')}
+        onMouseLeave={e => (e.currentTarget.style.background = 'var(--surface-2)')}
       >
-        <div style={{ width: 40, height: 3, borderRadius: 99, background: 'var(--border-hover)' }} />
+        {[0,1,2,3,4].map(i => (
+          <div key={i} style={{ width: 4, height: 4, borderRadius: 99, background: 'var(--text-3)', opacity: 0.5 }} />
+        ))}
       </div>
 
       {/* Content */}
