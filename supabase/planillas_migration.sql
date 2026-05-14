@@ -1,158 +1,139 @@
 -- ================================================================
--- MÓDULO PLANILLAS v2: Recepción y entrega de locales
--- Ejecutar en: Supabase Dashboard → SQL Editor
--- Idempotente: se puede ejecutar múltiples veces sin error
+-- MÓDULO PLANILLAS + ENUM OTROS
+-- Estado verificado: ninguna de estas tablas existe todavía.
+-- Ejecutar UNA VEZ en: Supabase Dashboard → SQL Editor → Run
 -- ================================================================
 
--- 1. PLANTILLAS REUTILIZABLES
-create table if not exists checklist_templates (
-  id          uuid primary key default gen_random_uuid(),
-  name        text not null,
+-- ── 1. Agregar 'otros' al enum area_type ──────────────────────
+ALTER TYPE public.area_type ADD VALUE IF NOT EXISTS 'otros';
+
+-- ── 2. Tabla: plantillas de planillas ─────────────────────────
+CREATE TABLE IF NOT EXISTS checklist_templates (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        text NOT NULL,
   description text,
-  kind        text not null default 'custom'
-              check (kind in ('event_delivery', 'branch_delivery', 'local_return', 'custom')),
-  created_at  timestamptz default now(),
-  updated_at  timestamptz default now()
+  kind        text NOT NULL DEFAULT 'custom'
+              CHECK (kind IN ('event_delivery', 'branch_delivery', 'local_return', 'custom')),
+  created_at  timestamptz DEFAULT now(),
+  updated_at  timestamptz DEFAULT now()
 );
 
--- Agregar columna kind si la tabla ya existe sin ella
-alter table checklist_templates
-  add column if not exists kind text not null default 'custom'
-  check (kind in ('event_delivery', 'branch_delivery', 'local_return', 'custom'));
-
--- 2. ÍTEMS DE PLANTILLA
-create table if not exists template_items (
-  id           uuid primary key default gen_random_uuid(),
-  template_id  uuid references checklist_templates(id) on delete cascade,
-  name         text not null,
-  category     text not null,
-  sort_order   integer default 0,
-  created_at   timestamptz default now()
+-- ── 3. Tabla: ítems de plantilla ──────────────────────────────
+CREATE TABLE IF NOT EXISTS template_items (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  template_id  uuid REFERENCES checklist_templates(id) ON DELETE CASCADE,
+  name         text NOT NULL,
+  category     text NOT NULL,
+  sort_order   integer DEFAULT 0,
+  created_at   timestamptz DEFAULT now()
 );
 
--- 3. PLANILLAS POR EVENTO / ÁREA (recepción o entrega)
-create table if not exists event_checklists (
-  id                   uuid primary key default gen_random_uuid(),
-  event_id             text not null,
-  type                 text not null check (type in ('reception', 'delivery')),
-  status               text default 'pending' check (status in ('pending', 'in_progress', 'completed')),
-  template_id          uuid references checklist_templates(id),
+-- ── 4. Tabla: planillas activas (por proyecto o área) ─────────
+CREATE TABLE IF NOT EXISTS event_checklists (
+  id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id             text NOT NULL,
+  type                 text NOT NULL CHECK (type IN ('reception', 'delivery')),
+  status               text DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed')),
+  template_id          uuid REFERENCES checklist_templates(id),
   title                text,
   assigned_to_project  text,
   assigned_to_area     text,
   completed_at         timestamptz,
-  created_at           timestamptz default now()
+  created_at           timestamptz DEFAULT now()
 );
 
--- Agregar columnas nuevas si la tabla ya existe sin ellas
-alter table event_checklists add column if not exists title               text;
-alter table event_checklists add column if not exists assigned_to_project text;
-alter table event_checklists add column if not exists assigned_to_area    text;
-
--- 4. ÍTEMS DE PLANILLA
-create table if not exists checklist_items (
-  id             uuid primary key default gen_random_uuid(),
-  checklist_id   uuid references event_checklists(id) on delete cascade,
-  name           text not null,
-  category       text not null,
+-- ── 5. Tabla: ítems de planilla activa ────────────────────────
+CREATE TABLE IF NOT EXISTS checklist_items (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  checklist_id   uuid REFERENCES event_checklists(id) ON DELETE CASCADE,
+  name           text NOT NULL,
+  category       text NOT NULL,
   qty            integer,
-  condition_in   text check (condition_in in ('good', 'fair', 'poor')),
-  condition_out  text check (condition_out in ('good', 'fair', 'poor')),
+  condition_in   text CHECK (condition_in IN ('good', 'fair', 'poor')),
+  condition_out  text CHECK (condition_out IN ('good', 'fair', 'poor')),
   notes          text,
-  photos         text[] default '{}',
-  sort_order     integer default 0,
-  created_at     timestamptz default now()
+  photos         text[] DEFAULT '{}',
+  sort_order     integer DEFAULT 0,
+  created_at     timestamptz DEFAULT now()
 );
 
--- ── Índices ────────────────────────────────────────────────
-create index if not exists idx_template_items_template_id on template_items(template_id);
-create index if not exists idx_event_checklists_event_id  on event_checklists(event_id);
-create index if not exists idx_checklist_items_checklist  on checklist_items(checklist_id);
+-- ── 6. Índices ────────────────────────────────────────────────
+CREATE INDEX IF NOT EXISTS idx_template_items_template_id ON template_items(template_id);
+CREATE INDEX IF NOT EXISTS idx_event_checklists_event_id  ON event_checklists(event_id);
+CREATE INDEX IF NOT EXISTS idx_checklist_items_checklist  ON checklist_items(checklist_id);
 
--- ── RLS permisivo (igual que el resto de la app) ───────────
-alter table checklist_templates enable row level security;
-alter table template_items      enable row level security;
-alter table event_checklists    enable row level security;
-alter table checklist_items     enable row level security;
+-- ── 7. RLS (igual que el resto de la app) ────────────────────
+ALTER TABLE checklist_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE template_items      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE event_checklists    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE checklist_items     ENABLE ROW LEVEL SECURITY;
 
-do $$ begin
-  if not exists (select 1 from pg_policies where tablename = 'checklist_templates' and policyname = 'allow_all_templates') then
-    create policy "allow_all_templates"  on checklist_templates for all using (true) with check (true);
-  end if;
-  if not exists (select 1 from pg_policies where tablename = 'template_items' and policyname = 'allow_all_tmpl_items') then
-    create policy "allow_all_tmpl_items" on template_items      for all using (true) with check (true);
-  end if;
-  if not exists (select 1 from pg_policies where tablename = 'event_checklists' and policyname = 'allow_all_checklists') then
-    create policy "allow_all_checklists" on event_checklists    for all using (true) with check (true);
-  end if;
-  if not exists (select 1 from pg_policies where tablename = 'checklist_items' and policyname = 'allow_all_cl_items') then
-    create policy "allow_all_cl_items"   on checklist_items     for all using (true) with check (true);
-  end if;
-end $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'checklist_templates' AND policyname = 'allow_all_templates') THEN
+    CREATE POLICY "allow_all_templates"  ON checklist_templates FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'template_items' AND policyname = 'allow_all_tmpl_items') THEN
+    CREATE POLICY "allow_all_tmpl_items" ON template_items      FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'event_checklists' AND policyname = 'allow_all_checklists') THEN
+    CREATE POLICY "allow_all_checklists" ON event_checklists    FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'checklist_items' AND policyname = 'allow_all_cl_items') THEN
+    CREATE POLICY "allow_all_cl_items"   ON checklist_items     FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
 
--- ── Storage bucket para fotos ──────────────────────────────
-insert into storage.buckets (id, name, public)
-  values ('event-photos', 'event-photos', true)
-  on conflict (id) do nothing;
+-- ── 8. Storage bucket para fotos ─────────────────────────────
+INSERT INTO storage.buckets (id, name, public)
+  VALUES ('event-photos', 'event-photos', true)
+  ON CONFLICT (id) DO NOTHING;
 
--- ── SEED: Actualizar kind de plantilla existente ───────────
-update checklist_templates
-set kind = 'event_delivery'
-where id = 'aaaaaaaa-0000-0000-0000-000000000001';
-
--- ── SEED: Plantilla "Entrega de local (eventos)" ──────────
-insert into checklist_templates (id, name, description, kind)
-values (
+-- ── 9. SEED: Plantilla general de eventos ────────────────────
+INSERT INTO checklist_templates (id, name, description, kind) VALUES (
   'aaaaaaaa-0000-0000-0000-000000000001',
   'Plantilla general de eventos',
-  'Plantilla base para eventos comerciales de mediana y gran escala. Editable.',
+  'Plantilla base para eventos comerciales. Editable.',
   'event_delivery'
-) on conflict (id) do nothing;
+) ON CONFLICT (id) DO NOTHING;
 
-insert into template_items (template_id, name, category, sort_order) values
-  -- Mobiliario
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Sillas',                                                          'Mobiliario',        1),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Mesas redondas',                                                  'Mobiliario',        2),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Mesas rectangulares',                                             'Mobiliario',        3),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Mesas altas / cocteleras',                                        'Mobiliario',        4),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Muebles de lounge (sofás, sillones, puffs)',                      'Mobiliario',        5),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Atril / podio',                                                   'Mobiliario',        6),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Percheros',                                                       'Mobiliario',        7),
-  -- Telas y textiles
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Manteles',                                                        'Telas y textiles',  1),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Caminos de mesa',                                                 'Telas y textiles',  2),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Servilletas de tela',                                             'Telas y textiles',  3),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Lazos / cintas para sillas',                                      'Telas y textiles',  4),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Fundas de silla',                                                 'Telas y textiles',  5),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Telas de fondo / backdrop',                                       'Telas y textiles',  6),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Cortinas',                                                        'Telas y textiles',  7),
-  -- Decoración
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Elementos decorativos de mesa (centros, candelabros, jarrones)',  'Decoración',        1),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Espejos y cuadros',                                               'Decoración',        2),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Estructuras decorativas (arcos, columnas, marcos)',               'Decoración',        3),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Alfombras',                                                       'Decoración',        4),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Plantas / vegetación decorativa',                                 'Decoración',        5),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Señalética y cartelería del local',                               'Decoración',        6),
-  -- Iluminación
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Iluminación general (funcionamiento)',                             'Iluminación',       1),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Iluminación ambiental / decorativa',                              'Iluminación',       2),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Iluminación de escena / reflectores',                             'Iluminación',       3),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Extensiones y cables de poder',                                   'Iluminación',       4),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Tablero eléctrico / breakers',                                    'Iluminación',       5),
-  -- Audiovisual
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Sistema de sonido',                                               'Audiovisual',       1),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Micrófonos',                                                      'Audiovisual',       2),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Pantallas / proyector',                                           'Audiovisual',       3),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Cables y conectores',                                             'Audiovisual',       4),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Conectividad (WiFi / red)',                                       'Audiovisual',       5),
-  -- Instalaciones
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Pisos (estado general)',                                          'Instalaciones',     1),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Paredes y pintura (estado general)',                              'Instalaciones',     2),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Puertas y ventanas (funcionamiento)',                             'Instalaciones',     3),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Baños (limpieza y funcionamiento)',                               'Instalaciones',     4),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Cocina / área de servicio',                                      'Instalaciones',     5),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Climatización (A/C o calefacción)',                               'Instalaciones',     6),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Extintores y señalética de emergencia',                           'Instalaciones',     7),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Áreas exteriores / terraza',                                     'Instalaciones',     8),
-  ('aaaaaaaa-0000-0000-0000-000000000001', 'Llaves y controles de acceso',                                    'Instalaciones',     9)
-on conflict do nothing;
+INSERT INTO template_items (template_id, name, category, sort_order) VALUES
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Sillas',                                                         'Mobiliario',       1),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Mesas redondas',                                                 'Mobiliario',       2),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Mesas rectangulares',                                            'Mobiliario',       3),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Mesas altas / cocteleras',                                       'Mobiliario',       4),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Muebles de lounge (sofás, sillones, puffs)',                     'Mobiliario',       5),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Atril / podio',                                                  'Mobiliario',       6),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Percheros',                                                      'Mobiliario',       7),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Manteles',                                                       'Telas y textiles', 1),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Caminos de mesa',                                                'Telas y textiles', 2),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Servilletas de tela',                                            'Telas y textiles', 3),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Lazos / cintas para sillas',                                     'Telas y textiles', 4),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Fundas de silla',                                                'Telas y textiles', 5),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Telas de fondo / backdrop',                                      'Telas y textiles', 6),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Cortinas',                                                       'Telas y textiles', 7),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Elementos decorativos de mesa (centros, candelabros, jarrones)', 'Decoración',       1),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Espejos y cuadros',                                              'Decoración',       2),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Estructuras decorativas (arcos, columnas, marcos)',              'Decoración',       3),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Alfombras',                                                      'Decoración',       4),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Plantas / vegetación decorativa',                                'Decoración',       5),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Señalética y cartelería del local',                              'Decoración',       6),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Iluminación general (funcionamiento)',                            'Iluminación',      1),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Iluminación ambiental / decorativa',                             'Iluminación',      2),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Iluminación de escena / reflectores',                            'Iluminación',      3),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Extensiones y cables de poder',                                  'Iluminación',      4),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Tablero eléctrico / breakers',                                   'Iluminación',      5),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Sistema de sonido',                                              'Audiovisual',      1),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Micrófonos',                                                     'Audiovisual',      2),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Pantallas / proyector',                                          'Audiovisual',      3),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Cables y conectores',                                            'Audiovisual',      4),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Conectividad (WiFi / red)',                                      'Audiovisual',      5),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Pisos (estado general)',                                         'Instalaciones',    1),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Paredes y pintura (estado general)',                             'Instalaciones',    2),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Puertas y ventanas (funcionamiento)',                            'Instalaciones',    3),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Baños (limpieza y funcionamiento)',                              'Instalaciones',    4),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Cocina / área de servicio',                                     'Instalaciones',    5),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Climatización (A/C o calefacción)',                              'Instalaciones',    6),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Extintores y señalética de emergencia',                          'Instalaciones',    7),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Áreas exteriores / terraza',                                    'Instalaciones',    8),
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Llaves y controles de acceso',                                   'Instalaciones',    9)
+ON CONFLICT DO NOTHING;
