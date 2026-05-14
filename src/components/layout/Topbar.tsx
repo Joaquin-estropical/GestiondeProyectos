@@ -8,11 +8,15 @@ function useBreadcrumb(): string[] {
   if (pathname === '/') return ['Inicio']
   if (pathname === '/mi-dia') return ['Mi día']
   if (pathname === '/calendario') return ['Calendario global']
-  if (pathname === '/bandeja-ia') return ['Bandeja IA']
   if (pathname === '/asistente-ia') return ['Asistente IA']
   if (pathname === '/reportes') return ['Reportes']
   if (pathname === '/configuracion') return ['Configuración']
   if (pathname === '/empty-states') return ['Empty states']
+  if (pathname === '/planillas') return ['Planillas']
+  if (pathname === '/planillas/plantillas') return ['Planillas', 'Plantillas']
+  if (pathname.startsWith('/planillas/plantillas/')) return ['Planillas', 'Plantillas', 'Detalle']
+  if (pathname.endsWith('/imprimir')) return ['Planillas', 'Imprimir']
+  if (pathname.startsWith('/planillas/')) return ['Planillas', 'Acta']
   if (pathname.startsWith('/area/')) {
     const id = pathname.split('/')[2]
     const a  = areas.find((x) => x.id === id)

@@ -103,7 +103,7 @@ export default function TemplateDetailPage() {
     acc[cat] = items.filter(i => i.category === cat)
     return acc
   }, {} as Record<string, TemplateItem[]>)
-  const uncategorized = items.filter(i => !i.category || i.category === 'Otro')
+  const uncategorized = items.filter(i => !i.category)
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: '28px 24px' }}>

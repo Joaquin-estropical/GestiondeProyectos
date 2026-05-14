@@ -43,7 +43,7 @@ export function CmdK({ onClose }: CmdKProps) {
       { kind: 'Ir a', label: 'Inicio',            Icon: Home,         go: () => nav('/'),               k: 'inicio' },
       { kind: 'Ir a', label: 'Mi día',            Icon: Sun,          go: () => nav('/mi-dia'),         k: 'mi dia' },
       { kind: 'Ir a', label: 'Calendario global', Icon: Calendar,     go: () => nav('/calendario'),     k: 'calendario' },
-      { kind: 'Ir a', label: 'Bandeja IA',        Icon: Inbox,        go: () => nav('/bandeja-ia'),     k: 'bandeja ia' },
+      { kind: 'Ir a', label: 'Asistente IA',       Icon: Inbox,        go: () => nav('/asistente-ia'),   k: 'asistente ia bandeja' },
       { kind: 'Ir a', label: 'Reportes',          Icon: BarChart3,    go: () => nav('/reportes'),       k: 'reportes' },
       { kind: 'Ir a', label: 'Configuración',     Icon: Settings,     go: () => nav('/configuracion'),  k: 'config' },
     ];
