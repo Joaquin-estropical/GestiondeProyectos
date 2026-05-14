@@ -164,7 +164,8 @@ export default function PrintPage() {
           .no-print { display: none !important; }
           html, body { background: #ffffff !important; margin: 0 !important; }
           .print-page { min-height: unset; }
-          @page { margin: 14mm 13mm; size: A4; }
+          @page { margin: 0; size: A4; }
+          html { -webkit-print-color-adjust: exact; }
           input { border-bottom: none !important; }
           .print-table td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .cat-row td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
