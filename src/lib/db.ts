@@ -78,12 +78,12 @@ export async function fetchProjects(areaId?: string): Promise<Project[]> {
 }
 
 export async function createProject(input: {
-  name: string; area: string; due: string; templateId?: string; assignee?: string
+  name: string; area: string; due?: string; templateId?: string; assignee?: string
 }): Promise<Project> {
   const id = 'p-' + Date.now().toString(36)
   const { data, error } = await supabaseWriter
     .from('projects')
-    .insert({ id, name: input.name, area: input.area, due: input.due, progress: 0, count: 0 })
+    .insert({ id, name: input.name, area: input.area, due: input.due || null, progress: 0, count: 0 })
     .select()
     .single()
   if (error) throw error
@@ -97,7 +97,7 @@ export async function createProject(input: {
       .order('sort_order')
 
     if (tplTasks && tplTasks.length > 0) {
-      const startDate = new Date(input.due)
+      const startDate = new Date(input.due ?? new Date().toISOString().slice(0, 10))
       const tasksToInsert = (tplTasks as TemplateTask[]).map((tt, i) => {
         const due = new Date(startDate)
         due.setDate(due.getDate() - (30 - tt.day_offset))

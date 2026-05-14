@@ -35,7 +35,6 @@ export function NewProjectModal() {
   const handleSave = async () => {
     if (!name.trim()) { setError('El nombre es obligatorio'); return }
     if (!areaId)      { setError('Seleccioná un área'); return }
-    if (!due)         { setError('La fecha límite es obligatoria'); return }
     setSaving(true); setError('')
     try {
       const project = await createProject({
@@ -98,7 +97,7 @@ export function NewProjectModal() {
 
           {/* Fecha límite */}
           <div className="form-group mt-16">
-            <label className="form-label">Fecha límite <span style={{ color: 'var(--red)' }}>*</span></label>
+            <label className="form-label">Fecha límite <span className="micro" style={{ marginLeft: 8, color: 'var(--text-3)' }}>opcional</span></label>
             <div className="input">
               <Calendar size={13} color="var(--text-3)" />
               <input
