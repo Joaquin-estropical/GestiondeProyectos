@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { X, BarChart3, Sparkles, Settings, ClipboardList, LayoutTemplate } from 'lucide-react'
+import { X, BarChart3, Sparkles, Settings, ClipboardList } from 'lucide-react'
 import { useAppStore } from '@/stores/app'
 import { Avatar } from '@/components/shared/Avatar'
 
