@@ -47,7 +47,6 @@ export function MoreDrawer({ open, onClose }: MoreDrawerProps) {
               { icon: BarChart3,    label: 'Reportes',     path: '/reportes'     },
               { icon: Sparkles,     label: 'Asistente IA', path: '/asistente-ia' },
               { icon: ClipboardList,label: 'Planillas',    path: '/planillas'    },
-              { icon: LayoutTemplate,label: 'Plantillas',  path: '/planillas/plantillas' },
               { icon: Settings,     label: 'Configuración',path: '/configuracion'},
             ].map(({ icon: Icon, label, path }) => (
               <button
