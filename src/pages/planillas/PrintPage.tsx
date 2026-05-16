@@ -178,6 +178,7 @@ export default function PrintPage() {
           .print-table td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .cat-row td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .sig-box img { -webkit-print-color-adjust: exact; print-color-adjust: exact; max-height: 64px; }
+          .print-table img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       `}</style>
 
@@ -285,33 +286,59 @@ export default function PrintPage() {
             <tbody>
               {categories.map(cat => {
                 const catItems = items.filter(i => i.category === cat)
+                const colSpan  = isReception ? 5 : 6
                 return [
                   <tr key={`cat-${cat}`} className="cat-row">
-                    <td colSpan={isReception ? 5 : 6}>{cat}</td>
+                    <td colSpan={colSpan}>{cat}</td>
                   </tr>,
-                  ...catItems.map((item, idx) => (
-                    <tr key={item.id}>
-                      <td style={{ color: '#94a3b8', textAlign: 'center', fontSize: 10 }}>{idx + 1}</td>
-                      <td style={{ fontWeight: 500, fontSize: 11 }}>
-                        {item.name}
-                        {item.photos.length > 0 && (
-                          <span style={{ fontSize: 9, color: '#94a3b8', marginLeft: 6, fontStyle: 'italic' }}>
-                            [{item.photos.length} foto{item.photos.length !== 1 ? 's' : ''}]
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'center', fontSize: 11 }}>{item.qty ?? ''}</td>
-                      <td style={{ textAlign: 'center', fontWeight: 700, fontSize: 11, color: item.condition_in ? COND_COLOR[item.condition_in] : 'inherit' }}>
-                        {item.condition_in ? conditionLabel(item.condition_in) : ''}
-                      </td>
-                      {!isReception && (
-                        <td style={{ textAlign: 'center', fontWeight: 700, fontSize: 11, color: item.condition_out ? COND_COLOR[item.condition_out] : 'inherit' }}>
-                          {item.condition_out ? conditionLabel(item.condition_out) : ''}
+                  ...catItems.flatMap((item, idx) => {
+                    const rows = []
+
+                    // Main item row
+                    rows.push(
+                      <tr key={item.id}>
+                        <td style={{ color: '#94a3b8', textAlign: 'center', fontSize: 10 }}>{idx + 1}</td>
+                        <td style={{ fontWeight: 500, fontSize: 11 }}>{item.name}</td>
+                        <td style={{ textAlign: 'center', fontSize: 11 }}>{item.qty ?? ''}</td>
+                        <td style={{ textAlign: 'center', fontWeight: 700, fontSize: 11, color: item.condition_in ? COND_COLOR[item.condition_in] : 'inherit' }}>
+                          {item.condition_in ? conditionLabel(item.condition_in) : ''}
                         </td>
-                      )}
-                      <td style={{ fontSize: 10, color: '#0f172a' }}>{item.notes ?? ''}</td>
-                    </tr>
-                  )),
+                        {!isReception && (
+                          <td style={{ textAlign: 'center', fontWeight: 700, fontSize: 11, color: item.condition_out ? COND_COLOR[item.condition_out] : 'inherit' }}>
+                            {item.condition_out ? conditionLabel(item.condition_out) : ''}
+                          </td>
+                        )}
+                        <td style={{ fontSize: 10, color: '#0f172a' }}>{item.notes ?? ''}</td>
+                      </tr>
+                    )
+
+                    // Extra row for photos if any
+                    if (item.photos.length > 0) {
+                      rows.push(
+                        <tr key={`${item.id}-photos`}>
+                          <td />
+                          <td colSpan={colSpan - 1} style={{ paddingTop: 6, paddingBottom: 8, borderTop: 'none' }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                              {item.photos.map((url, i) => (
+                                <img
+                                  key={i}
+                                  src={url}
+                                  alt={`Foto ${i + 1} de ${item.name}`}
+                                  style={{
+                                    width: 80, height: 80, objectFit: 'cover',
+                                    borderRadius: 4, border: '1px solid #e2e8f0',
+                                    WebkitPrintColorAdjust: 'exact',
+                                  } as React.CSSProperties}
+                                />
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    }
+
+                    return rows
+                  }),
                 ]
               })}
             </tbody>
