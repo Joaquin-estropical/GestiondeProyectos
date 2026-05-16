@@ -12,6 +12,9 @@ import {
   uploadItemPhoto, deleteItemPhoto, calcDelta, conditionLabel, conditionColor,
 } from '@/lib/planillas'
 import { useAppStore } from '@/stores/app'
+import { useSignatures } from '@/hooks/useSignatures'
+import type { SignatureRole } from '@/hooks/useSignatures'
+import { SignatureModal } from '@/components/SignatureModal'
 
 const CONDITIONS: ItemCondition[] = ['good', 'fair', 'poor']
 
@@ -54,11 +57,17 @@ export default function ChecklistDetailPage() {
   const [newItemQty, setNewItemQty]       = useState<string>('')
 
   const [collapsed, setCollapsed]         = useState<Record<string, boolean>>({})
+  const [sigModalOpen, setSigModalOpen]   = useState(false)
+  const [activeRole, setActiveRole]       = useState<SignatureRole>('delivery')
 
   const pendingNotes  = useRef<Record<string, string>>({})
   const photoInputRef = useRef<HTMLInputElement>(null)
   const [uploadingFor, setUploadingFor]   = useState<string | null>(null)
   const [uploading, setUploading]         = useState(false)
+
+  const { signatures, saveSignature, clearSignature } = useSignatures(checklistId ?? '')
+
+  const openSignModal = (role: SignatureRole) => { setActiveRole(role); setSigModalOpen(true) }
 
   const load = useCallback(async () => {
     if (!checklistId) return
@@ -494,6 +503,109 @@ export default function ChecklistDetailPage() {
           <button className="btn btn-ghost btn-sm" onClick={() => setAddingCat(null)}>Cancelar</button>
         </div>
       )}
+
+      {/* Signature section */}
+      <div style={{
+        marginTop: 32, border: '1px solid var(--border)', borderRadius: 12,
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          padding: '12px 16px', background: 'var(--surface-2)',
+          borderBottom: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>Firmas</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
+              Las firmas se conservan hasta imprimir o cerrar la pestaña.
+            </div>
+          </div>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => navigate(`/planillas/${checklistId}/imprimir`)}
+            style={{ gap: 6 }}
+          >
+            <Printer size={13} /> Imprimir
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, background: 'var(--border)' }}>
+          {(['delivery', 'reception'] as SignatureRole[]).map(role => {
+            const sig   = signatures[role]
+            const label = role === 'delivery' ? 'Quien entrega' : 'Quien recibe'
+            return (
+              <div key={role} style={{ background: 'var(--surface)', padding: 16 }}>
+                <div style={{
+                  fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
+                  letterSpacing: '.06em', color: 'var(--text-3)', marginBottom: 10,
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                }}>
+                  <span>{label}</span>
+                  {sig && (
+                    <span style={{ fontSize: 10, color: '#059669', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>
+                      ✓ Firmado
+                    </span>
+                  )}
+                </div>
+
+                {sig ? (
+                  <div>
+                    <div style={{
+                      height: 80, border: '1px solid var(--border)', borderRadius: 8,
+                      overflow: 'hidden', background: '#fff', marginBottom: 8,
+                    }}>
+                      <img
+                        src={sig.dataUrl}
+                        alt={`Firma de ${label}`}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }}
+                      />
+                    </div>
+                    {sig.signerName && (
+                      <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 8 }}>
+                        {sig.signerName}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => clearSignature(role)}
+                      style={{
+                        fontSize: 12, padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+                        border: '1px solid var(--border)', background: 'transparent',
+                        color: 'var(--text-3)',
+                      }}
+                    >
+                      Borrar firma
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => openSignModal(role)}
+                    style={{
+                      width: '100%', height: 80, border: '1.5px dashed var(--border)',
+                      borderRadius: 8, background: 'var(--surface-2)', cursor: 'pointer',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center',
+                      justifyContent: 'center', gap: 6, color: 'var(--text-3)',
+                    }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                    </svg>
+                    <span style={{ fontSize: 12 }}>Tap para firmar</span>
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Signature modal */}
+      <SignatureModal
+        open={sigModalOpen}
+        role={activeRole}
+        onSave={(dataUrl, name) => saveSignature(activeRole, dataUrl, name)}
+        onClose={() => setSigModalOpen(false)}
+      />
 
       {/* Hidden photo input */}
       <input

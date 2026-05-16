@@ -4,6 +4,7 @@ import type { EventChecklist, ChecklistItem } from '@/types'
 import { fetchChecklistById, fetchChecklistItems, conditionLabel } from '@/lib/planillas'
 import { fetchProjects } from '@/lib/db'
 import type { Project } from '@/types'
+import type { SignaturesState } from '@/hooks/useSignatures'
 
 const COND_COLOR: Record<string, string> = { good: '#059669', fair: '#d97706', poor: '#dc2626' }
 
@@ -46,8 +47,15 @@ export default function PrintPage() {
   const [customTotal,   setCustomTotal]   = useState('')
   const [editingHeader, setEditingHeader] = useState(false)
 
+  const [signatures, setSignatures] = useState<SignaturesState>({ delivery: null, reception: null })
+
   useEffect(() => {
     if (!checklistId) return
+    // Load signatures persisted in sessionStorage from the checklist view
+    try {
+      const raw = sessionStorage.getItem(`signatures_${checklistId}`)
+      if (raw) setSignatures(JSON.parse(raw))
+    } catch {}
     ;(async () => {
       try {
         const [cl, its, projs] = await Promise.all([
@@ -165,10 +173,11 @@ export default function PrintPage() {
           html, body { background: #ffffff !important; margin: 0 !important; }
           .print-page { min-height: unset; }
           @page { margin: 0; size: A4; }
-          html { -webkit-print-color-adjust: exact; }
+          html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           input { border-bottom: none !important; }
           .print-table td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .cat-row td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .sig-box img { -webkit-print-color-adjust: exact; print-color-adjust: exact; max-height: 64px; }
         }
       `}</style>
 
@@ -310,17 +319,50 @@ export default function PrintPage() {
 
           {/* Signatures */}
           <div className="sig-row">
-            <div className="sig-box">
-              <strong>Entregado por</strong>
-              Nombre completo y firma
-            </div>
-            <div className="sig-box">
-              <strong>Recibido por</strong>
-              Nombre completo y firma
-            </div>
+            {(['delivery', 'reception'] as const).map(role => {
+              const sig   = signatures[role]
+              const label = role === 'delivery' ? 'Entregado por' : 'Recibido por'
+              return (
+                <div key={role} className="sig-box">
+                  <strong>{label}</strong>
+                  {sig ? (
+                    <>
+                      <img
+                        src={sig.dataUrl}
+                        alt={`Firma de ${label}`}
+                        style={{
+                          display: 'block', height: 64, maxWidth: '100%',
+                          objectFit: 'contain', marginBottom: 6,
+                          WebkitPrintColorAdjust: 'exact',
+                        } as React.CSSProperties}
+                      />
+                      <span style={{ fontSize: 10, color: '#0f172a' }}>
+                        {sig.signerName || '—'}
+                      </span>
+                      {sig.signedAt && (
+                        <span style={{ display: 'block', fontSize: 9, color: '#94a3b8', marginTop: 2 }}>
+                          {new Date(sig.signedAt).toLocaleString('es-AR', {
+                            day: '2-digit', month: '2-digit', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit',
+                          })}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Sin firma digital</span>
+                  )}
+                </div>
+              )
+            })}
             <div className="sig-box">
               <strong>Fecha y hora</strong>
-              _____ / _____ / _________&nbsp;&nbsp;_____:_____
+              {signatures.delivery?.signedAt
+                ? new Date(signatures.delivery.signedAt).toLocaleString('es-AR', {
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit',
+                  })
+                : '_____ / _____ / _________  _____:_____'
+              }
             </div>
           </div>
 
