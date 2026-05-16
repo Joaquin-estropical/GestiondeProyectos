@@ -20,19 +20,23 @@ export function SignatureModal({ open, role, onSave, onClose }: Props) {
   const [hasDrawn, setHasDrawn]     = useState(false)
   const [signerName, setSignerName] = useState('')
 
-  // Resize canvas to physical pixels when opening
+  // Resize canvas to physical pixels after the modal has painted
   useEffect(() => {
     if (!open) return
     setHasDrawn(false)
     setSignerName('')
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const rect = canvas.getBoundingClientRect()
-    const dpr  = window.devicePixelRatio || 1
-    canvas.width  = rect.width  * dpr
-    canvas.height = rect.height * dpr
-    const ctx = canvas.getContext('2d')
-    if (ctx) ctx.scale(dpr, dpr)
+    // rAF ensures the modal is rendered and the canvas has its final layout size
+    const raf = requestAnimationFrame(() => {
+      const canvas = canvasRef.current
+      if (!canvas) return
+      const rect = canvas.getBoundingClientRect()
+      const dpr  = window.devicePixelRatio || 1
+      canvas.width  = rect.width  * dpr
+      canvas.height = rect.height * dpr
+      const ctx = canvas.getContext('2d')
+      if (ctx) ctx.scale(dpr, dpr)
+    })
+    return () => cancelAnimationFrame(raf)
   }, [open])
 
   const getCtx = useCallback(() => {
@@ -93,19 +97,28 @@ export function SignatureModal({ open, role, onSave, onClose }: Props) {
   if (!open) return null
 
   return (
+    <>
+      <style>{`
+        .sig-overlay {
+          position: fixed; inset: 0; z-index: 50;
+          background: rgba(0,0,0,0.45);
+          display: flex; align-items: flex-end; justify-content: center;
+        }
+        .sig-dialog {
+          background: var(--surface); border: 1px solid var(--border);
+          border-radius: 16px 16px 0 0;
+          width: 100%; max-width: 520px; overflow: hidden;
+        }
+        @media (min-width: 640px) {
+          .sig-overlay { align-items: center; padding: 24px; }
+          .sig-dialog  { border-radius: 12px; }
+        }
+      `}</style>
     <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 50,
-        background: 'rgba(0,0,0,0.45)',
-        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-      }}
+      className="sig-overlay"
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div style={{
-        background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: '16px 16px 0 0', width: '100%', maxWidth: 480,
-        overflow: 'hidden',
-      }}>
+      <div className="sig-dialog">
         {/* Header */}
         <div style={{
           display: 'flex', alignItems: 'center', padding: '12px 16px',
@@ -209,5 +222,6 @@ export function SignatureModal({ open, role, onSave, onClose }: Props) {
         </div>
       </div>
     </div>
+    </>
   )
 }
