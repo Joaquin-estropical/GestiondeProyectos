@@ -6,7 +6,7 @@ import {
   Copy, Save, ClipboardList,
 } from 'lucide-react'
 import type { EventChecklist, ChecklistTemplate, TemplateItem, TemplateKind } from '@/types'
-import { TEMPLATE_KIND_LABELS, DEFAULT_CATEGORIES } from '@/types'
+import { DEFAULT_CATEGORIES } from '@/types'
 import {
   fetchEventChecklists, fetchChecklistTemplates,
   createChecklistTemplate, updateChecklistTemplate, deleteChecklistTemplate,
@@ -377,8 +377,6 @@ function AssignModal({ template, onClose, onCreated }: AssignModalProps) {
     } finally { setCreating(false) }
   }
 
-  const secondLabel = firstType === 'reception' ? 'Entrega' : 'Recepción'
-
   return (
     <>
       <div className="modal-bd" onClick={onClose} />
@@ -411,51 +409,27 @@ function AssignModal({ template, onClose, onCreated }: AssignModalProps) {
 
           {/* Flujo */}
           <div>
-            <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>
-              ¿Cómo empieza el flujo?
+            <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-2)', display: 'block', marginBottom: 8 }}>
+              Acta inicial
             </label>
-            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 10px' }}>
-              Se crean siempre las dos actas. Elegí cuál ocurre primero.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <button onClick={() => setFirstType('reception')} style={{
-                display: 'flex', alignItems: 'flex-start', gap: 12, padding: '11px 14px',
-                borderRadius: 8, cursor: 'pointer', textAlign: 'left',
-                border: `2px solid ${firstType === 'reception' ? 'var(--teal)' : 'var(--border)'}`,
-                background: firstType === 'reception' ? 'var(--teal-bg)' : 'var(--surface)',
-              }}>
-                <span style={{ fontSize: 18 }}>📥</span>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: firstType === 'reception' ? 'var(--teal)' : 'var(--text-1)' }}>
-                    Primero recibimos el espacio
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>Outlet, sucursal — recibimos y después devolvemos.</div>
-                </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className={`btn btn-sm ${firstType === 'reception' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setFirstType('reception')}
+                style={{ flex: 1 }}
+              >
+                📥 Recepción
               </button>
-              <button onClick={() => setFirstType('delivery')} style={{
-                display: 'flex', alignItems: 'flex-start', gap: 12, padding: '11px 14px',
-                borderRadius: 8, cursor: 'pointer', textAlign: 'left',
-                border: `2px solid ${firstType === 'delivery' ? '#6366f1' : 'var(--border)'}`,
-                background: firstType === 'delivery' ? '#eef2ff' : 'var(--surface)',
-              }}>
-                <span style={{ fontSize: 18 }}>📤</span>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: firstType === 'delivery' ? '#6366f1' : 'var(--text-1)' }}>
-                    Primero entregamos el espacio
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>Edificio, arrendamiento — entregamos y después recibimos.</div>
-                </div>
+              <button
+                className={`btn btn-sm ${firstType === 'delivery' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setFirstType('delivery')}
+                style={{ flex: 1 }}
+              >
+                📤 Entrega
               </button>
             </div>
-            <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, background: 'var(--surface-2)', border: '1px solid var(--border)', fontSize: 12, color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontWeight: 600 }}>Se crearán:</span>
-              <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: firstType === 'reception' ? 'var(--teal-bg)' : '#eef2ff', color: firstType === 'reception' ? 'var(--teal)' : '#6366f1' }}>
-                {firstType === 'reception' ? 'Recepción' : 'Entrega'}
-              </span>
-              <span style={{ color: 'var(--text-3)' }}>→</span>
-              <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-2)' }}>
-                {secondLabel}
-              </span>
+            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-3)' }}>
+              Se crearán ambas actas. La seleccionada es la que ocurre primero.
             </div>
           </div>
 
@@ -499,7 +473,6 @@ export default function PlanillasPage() {
   // nueva plantilla
   const [creating, setCreating]   = useState(false)
   const [newName, setNewName]     = useState('')
-  const [newKind, setNewKind]     = useState<TemplateKind>('custom')
 
   // usar plantilla
   const [assigningTemplate, setAssigningTemplate] = useState<ChecklistTemplate | null>(null)
@@ -529,7 +502,7 @@ export default function PlanillasPage() {
 
   async function handleCreate() {
     if (!newName.trim()) return
-    const tpl = await createChecklistTemplate({ name: newName.trim(), kind: newKind })
+    const tpl = await createChecklistTemplate({ name: newName.trim(), kind: 'custom' })
     setNewName(''); setCreating(false)
     await load()
     setExpandedId(tpl.id)
@@ -553,8 +526,6 @@ export default function PlanillasPage() {
     if (expandedId === id) setExpandedId(null)
     load()
   }
-
-  const kindEntries = Object.entries(TEMPLATE_KIND_LABELS) as [TemplateKind, string][]
 
   return (
     <div style={{ maxWidth: 880, margin: '0 auto', padding: '28px 24px' }}>
@@ -581,21 +552,9 @@ export default function PlanillasPage() {
         {/* Formulario nueva plantilla */}
         {creating && (
           <div style={{ marginBottom: 12, padding: '14px 16px', background: 'var(--surface-2)', border: '1px solid var(--teal)', borderRadius: 10, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>Nueva plantilla</div>
-            <input autoFocus className="input" placeholder="Nombre (ej: Entrega edificio, Outlet estándar…)"
+            <input autoFocus className="input" placeholder="Nombre de la plantilla (ej: Entrega edificio, Outlet estándar…)"
               value={newName} onChange={e => setNewName(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setCreating(false) }} />
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 500, display: 'block', marginBottom: 8 }}>Tipo</label>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {kindEntries.map(([k, label]) => (
-                  <button key={k} className={`btn btn-sm ${newKind === k ? 'btn-primary' : 'btn-secondary'}`}
-                    onClick={() => setNewKind(k)} style={{ fontSize: 12 }}>
-                    {KIND_EMOJI[k]} {label}
-                  </button>
-                ))}
-              </div>
-            </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button className="btn btn-primary btn-sm" onClick={handleCreate} disabled={!newName.trim()}>
                 Crear y agregar ítems
@@ -619,89 +578,69 @@ export default function PlanillasPage() {
             </button>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {/* Agrupar por kind */}
-            {kindEntries.map(([kind, kindLabel]) => {
-              const kindTpls = templates.filter(t => t.kind === kind)
-              if (kindTpls.length === 0) return null
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {templates.map(tpl => {
+              const isExpanded = expandedId === tpl.id
               return (
-                <div key={kind} style={{ marginBottom: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, paddingLeft: 2 }}>
-                    <span style={{ fontSize: 14 }}>{KIND_EMOJI[kind]}</span>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: KIND_COLORS[kind] }}>{kindLabel}</span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {kindTpls.map(tpl => {
-                      const isExpanded = expandedId === tpl.id
-                      return (
-                        <div key={tpl.id} style={{
-                          background: 'var(--surface)', border: '1px solid var(--border)',
-                          borderLeft: `3px solid ${KIND_COLORS[tpl.kind]}`,
-                          borderRadius: 8, overflow: 'hidden',
-                          boxShadow: isExpanded ? '0 2px 10px rgba(0,0,0,.1)' : 'none',
-                        }}>
-                          {/* Fila de plantilla */}
-                          <div
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px',
-                              cursor: editingNameId === tpl.id ? 'default' : 'pointer',
-                              background: isExpanded ? 'var(--surface-2)' : 'var(--surface)',
-                            }}
-                            onClick={() => { if (editingNameId === tpl.id) return; setExpandedId(isExpanded ? null : tpl.id) }}
-                          >
-                            <span style={{ color: 'var(--text-3)', flexShrink: 0 }}>
-                              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                            </span>
+                <div key={tpl.id} style={{
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderRadius: 8, overflow: 'hidden',
+                  boxShadow: isExpanded ? '0 2px 10px rgba(0,0,0,.1)' : 'none',
+                }}>
+                  {/* Fila */}
+                  <div
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px',
+                      cursor: editingNameId === tpl.id ? 'default' : 'pointer',
+                      background: isExpanded ? 'var(--surface-2)' : 'var(--surface)',
+                    }}
+                    onClick={() => { if (editingNameId === tpl.id) return; setExpandedId(isExpanded ? null : tpl.id) }}
+                  >
+                    <span style={{ color: 'var(--text-3)', flexShrink: 0 }}>
+                      {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    </span>
 
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              {editingNameId === tpl.id ? (
-                                <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
-                                  <input autoFocus className="input" value={editNameVal}
-                                    onChange={e => setEditNameVal(e.target.value)}
-                                    onKeyDown={e => { if (e.key === 'Enter') handleRename(tpl.id); if (e.key === 'Escape') setEditingNameId(null) }}
-                                    style={{ flex: 1, fontSize: 13 }} />
-                                  <button className="btn btn-primary btn-sm btn-icon" onClick={() => handleRename(tpl.id)}><Check size={12} /></button>
-                                  <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setEditingNameId(null)}><X size={12} /></button>
-                                </div>
-                              ) : (
-                                <span style={{ fontSize: 14, fontWeight: 600 }}>{tpl.name}</span>
-                              )}
-                            </div>
-
-                            {editingNameId !== tpl.id && (
-                              <div style={{ display: 'flex', gap: 3, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                                {/* Usar */}
-                                <button className="btn btn-primary btn-sm" style={{ fontSize: 12, padding: '4px 10px' }}
-                                  onClick={() => setAssigningTemplate(tpl)}>
-                                  Usar
-                                </button>
-                                {/* Renombrar */}
-                                <button className="btn btn-ghost btn-sm btn-icon" title="Renombrar"
-                                  onClick={() => { setEditingNameId(tpl.id); setEditNameVal(tpl.name) }}>
-                                  <Pencil size={12} />
-                                </button>
-                                {/* Duplicar */}
-                                <button className="btn btn-ghost btn-sm btn-icon" title="Duplicar"
-                                  onClick={() => handleDuplicate(tpl.id)}>
-                                  <Copy size={12} />
-                                </button>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Panel expandido con ítems */}
-                          {isExpanded && (
-                            <ExpandedPanel
-                              template={tpl}
-                              onClose={() => setExpandedId(null)}
-                              onReload={load}
-                              onDeleted={() => handleDelete(tpl.id, tpl.name)}
-                            />
-                          )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {editingNameId === tpl.id ? (
+                        <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
+                          <input autoFocus className="input" value={editNameVal}
+                            onChange={e => setEditNameVal(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') handleRename(tpl.id); if (e.key === 'Escape') setEditingNameId(null) }}
+                            style={{ flex: 1, fontSize: 13 }} />
+                          <button className="btn btn-primary btn-sm btn-icon" onClick={() => handleRename(tpl.id)}><Check size={12} /></button>
+                          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setEditingNameId(null)}><X size={12} /></button>
                         </div>
-                      )
-                    })}
+                      ) : (
+                        <span style={{ fontSize: 14, fontWeight: 600 }}>{tpl.name}</span>
+                      )}
+                    </div>
+
+                    {editingNameId !== tpl.id && (
+                      <div style={{ display: 'flex', gap: 3, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                        <button className="btn btn-primary btn-sm" style={{ fontSize: 12, padding: '4px 10px' }}
+                          onClick={() => setAssigningTemplate(tpl)}>
+                          Usar
+                        </button>
+                        <button className="btn btn-ghost btn-sm btn-icon" title="Renombrar"
+                          onClick={() => { setEditingNameId(tpl.id); setEditNameVal(tpl.name) }}>
+                          <Pencil size={12} />
+                        </button>
+                        <button className="btn btn-ghost btn-sm btn-icon" title="Duplicar"
+                          onClick={() => handleDuplicate(tpl.id)}>
+                          <Copy size={12} />
+                        </button>
+                      </div>
+                    )}
                   </div>
+
+                  {isExpanded && (
+                    <ExpandedPanel
+                      template={tpl}
+                      onClose={() => setExpandedId(null)}
+                      onReload={load}
+                      onDeleted={() => handleDelete(tpl.id, tpl.name)}
+                    />
+                  )}
                 </div>
               )
             })}
