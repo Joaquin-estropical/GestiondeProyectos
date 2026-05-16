@@ -168,11 +168,11 @@ export async function deleteChecklistItem(id: string): Promise<void> {
   if (error) throw error
 }
 
-// ── FLUJO: crear planilla de recepción desde plantilla ───────────────────────
-export async function createReceptionFromTemplate(
-  eventId: string, templateId: string
+// ── FLUJO: crear una sola acta desde plantilla ───────────────────────────────
+async function createChecklistFromTemplate(
+  eventId: string, templateId: string, type: 'reception' | 'delivery'
 ): Promise<{ checklist: EventChecklist; items: ChecklistItem[] }> {
-  const checklist = await createEventChecklist({ event_id: eventId, type: 'reception', template_id: templateId })
+  const checklist = await createEventChecklist({ event_id: eventId, type, template_id: templateId })
   const tplItems  = await fetchTemplateItems(templateId)
   let items: ChecklistItem[] = []
   if (tplItems.length > 0) {
@@ -185,6 +185,29 @@ export async function createReceptionFromTemplate(
     items = (data ?? []).map(r => ({ ...r, photos: r.photos ?? [] })) as ChecklistItem[]
   }
   return { checklist, items }
+}
+
+// Alias público para compatibilidad con código existente
+export async function createReceptionFromTemplate(
+  eventId: string, templateId: string
+): Promise<{ checklist: EventChecklist; items: ChecklistItem[] }> {
+  return createChecklistFromTemplate(eventId, templateId, 'reception')
+}
+
+// ── FLUJO: crear par vinculado recepción + entrega desde plantilla ───────────
+// firstType: qué acta se abre al navegar (la "principal" del proyecto)
+// Siempre se crean ambas. El par queda ligado por event_id.
+export async function createLinkedPair(
+  eventId: string,
+  templateId: string,
+  firstType: 'reception' | 'delivery'
+): Promise<{ first: EventChecklist; second: EventChecklist }> {
+  const secondType = firstType === 'reception' ? 'delivery' : 'reception'
+  const [{ checklist: first }, { checklist: second }] = await Promise.all([
+    createChecklistFromTemplate(eventId, templateId, firstType),
+    createChecklistFromTemplate(eventId, templateId, secondType),
+  ])
+  return { first, second }
 }
 
 // ── FLUJO: cerrar recepción y crear entrega automáticamente ──────────────────

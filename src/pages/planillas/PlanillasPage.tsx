@@ -8,7 +8,7 @@ import type { EventChecklist, ChecklistTemplate, TemplateKind } from '@/types'
 import { TEMPLATE_KIND_LABELS } from '@/types'
 import {
   fetchEventChecklists, fetchChecklistTemplates,
-  createEventChecklist, createReceptionFromTemplate,
+  createLinkedPair,
   duplicateChecklistTemplate,
 } from '@/lib/planillas'
 import { useAppStore } from '@/stores/app'
@@ -54,55 +54,52 @@ function AssignModal({ template, onClose, onCreated }: AssignModalProps) {
   const { projects, areas } = useAppStore()
   const navigate = useNavigate()
 
-  const [targetType, setTargetType]   = useState<'project' | 'area'>('project')
-  const [projectId,  setProjectId]    = useState('')
-  const [areaId,     setAreaId]       = useState('')
-  const [clType,     setClType]       = useState<'reception' | 'delivery'>('reception')
-  const [creating,   setCreating]     = useState(false)
-  const [error,      setError]        = useState<string | null>(null)
+  const [targetType, setTargetType] = useState<'project' | 'area'>('project')
+  const [projectId,  setProjectId]  = useState('')
+  const [areaId,     setAreaId]     = useState('')
+  // firstType = qué acta ocurre primero en el flujo del proyecto
+  const [firstType,  setFirstType]  = useState<'reception' | 'delivery'>('reception')
+  const [creating,   setCreating]   = useState(false)
+  const [error,      setError]      = useState<string | null>(null)
 
   async function handleCreate() {
     const eventId = targetType === 'project' ? projectId : areaId
     if (!eventId) { setError('Seleccioná un destino'); return }
     setCreating(true); setError(null)
     try {
-      const { checklist } = await createReceptionFromTemplate(eventId, template.id)
-      // update type if delivery
-      if (clType === 'delivery') {
-        await createEventChecklist({ event_id: eventId, type: 'delivery', template_id: template.id })
-      }
+      const { first } = await createLinkedPair(eventId, template.id, firstType)
       onCreated()
-      navigate(`/planillas/${checklist.id}`)
+      navigate(`/planillas/${first.id}`)
     } catch (e) {
       setError((e as Error).message)
     } finally { setCreating(false) }
   }
 
+  const secondType = firstType === 'reception' ? 'entrega' : 'recepción'
+
   return (
     <>
       <div className="modal-bd" onClick={onClose} />
-      <div className="modal" style={{ maxWidth: 480 }}>
+      <div className="modal" style={{ maxWidth: 500 }}>
         <div className="modal-head">
           <span className="fw-6" style={{ fontSize: 15 }}>Usar plantilla: {template.name}</span>
           <button className="btn btn-ghost btn-sm btn-icon" style={{ marginLeft: 'auto' }} onClick={onClose}>
             <X size={14} />
           </button>
         </div>
-        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Target */}
+
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+          {/* Destino */}
           <div>
             <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-2)', display: 'block', marginBottom: 8 }}>
               Asignar a
             </label>
             <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-              <button
-                className={`btn btn-sm ${targetType === 'project' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setTargetType('project')}
-              >Proyecto</button>
-              <button
-                className={`btn btn-sm ${targetType === 'area' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setTargetType('area')}
-              >Área</button>
+              <button className={`btn btn-sm ${targetType === 'project' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setTargetType('project')}>Proyecto</button>
+              <button className={`btn btn-sm ${targetType === 'area' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setTargetType('area')}>Área</button>
             </div>
             {targetType === 'project' ? (
               <select className="input" value={projectId} onChange={e => setProjectId(e.target.value)}>
@@ -117,20 +114,80 @@ function AssignModal({ template, onClose, onCreated }: AssignModalProps) {
             )}
           </div>
 
-          {/* Checklist type */}
+          {/* Flujo del proyecto */}
           <div>
-            <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-2)', display: 'block', marginBottom: 8 }}>
-              Tipo de acta
+            <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-2)', display: 'block', marginBottom: 4 }}>
+              ¿Cómo empieza el flujo de este proyecto?
             </label>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <p style={{ fontSize: 12, color: 'var(--text-3)', margin: '0 0 10px' }}>
+              Siempre se crean las dos actas (recepción + entrega). Elegí cuál ocurre primero.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* Opción: primero recepción */}
               <button
-                className={`btn btn-sm ${clType === 'reception' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setClType('reception')}
-              >Recepción</button>
+                onClick={() => setFirstType('reception')}
+                style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 12,
+                  padding: '12px 14px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+                  border: `2px solid ${firstType === 'reception' ? 'var(--teal)' : 'var(--border)'}`,
+                  background: firstType === 'reception' ? 'var(--teal-bg)' : 'var(--surface)',
+                }}
+              >
+                <span style={{ fontSize: 20, lineHeight: 1 }}>📥</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: firstType === 'reception' ? 'var(--teal)' : 'var(--text-1)' }}>
+                    Primero recibimos el local / espacio
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 3 }}>
+                    Ej: outlets, sucursales — recepcionamos el espacio y después lo devolvemos al final.
+                  </div>
+                </div>
+              </button>
+
+              {/* Opción: primero entrega */}
               <button
-                className={`btn btn-sm ${clType === 'delivery' ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setClType('delivery')}
-              >Entrega</button>
+                onClick={() => setFirstType('delivery')}
+                style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 12,
+                  padding: '12px 14px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+                  border: `2px solid ${firstType === 'delivery' ? '#6366f1' : 'var(--border)'}`,
+                  background: firstType === 'delivery' ? '#eef2ff' : 'var(--surface)',
+                }}
+              >
+                <span style={{ fontSize: 20, lineHeight: 1 }}>📤</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: firstType === 'delivery' ? '#6366f1' : 'var(--text-1)' }}>
+                    Primero entregamos el local / espacio
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 3 }}>
+                    Ej: edificio — entregamos al arrendatario y después lo recibimos de vuelta.
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            {/* Resumen del par */}
+            <div style={{
+              marginTop: 12, padding: '10px 14px', borderRadius: 8,
+              background: 'var(--surface-2)', border: '1px solid var(--border)',
+              fontSize: 12, color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <span style={{ fontWeight: 600 }}>Se crearán:</span>
+              <span style={{
+                padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600,
+                background: firstType === 'reception' ? 'var(--teal-bg)' : '#eef2ff',
+                color: firstType === 'reception' ? 'var(--teal)' : '#6366f1',
+              }}>
+                {firstType === 'reception' ? 'Recepción' : 'Entrega'}
+              </span>
+              <span style={{ color: 'var(--text-3)' }}>→ luego →</span>
+              <span style={{
+                padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600,
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                color: 'var(--text-2)',
+              }}>
+                {secondType.charAt(0).toUpperCase() + secondType.slice(1)}
+              </span>
             </div>
           </div>
 
@@ -140,6 +197,7 @@ function AssignModal({ template, onClose, onCreated }: AssignModalProps) {
             </div>
           )}
         </div>
+
         <div className="modal-foot">
           <button className="btn btn-secondary btn-md" onClick={onClose}>Cancelar</button>
           <button
@@ -147,7 +205,7 @@ function AssignModal({ template, onClose, onCreated }: AssignModalProps) {
             disabled={creating || (targetType === 'project' ? !projectId : !areaId)}
             onClick={handleCreate}
           >
-            {creating ? 'Creando…' : 'Crear planilla'}
+            {creating ? 'Creando…' : 'Crear par de actas'}
           </button>
         </div>
       </div>
@@ -338,34 +396,111 @@ export default function PlanillasPage() {
                   </span>
                 </div>
 
-                {/* checklists */}
-                {group.checklists.map((cl, idx) => (
-                  <div
-                    key={cl.id}
-                    onClick={() => navigate(`/planillas/${cl.id}`)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px',
-                      cursor: 'pointer', transition: 'background .1s',
-                      borderBottom: idx < group.checklists.length - 1 ? '1px solid var(--border)' : 'none',
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                  >
-                    <StatusBadge status={cl.status} />
-                    <div style={{ flex: 1 }}>
-                      <span style={{ fontSize: 13, fontWeight: 500 }}>
-                        {cl.title ?? `Acta de ${clTypeLabel(cl.type).toLowerCase()}`}
-                      </span>
-                      <span style={{ fontSize: 11, color: 'var(--text-3)', marginLeft: 8 }}>
-                        {statusLabel(cl.status)}
-                      </span>
+                {/* checklists — agrupar en pares por template_id + fecha cercana */}
+                {(() => {
+                  // Agrupar: pares que comparten template_id y fueron creados con <10s de diferencia
+                  const cls  = [...group.checklists].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+                  const used = new Set<string>()
+                  const pairs: Array<{ primary: EventChecklist; sibling?: EventChecklist }> = []
+
+                  for (const cl of cls) {
+                    if (used.has(cl.id)) continue
+                    const partner = cls.find(other =>
+                      !used.has(other.id) &&
+                      other.id !== cl.id &&
+                      other.template_id === cl.template_id &&
+                      cl.template_id !== null &&
+                      Math.abs(new Date(other.created_at).getTime() - new Date(cl.created_at).getTime()) < 30_000
+                    )
+                    used.add(cl.id)
+                    if (partner) used.add(partner.id)
+                    pairs.push({ primary: cl, sibling: partner })
+                  }
+
+                  return pairs.map(({ primary, sibling }, pairIdx) => (
+                    <div
+                      key={primary.id}
+                      style={{ borderBottom: pairIdx < pairs.length - 1 ? '1px solid var(--border)' : 'none' }}
+                    >
+                      {sibling ? (
+                        // ── par vinculado ──
+                        <div style={{ padding: '10px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                            <span style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)' }}>
+                              Par de actas · {new Date(primary.created_at).toLocaleDateString('es-AR')}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            {[primary, sibling].map(cl => {
+                              const isReception = cl.type === 'reception'
+                              const accent = isReception ? 'var(--teal)' : '#6366f1'
+                              const accentBg = isReception ? 'var(--teal-bg)' : '#eef2ff'
+                              return (
+                                <div
+                                  key={cl.id}
+                                  onClick={() => navigate(`/planillas/${cl.id}`)}
+                                  style={{
+                                    flex: 1, minWidth: 160, cursor: 'pointer',
+                                    border: `1px solid var(--border)`,
+                                    borderLeft: `3px solid ${accent}`,
+                                    borderRadius: 8, padding: '10px 12px',
+                                    background: 'var(--surface)',
+                                    transition: 'background .1s',
+                                  }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = accentBg)}
+                                  onMouseLeave={e => (e.currentTarget.style.background = 'var(--surface)')}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                    <span style={{ fontSize: 11, fontWeight: 700, color: accent }}>
+                                      {isReception ? '📥 Recepción' : '📤 Entrega'}
+                                    </span>
+                                    <StatusBadge status={cl.status} />
+                                  </div>
+                                  <div style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 500 }}>
+                                    {statusLabel(cl.status)}
+                                  </div>
+                                  {cl.status === 'completed' && cl.completed_at && (
+                                    <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
+                                      Cerrada {new Date(cl.completed_at).toLocaleDateString('es-AR')}
+                                    </div>
+                                  )}
+                                  <div style={{ marginTop: 6, textAlign: 'right' }}>
+                                    <ChevronRight size={12} style={{ color: accent }} />
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        // ── acta suelta (creada antes del nuevo flujo) ──
+                        <div
+                          onClick={() => navigate(`/planillas/${primary.id}`)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px',
+                            cursor: 'pointer', transition: 'background .1s',
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                        >
+                          <StatusBadge status={primary.status} />
+                          <div style={{ flex: 1 }}>
+                            <span style={{ fontSize: 13, fontWeight: 500 }}>
+                              {primary.title ?? `Acta de ${clTypeLabel(primary.type).toLowerCase()}`}
+                            </span>
+                            <span style={{ fontSize: 11, color: 'var(--text-3)', marginLeft: 8 }}>
+                              {statusLabel(primary.status)}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                            {new Date(primary.created_at).toLocaleDateString('es-AR')}
+                          </span>
+                          <ChevronRight size={13} style={{ color: 'var(--text-3)' }} />
+                        </div>
+                      )}
                     </div>
-                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                      {new Date(cl.created_at).toLocaleDateString('es-AR')}
-                    </span>
-                    <ChevronRight size={13} style={{ color: 'var(--text-3)' }} />
-                  </div>
-                ))}
+                  ))
+                })()}
               </div>
             ))}
           </div>
