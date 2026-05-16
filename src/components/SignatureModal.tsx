@@ -42,7 +42,7 @@ export function SignatureModal({ open, role, onSave, onClose }: Props) {
   const getCtx = useCallback(() => {
     const ctx = canvasRef.current?.getContext('2d')
     if (!ctx) return null
-    ctx.strokeStyle = '#003DA5'
+    ctx.strokeStyle = '#000000'
     ctx.lineWidth   = 2.5
     ctx.lineCap     = 'round'
     ctx.lineJoin    = 'round'
@@ -157,7 +157,7 @@ export function SignatureModal({ open, role, onSave, onClose }: Props) {
           <div style={{
             position: 'relative', background: 'var(--surface-2)',
             border: '1px solid var(--border)', borderRadius: 10,
-            height: 180, overflow: 'hidden',
+            height: 260, overflow: 'hidden',
           }}>
             {!hasDrawn && (
               <div style={{
@@ -174,7 +174,7 @@ export function SignatureModal({ open, role, onSave, onClose }: Props) {
             )}
             <canvas
               ref={canvasRef}
-              style={{ width: '100%', height: '100%', display: 'block', touchAction: 'none', cursor: 'crosshair' }}
+              style={{ width: '100%', height: 260, display: 'block', touchAction: 'none', cursor: 'crosshair' }}
               onMouseDown={e => { const p = getPos(e.clientX, e.clientY); startDraw(p.x, p.y) }}
               onMouseMove={e => { const p = getPos(e.clientX, e.clientY); draw(p.x, p.y) }}
               onMouseUp={stopDraw}
