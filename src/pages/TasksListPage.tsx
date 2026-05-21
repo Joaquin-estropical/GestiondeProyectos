@@ -5,6 +5,7 @@ import { PageHead } from '@/components/shared/PageHead'
 import { StatusPill, PriorityPill } from '@/components/shared/Badges'
 import { dueColor, fmtDate } from '@/lib/mock-data'
 import { Avatar } from '@/components/shared/Avatar'
+import { useMembers } from '@/hooks/useSupabase'
 import type { Task } from '@/types'
 
 type FilterKey = 'overdue' | 'at_risk' | 'done' | 'today' | 'open' | 'all'
@@ -36,6 +37,8 @@ export default function TasksListPage() {
   const navigate  = useNavigate()
   const filter    = (params.get('filter') ?? 'all') as FilterKey
   const { tasks, projects, areas, openTask } = useAppStore()
+  const { data: members = [] } = useMembers()
+  const resolveName = (id: string) => members.find(m => m.id === id)?.name ?? id
 
   const filtered = applyFilter(tasks, filter)
   const label    = FILTER_LABELS[filter] ?? 'Tareas'
@@ -97,7 +100,7 @@ export default function TasksListPage() {
 
                   {/* Assignee */}
                   {t.assignee && (
-                    <Avatar name={t.assignee} size={22} />
+                    <Avatar name={resolveName(t.assignee)} size={22} title={resolveName(t.assignee)} />
                   )}
 
                   {/* Pills */}

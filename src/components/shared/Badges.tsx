@@ -1,8 +1,9 @@
-import { Flag, Store, Building2, Warehouse } from 'lucide-react'
-import { getArea, STATUS_LABELS, PRIORITY_LABELS } from '@/lib/mock-data'
+import { Flag, Store, Building2, Warehouse, MapPin } from 'lucide-react'
+import { STATUS_LABELS, PRIORITY_LABELS } from '@/lib/mock-data'
+import { useAppStore } from '@/stores/app'
 
 type IconComponent = React.ComponentType<{ size?: number }>
-const AREA_ICONS: Record<string, IconComponent> = { Store, Building2, Warehouse }
+const AREA_ICONS: Record<string, IconComponent> = { store: Store, 'building-2': Building2, warehouse: Warehouse, 'map-pin': MapPin }
 
 interface StatusPillProps { status: string }
 export function StatusPill({ status }: StatusPillProps) {
@@ -29,7 +30,8 @@ export function PriorityPill({ priority, iconOnly }: PriorityPillProps) {
 
 interface AreaPillProps { areaId: string; mini?: boolean }
 export function AreaPill({ areaId, mini }: AreaPillProps) {
-  const a = getArea(areaId)
+  const areas = useAppStore(s => s.areas)
+  const a = areas.find(x => x.id === areaId)
   if (!a) return null
   const IconComp = AREA_ICONS[a.icon] ?? Store
   return (

@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Folder, ListTodo, Percent, Users, UserPlus, Plus, Pencil, MoreHorizontal, Pen, Trash2, Layers } from 'lucide-react';
-import { useAreas, useSubAreas, useProjects, useTasks } from '@/hooks/useSupabase';
-import { getMember, fmtDate, dueColor } from '@/lib/mock-data';
+import { useAreas, useSubAreas, useProjects, useTasks, useMembers } from '@/hooks/useSupabase';
+import { fmtDate, dueColor } from '@/lib/mock-data';
 import { Avatar } from '@/components/shared/Avatar';
 import { StatusPill, PriorityPill } from '@/components/shared/Badges';
 import { PageHead } from '@/components/shared/PageHead';
@@ -170,9 +170,11 @@ export default function AreaView() {
   const id = areaId ?? '';
 
   const { data: areas    = [], loading } = useAreas();
-  const { data: subareas = [] }          = useSubAreas(id);
+  const { data: subareas = [] }          = useSubAreas(id === 'edificio' ? id : undefined);
   const { data: allProjects = [] }       = useProjects(id);
   const { data: tasks    = [] }          = useTasks({ areaId: id });
+  const { data: members  = [] }          = useMembers();
+  const resolveMember = (memberId: string) => members.find(m => m.id === memberId);
 
   const a = areas.find(x => x.id === id);
   const sa = subareaId ? subareas.find(x => x.id === subareaId) : null;
@@ -251,8 +253,8 @@ export default function AreaView() {
                         <td>{t.title}</td>
                         <td style={{ width: 130 }}>
                           <div className="row gap-8 items-center">
-                            <Avatar name={getMember(t.assignee)?.name ?? t.assignee} size={20} />
-                            <span className="f-xs text-2">{getMember(t.assignee)?.short ?? t.assignee}</span>
+                            <Avatar name={resolveMember(t.assignee)?.name ?? t.assignee} size={20} />
+                            <span className="f-xs text-2">{resolveMember(t.assignee)?.short ?? t.assignee}</span>
                           </div>
                         </td>
                         <td style={{ width: 100 }}><span className="mono f-xs" style={{ color: dueColor(t.due) }}>{fmtDate(t.due)}</span></td>
@@ -416,8 +418,8 @@ export default function AreaView() {
                   <td>{t.title}</td>
                   <td style={{ width: 130 }}>
                     <div className="row gap-8 items-center">
-                      <Avatar name={getMember(t.assignee)?.name ?? ''} size={20} />
-                      <span className="f-xs text-2">{getMember(t.assignee)?.short}</span>
+                      <Avatar name={resolveMember(t.assignee)?.name ?? t.assignee} size={20} />
+                      <span className="f-xs text-2">{resolveMember(t.assignee)?.short ?? t.assignee}</span>
                     </div>
                   </td>
                   <td style={{ width: 100 }}>
