@@ -17,14 +17,14 @@ export const TEAM: Member[] = [
 ]
 
 export const PROJECTS: Project[] = [
-  { id: 'p1', name: 'Remodelación local',   area: 'outlet',  subarea: 'sub-outlet-generales', due: '2026-03-28', progress: 67, count: 12 },
-  { id: 'p2', name: 'Inventario Q2',        area: 'outlet',  subarea: 'sub-outlet-generales', due: '2026-04-15', progress: 28, count: 9  },
-  { id: 'p3', name: 'Apertura zona este',   area: 'norte',   subarea: 'sub-norte-generales',  due: '2026-05-20', progress: 41, count: 14 },
-  { id: 'p4', name: 'Auditoría seguridad',  area: 'corp',    subarea: 'sub-corp-generales',   due: '2026-03-30', progress: 80, count: 6  },
-  { id: 'p5', name: 'Migración POS',        area: 'corp',    subarea: 'sub-corp-generales',   due: '2026-04-10', progress: 22, count: 11 },
-  { id: 'p6', name: 'Inventario Q2 Sur',    area: 'bodega',  subarea: 'sub-bodega-generales', due: '2026-04-15', progress: 43, count: 7  },
-  { id: 'p7', name: 'Capacitación turnos',  area: 'bodega',  subarea: 'sub-bodega-generales', due: '2026-03-22', progress: 60, count: 5  },
-  { id: 'p8', name: 'Apertura Plaza',       area: 'plaza',   subarea: 'sub-plaza-generales',  due: '2026-06-01', progress: 12, count: 8  },
+  { id: 'p1', name: 'Remodelación local',   area: 'outlet',  subarea: null, due: '2026-03-28', progress: 67, count: 12 },
+  { id: 'p2', name: 'Inventario Q2',        area: 'outlet',  subarea: null, due: '2026-04-15', progress: 28, count: 9  },
+  { id: 'p3', name: 'Apertura zona este',   area: 'norte',   subarea: null, due: '2026-05-20', progress: 41, count: 14 },
+  { id: 'p4', name: 'Auditoría seguridad',  area: 'corp',    subarea: null, due: '2026-03-30', progress: 80, count: 6  },
+  { id: 'p5', name: 'Migración POS',        area: 'corp',    subarea: null, due: '2026-04-10', progress: 22, count: 11 },
+  { id: 'p6', name: 'Inventario Q2 Sur',    area: 'bodega',  subarea: null, due: '2026-04-15', progress: 43, count: 7  },
+  { id: 'p7', name: 'Capacitación turnos',  area: 'bodega',  subarea: null, due: '2026-03-22', progress: 60, count: 5  },
+  { id: 'p8', name: 'Apertura Plaza',       area: 'plaza',   subarea: null, due: '2026-06-01', progress: 12, count: 8  },
 ]
 
 const T = (o: Omit<Task, 'description' | 'start_date' | 'end_date' | 'progress' | 'is_milestone' | 'sort_order' | 'tags' | 'helper'>): Task =>

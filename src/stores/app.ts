@@ -126,8 +126,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   loadSubAreas: async () => {
     if (get().subAreasLoaded) return
-    const subareas = await fetchSubAreas()
-    set({ subareas, subAreasLoaded: true })
+    try {
+      const subareas = await fetchSubAreas()
+      set({ subareas, subAreasLoaded: true })
+    } catch {
+      // table may not exist in older deployments — fail silently
+      set({ subareas: [], subAreasLoaded: true })
+    }
   },
   loadProjects: async () => {
     const projects = await fetchProjects()
@@ -135,7 +140,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   refreshAll: async () => {
     const [tasks, areas, subareas, projects] = await Promise.all([
-      fetchTasks(), fetchAreas(), fetchSubAreas(), fetchProjects(),
+      fetchTasks(), fetchAreas(),
+      fetchSubAreas().catch(() => [] as import('@/types').SubArea[]),
+      fetchProjects(),
     ])
     set({ tasks, areas, subareas, projects, tasksLoaded: true, areasLoaded: true, subAreasLoaded: true })
   },

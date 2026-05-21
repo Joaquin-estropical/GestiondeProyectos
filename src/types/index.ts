@@ -47,7 +47,7 @@ export interface Project {
   id:       string
   name:     string
   area:     string
-  subarea:  string            // FK → SubArea.id (introducida en 20260521_010)
+  subarea:  string | null     // FK → SubArea.id (introducida en 20260521_010; null en rows legacy)
   due:      string
   progress: number
   count:    number
