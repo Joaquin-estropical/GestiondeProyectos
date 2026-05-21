@@ -101,6 +101,7 @@ export interface GanttTask {
   lf:          number
   float:       number
   critical:    boolean
+  noScope?:    boolean  // true when task has start but no real end (placeholder due, no end_date)
   // display metadata
   originalTask: Task
 }

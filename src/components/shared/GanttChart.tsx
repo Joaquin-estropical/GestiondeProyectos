@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
-import { Plus, ZoomIn, ZoomOut, Target, Printer, AlertTriangle, ChevronDown, ChevronRight, GripVertical } from 'lucide-react'
+import { Plus, ZoomIn, ZoomOut, Target, Printer, AlertTriangle, ChevronDown, ChevronRight, GripVertical, Eye, EyeOff } from 'lucide-react'
 import type { Task, TaskDependency, GanttTask } from '@/types'
 import { fetchTaskDependencies, updateTaskGantt } from '@/lib/db'
 import { useAppStore } from '@/stores/app'
@@ -22,10 +22,13 @@ const C = {
   done:      '#22C55E',
   float:     '#93C5FD',
   milestone: '#D97706',
+  noScope:   '#6B6B7A',
 }
 
+const PLACEHOLDER_DUE = '2099-12-31'
+
 // ─── CPM ─────────────────────────────────────────────────
-function calcCPM(tasks: GanttTask[]): GanttTask[] {
+function calcCPM(tasks: GanttTask[], allDeps: TaskDependency[]): GanttTask[] {
   if (!tasks.length) return tasks
   const m = new Map(tasks.map(t => [t.id, t]))
 
@@ -60,19 +63,42 @@ function calcCPM(tasks: GanttTask[]): GanttTask[] {
       if (s.deps.includes(id)) { t.lf = Math.min(t.lf, s.ls); t.ls = t.lf - t.duration }
     })
     t.float    = t.ls - t.es
-    t.critical = t.float <= 0 && t.duration > 0
+  })
+
+  // Criticality: only tasks with real scope, not done, and in a dependency chain
+  const inChain = new Set<string>()
+  allDeps.forEach(d => { inChain.add(d.predecessor_id); inChain.add(d.successor_id) })
+  tasks.forEach(t => {
+    if (t.noScope || t.originalTask.status === 'done') {
+      t.critical = false
+      return
+    }
+    t.critical = t.float <= 0 && t.duration > 0 && inChain.has(t.id)
   })
   return tasks
 }
 
 
 function toGantt(task: Task, deps: string[], origin: Date): GanttTask {
-  const s = task.start_date && isValid(parseISO(task.start_date)) ? parseISO(task.start_date) : parseISO(task.due)
-  const e = task.end_date   && isValid(parseISO(task.end_date))   ? parseISO(task.end_date)   : parseISO(task.due)
+  const hasStart   = !!(task.start_date && isValid(parseISO(task.start_date)))
+  const hasEndDate = !!(task.end_date   && isValid(parseISO(task.end_date)))
+  const hasRealDue = !!(task.due && task.due !== PLACEHOLDER_DUE && isValid(parseISO(task.due)))
+  const hasRealEnd = hasEndDate || hasRealDue
+  const noScope    = hasStart && !hasRealEnd
+
+  const s = hasStart
+    ? parseISO(task.start_date!)
+    : (hasRealDue ? parseISO(task.due) : parseISO(task.due))
+  const e = hasEndDate
+    ? parseISO(task.end_date!)
+    : hasRealDue
+      ? parseISO(task.due)
+      : addDays(s, 1)  // noScope fallback: 1-day stub
   const start    = Math.max(0, differenceInCalendarDays(s, origin))
   const duration = task.is_milestone ? 0 : Math.max(1, differenceInCalendarDays(e, s))
   return { id: task.id, name: task.title, start, duration, deps,
     es: start, ef: start + duration, ls: start, lf: start + duration, float: 0, critical: false,
+    noScope,
     originalTask: task }
 }
 
@@ -91,13 +117,24 @@ function Tooltip({ gt, preds, x, y }: { gt: GanttTask; preds: GanttTask[]; x: nu
       <div style={{ fontWeight: 700, fontSize: 13, color: '#E8E8EA', marginBottom: 10, lineHeight: 1.3 }}>
         {t.is_milestone ? '◆ ' : ''}{t.title}
       </div>
+      {gt.noScope && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, padding: '6px 8px', background: 'rgba(217,119,6,.12)', border: '1px solid rgba(217,119,6,.3)', borderRadius: 5, fontSize: 11.5, color: '#F59E0B' }}>
+          <AlertTriangle size={12} /> Sin fecha fin definida — clic para asignar
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', rowGap: 5, columnGap: 16, color: '#6B6B7A' }}>
         <span>Inicio</span>     <span style={{ color: '#C8C8D0' }}>{fmt(t.start_date)}</span>
-        <span>Fin</span>        <span style={{ color: '#C8C8D0' }}>{fmt(t.end_date ?? t.due)}</span>
-        <span>Duración</span>   <span style={{ color: '#C8C8D0' }}>{gt.duration}d</span>
+        <span>Fin</span>
+        <span style={{ color: gt.noScope ? '#F59E0B' : '#C8C8D0' }}>
+          {gt.noScope ? 'sin definir' : fmt(t.end_date ?? t.due)}
+        </span>
+        <span>Duración</span>
+        <span style={{ color: gt.noScope ? '#F59E0B' : '#C8C8D0' }}>
+          {gt.noScope ? 's/f' : `${gt.duration}d`}
+        </span>
         <span>Holgura</span>
-        <span style={{ color: gt.float > 0 ? C.done : C.critical, fontWeight: 600 }}>
-          {gt.float > 0 ? `${gt.float}d libres` : 'Sin holgura'}
+        <span style={{ color: gt.noScope ? '#6B6B7A' : gt.float > 0 ? C.done : C.critical, fontWeight: 600 }}>
+          {gt.noScope ? '—' : gt.float > 0 ? `${gt.float}d libres` : 'Sin holgura'}
         </span>
         <span>Avance</span>     <span style={{ color: '#C8C8D0' }}>{t.progress}%</span>
         <span>Crítica</span>
@@ -150,28 +187,68 @@ function Arrows({ tasks, deps, dw, rh }: { tasks: GanttTask[]; deps: TaskDepende
 }
 
 // ─── Critical path bar ────────────────────────────────────
-function CritBar({ tasks, origin, col, onToggle }: { tasks: GanttTask[]; origin: Date; col: boolean; onToggle: () => void }) {
+function CritBar({ tasks, deps, origin, projectDue, col, onToggle }: { tasks: GanttTask[]; deps: TaskDependency[]; origin: Date; projectDue?: string; col: boolean; onToggle: () => void }) {
+  const hasDeps = deps.length > 0
   const crits = tasks.filter(t => t.critical)
-  const end   = addDays(origin, Math.max(...tasks.map(t => t.ef), 0))
-  const late  = differenceInCalendarDays(new Date(), end)
-  return (
-    <div style={{ flexShrink: 0, borderBottom: '1px solid #1E1E28', background: '#0E0E13' }}>
-      <div onClick={onToggle} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 16px', cursor: 'pointer', userSelect: 'none' }}>
-        {col ? <ChevronRight size={13} color="#5A5A68" /> : <ChevronDown size={13} color="#5A5A68" />}
-        <span style={{ fontSize: 10.5, fontWeight: 700, color: '#5A5A68', textTransform: 'uppercase', letterSpacing: '.08em' }}>Ruta Crítica</span>
-        <span style={{ background: `${C.critical}20`, color: C.critical, borderRadius: 4, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>
-          {crits.length} tareas
+  const tasksWithScope = tasks.filter(t => !t.noScope && t.originalTask.status !== 'done')
+  const efMax = tasksWithScope.length ? Math.max(...tasksWithScope.map(t => t.ef)) : null
+  const end = efMax !== null
+    ? addDays(origin, efMax)
+    : (projectDue && projectDue !== PLACEHOLDER_DUE && isValid(parseISO(projectDue)) ? parseISO(projectDue) : null)
+  const late = end ? differenceInCalendarDays(new Date(), end) : 0
+
+  // Header content varies by state
+  const headerContent = !hasDeps ? (
+    <>
+      <span style={{ fontSize: 10.5, fontWeight: 700, color: '#5A5A68', textTransform: 'uppercase', letterSpacing: '.08em' }}>Ruta Crítica</span>
+      <span style={{ fontSize: 12, color: '#6B6B7A', fontStyle: 'italic' }}>
+        Agregá dependencias entre tareas para calcularla
+      </span>
+      {end && (
+        <span style={{ fontSize: 12, color: '#8888A0', marginLeft: 'auto' }}>
+          Fin estimado: <strong style={{ color: '#C8C8D0' }}>{format(end, 'd MMM yyyy', { locale: es })}</strong>
         </span>
+      )}
+    </>
+  ) : crits.length === 0 ? (
+    <>
+      <span style={{ fontSize: 10.5, fontWeight: 700, color: '#5A5A68', textTransform: 'uppercase', letterSpacing: '.08em' }}>Ruta Crítica</span>
+      <span style={{ fontSize: 12, color: '#6B6B7A', fontStyle: 'italic' }}>
+        Sin tareas en ruta crítica
+      </span>
+      {end && (
+        <span style={{ fontSize: 12, color: '#8888A0', marginLeft: 'auto' }}>
+          Fin: <strong style={{ color: '#C8C8D0' }}>{format(end, 'd MMM yyyy', { locale: es })}</strong>
+        </span>
+      )}
+    </>
+  ) : (
+    <>
+      <span style={{ fontSize: 10.5, fontWeight: 700, color: '#5A5A68', textTransform: 'uppercase', letterSpacing: '.08em' }}>Ruta Crítica</span>
+      <span style={{ background: `${C.critical}20`, color: C.critical, borderRadius: 4, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>
+        {crits.length} tareas
+      </span>
+      {end && (
         <span style={{ fontSize: 12, color: '#8888A0', marginLeft: 4 }}>
           Fin: <strong style={{ color: '#C8C8D0' }}>{format(end, 'd MMM yyyy', { locale: es })}</strong>
         </span>
-        {late > 0 && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: C.critical }}>
-            <AlertTriangle size={11} /> {late}d retraso
-          </span>
-        )}
+      )}
+      {late > 0 && end && (
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: C.critical }}>
+          <AlertTriangle size={11} /> {late}d retraso
+        </span>
+      )}
+    </>
+  )
+
+  const collapsible = hasDeps && crits.length > 0
+  return (
+    <div style={{ flexShrink: 0, borderBottom: '1px solid #1E1E28', background: '#0E0E13' }}>
+      <div onClick={collapsible ? onToggle : undefined} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 16px', cursor: collapsible ? 'pointer' : 'default', userSelect: 'none' }}>
+        {collapsible && (col ? <ChevronRight size={13} color="#5A5A68" /> : <ChevronDown size={13} color="#5A5A68" />)}
+        {headerContent}
       </div>
-      {!col && crits.length > 0 && (
+      {collapsible && !col && (
         <div style={{ display: 'flex', gap: 4, padding: '0 16px 8px', flexWrap: 'wrap' }}>
           {crits.map((t, i) => (
             <span key={t.id} style={{
@@ -199,13 +276,14 @@ export interface GanttChartProps {
   onTaskCreated?: () => void
 }
 
-export function GanttChart({ tasks, projectId, projectName = '', onTaskCreated }: GanttChartProps) {
+export function GanttChart({ tasks, projectId, projectName = '', projectDue, onTaskCreated }: GanttChartProps) {
   const { openTask } = useAppStore()
   const [dw,     setDw]     = useState<ZoomLevel>(28)
   const [deps,   setDeps]   = useState<TaskDependency[]>([])
   const [selId,  setSelId]  = useState<string | null>(null)
   const [tip,    setTip]    = useState<{ gt: GanttTask; x: number; y: number } | null>(null)
   const [critCol, setCritCol] = useState(false)
+  const [showCompleted, setShowCompleted] = useState(false)
   const [drag,   setDrag]   = useState<{ id: string; startX: number; origDur: number; curDur: number } | null>(null)
   const [localDur, setLocalDur] = useState<Record<string, number>>({})
   // Drag-to-reorder
@@ -221,32 +299,47 @@ export function GanttChart({ tasks, projectId, projectName = '', onTaskCreated }
     fetchTaskDependencies(projectId).then(setDeps).catch(console.error)
   }, [projectId])
 
+  // Filter tasks before plotting:
+  //  • require start_date (no temporal anchor → skip)
+  //  • hide done tasks unless they are "bridges" (have ≥1 pred AND ≥1 succ in deps)
+  //    or showCompleted toggle is on
+  const visibleTasks = useMemo(() => {
+    return tasks.filter(t => {
+      if (!t.start_date) return false
+      if (t.status === 'done' && !showCompleted) {
+        const hasPred = deps.some(d => d.successor_id === t.id)
+        const hasSucc = deps.some(d => d.predecessor_id === t.id)
+        if (!(hasPred && hasSucc)) return false
+      }
+      return true
+    })
+  }, [tasks, deps, showCompleted])
+
   const origin = useMemo(() => {
-    const sd = tasks.filter(t => t.start_date).map(t => parseISO(t.start_date!)).filter(isValid)
+    const sd = visibleTasks.filter(t => t.start_date).map(t => parseISO(t.start_date!)).filter(isValid)
     if (sd.length) return new Date(Math.min(...sd.map(d => d.getTime())))
-    const dd = tasks.map(t => parseISO(t.due)).filter(isValid)
-    return dd.length ? new Date(Math.min(...dd.map(d => d.getTime()))) : new Date()
-  }, [tasks])
+    return new Date()
+  }, [visibleTasks])
 
   const ganttTasks = useMemo(() => {
     const dm = new Map<string, string[]>()
     deps.forEach(d => { dm.set(d.successor_id, [...(dm.get(d.successor_id) ?? []), d.predecessor_id]) })
-    const taskMap = new Map(tasks.map(t => [t.id, t]))
+    const taskMap = new Map(visibleTasks.map(t => [t.id, t]))
     let sorted: Task[]
     if (sortOverride) {
       sorted = sortOverride.map(id => taskMap.get(id)).filter(Boolean) as Task[]
-      // append any tasks not in sortOverride (e.g., newly added)
-      tasks.forEach(t => { if (!sortOverride.includes(t.id)) sorted.push(t) })
+      // append any visible tasks not in sortOverride (e.g., newly added)
+      visibleTasks.forEach(t => { if (!sortOverride.includes(t.id)) sorted.push(t) })
     } else {
-      sorted = tasks.slice().sort((a, b) => a.sort_order - b.sort_order || a.due.localeCompare(b.due))
+      sorted = visibleTasks.slice().sort((a, b) => a.sort_order - b.sort_order || a.due.localeCompare(b.due))
     }
     const gt = sorted.map(t => {
         const g = toGantt(t, dm.get(t.id) ?? [], origin)
         if (localDur[t.id] !== undefined) { g.duration = localDur[t.id]; g.ef = g.es + g.duration }
         return g
       })
-    return calcCPM(gt)
-  }, [tasks, deps, origin, localDur, sortOverride])
+    return calcCPM(gt, deps)
+  }, [visibleTasks, deps, origin, localDur, sortOverride])
 
   const totalDays = useMemo(() => Math.max(...ganttTasks.map(t => t.ef), 60) + 14, [ganttTasks])
   const totalW    = totalDays * dw
@@ -360,6 +453,24 @@ export function GanttChart({ tasks, projectId, projectName = '', onTaskCreated }
     )
   }
 
+  if (!ganttTasks.length) {
+    const hiddenDone = tasks.filter(t => t.status === 'done').length
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, color: '#5A5A68', textAlign: 'center', padding: 24 }}>
+        <div style={{ fontSize: 48 }}>📅</div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: '#C8C8D0' }}>Sin tareas con fechas</div>
+        <div style={{ fontSize: 13, maxWidth: 420 }}>
+          Ninguna tarea tiene fecha de inicio asignada. Definí la fecha de inicio en las tareas para verlas en el Gantt.
+        </div>
+        {hiddenDone > 0 && !showCompleted && (
+          <button className="btn btn-secondary btn-sm" style={{ marginTop: 4 }} onClick={() => setShowCompleted(true)}>
+            <Eye size={13} /> Mostrar {hiddenDone} completada{hiddenDone !== 1 ? 's' : ''}
+          </button>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', overflow: 'hidden', background: '#0A0A0E' }}>
 
@@ -379,6 +490,14 @@ export function GanttChart({ tasks, projectId, projectName = '', onTaskCreated }
           onClick={() => { if (rightRef.current) rightRef.current.scrollLeft = Math.max(0, todayX - 280) }}>
           <Target size={13} /> Hoy
         </button>
+        <button
+          className="btn btn-secondary btn-sm"
+          title={showCompleted ? 'Ocultar tareas completadas' : 'Mostrar tareas completadas'}
+          onClick={() => setShowCompleted(v => !v)}
+        >
+          {showCompleted ? <EyeOff size={13} /> : <Eye size={13} />}
+          {showCompleted ? 'Ocultar completadas' : 'Mostrar completadas'}
+        </button>
 
         {/* Leyenda */}
         <div style={{ display: 'flex', gap: 10, marginLeft: 6 }}>
@@ -388,10 +507,13 @@ export function GanttChart({ tasks, projectId, projectName = '', onTaskCreated }
             { c: C.done,      l: 'Completada',         shape: 'rect' },
             { c: C.float,     l: 'Holgura',            shape: 'rect' },
             { c: C.milestone, l: 'Hito',               shape: 'diamond' },
+            { c: C.noScope,   l: 'Sin fecha fin',       shape: 'dashed' },
           ].map(l => (
             <span key={l.l} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#5A5A68' }}>
               {l.shape === 'diamond'
                 ? <span style={{ width: 9, height: 9, background: l.c, transform: 'rotate(45deg)', display: 'inline-block', borderRadius: 1, flexShrink: 0 }} />
+                : l.shape === 'dashed'
+                ? <span style={{ width: 10, height: 8, borderRadius: 2, border: `1.5px dashed ${l.c}`, background: 'transparent', flexShrink: 0 }} />
                 : <span style={{ width: 10, height: 8, borderRadius: 2, background: l.c, flexShrink: 0 }} />}
               {l.l}
             </span>
@@ -409,7 +531,7 @@ export function GanttChart({ tasks, projectId, projectName = '', onTaskCreated }
       </div>
 
       {/* ── Critical bar ── */}
-      <CritBar tasks={ganttTasks} origin={origin} col={critCol} onToggle={() => setCritCol(v => !v)} />
+      <CritBar tasks={ganttTasks} deps={deps} origin={origin} projectDue={projectDue} col={critCol} onToggle={() => setCritCol(v => !v)} />
 
       {/* ── Body ── */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
@@ -454,8 +576,11 @@ export function GanttChart({ tasks, projectId, projectName = '', onTaskCreated }
                 <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: '#D8D8E0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {gt.originalTask.is_milestone ? '◆ ' : ''}{gt.name}
                 </span>
-                <span style={{ fontSize: 11, color: '#5A5A68', fontFamily: 'JetBrains Mono, monospace', flexShrink: 0 }}>
-                  {gt.originalTask.is_milestone ? '◈' : `${gt.duration}d`}
+                <span
+                  title={gt.noScope ? 'Sin fecha fin definida' : undefined}
+                  style={{ fontSize: 11, color: gt.noScope ? '#F59E0B' : '#5A5A68', fontFamily: 'JetBrains Mono, monospace', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3 }}
+                >
+                  {gt.originalTask.is_milestone ? '◈' : gt.noScope ? <><AlertTriangle size={10} /> s/f</> : `${gt.duration}d`}
                 </span>
               </div>
             ))}
@@ -555,7 +680,7 @@ export function GanttChart({ tasks, projectId, projectName = '', onTaskCreated }
               return (
                 <div key={gt.id} style={{ position: 'absolute', top: HEADER_H + ri * ROW_H, height: ROW_H, left: 0, width: totalW, pointerEvents: 'none' }}>
                   {/* Float bar */}
-                  {gt.float > 0 && !gt.originalTask.is_milestone && (
+                  {gt.float > 0 && !gt.originalTask.is_milestone && !gt.noScope && (
                     <div style={{
                       position: 'absolute', left: x + bw, top: ROW_H / 2 - 6, width: fw, height: 12, borderRadius: 3,
                       background: `${C.float}25`, border: `1.5px dashed ${C.float}70`, pointerEvents: 'none',
@@ -579,8 +704,9 @@ export function GanttChart({ tasks, projectId, projectName = '', onTaskCreated }
                     <div style={{
                       position: 'absolute', left: x, top: 7, height: ROW_H - 14, width: bw,
                       borderRadius: 5, overflow: 'hidden', display: 'flex', alignItems: 'center',
-                      background: gt.originalTask.status === 'done' ? `${c}CC` : `${c}22`,
-                      border: `1.5px solid ${c}`,
+                      background: gt.noScope ? 'transparent' : gt.originalTask.status === 'done' ? `${c}CC` : `${c}22`,
+                      border: gt.noScope ? `1.5px dashed ${C.noScope}` : `1.5px solid ${c}`,
+                      opacity: gt.noScope ? 0.75 : 1,
                       pointerEvents: 'all', cursor: dragging ? 'col-resize' : 'pointer',
                       boxShadow: selected ? `0 0 0 2px ${c}80, 0 4px 12px ${c}30` : dragging ? `0 0 0 2px ${c}50` : 'none',
                       transition: 'box-shadow .1s',
