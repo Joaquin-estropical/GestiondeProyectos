@@ -140,19 +140,21 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                   ? { justifyContent: 'center', padding: '9px 0', margin: '2px 6px' }
                   : { paddingRight: 4, cursor: 'pointer' }}
                 title={a.name}
-                onClick={() => !c && toggle(a.id)}
+                onClick={() => !c && goTo(areaPath)}
               >
                 {!c && (
-                  <span style={{ display: 'inline-flex', padding: '2px 2px 2px 0' }}>
+                  <span
+                    style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 4, flexShrink: 0, color: 'var(--text-3)' }}
+                    onClick={(e) => { e.stopPropagation(); toggle(a.id) }}
+                  >
                     {isOpen
-                      ? <ChevronDown size={12} color="var(--text-3)" />
-                      : <ChevronRight size={12} color="var(--text-3)" />}
+                      ? <ChevronDown size={15} />
+                      : <ChevronRight size={15} />}
                   </span>
                 )}
                 <span
                   className="sb-area-dot"
                   style={{ background: a.color, width: c ? 10 : 8, height: c ? 10 : 8, borderRadius: c ? 3 : 2 }}
-                  onClick={(e) => { e.stopPropagation(); goTo(areaPath) }}
                 />
                 {!c && (
                   <span style={{ flex: 1 }}>{a.name}</span>
@@ -182,16 +184,18 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                           className={`sb-item${isActive(subPath) ? ' active' : ''}`}
                           style={{ paddingRight: 4, cursor: 'pointer' }}
                           title={sa.name}
-                          onClick={() => toggleSub(sa.id)}
+                          onClick={() => goTo(subPath)}
                         >
-                          <span style={{ display: 'inline-flex', padding: '2px 2px 2px 0' }}>
+                          <span
+                            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 4, flexShrink: 0, color: 'var(--text-3)' }}
+                            onClick={(e) => { e.stopPropagation(); toggleSub(sa.id) }}
+                          >
                             {subOpen
-                              ? <ChevronDown size={11} color="var(--text-3)" />
-                              : <ChevronRight size={11} color="var(--text-3)" />}
+                              ? <ChevronDown size={13} />
+                              : <ChevronRight size={13} />}
                           </span>
                           <span
                             style={{ width: 6, height: 6, borderRadius: 1, background: sa.color, flexShrink: 0 }}
-                            onClick={(e) => { e.stopPropagation(); goTo(subPath) }}
                           />
                           <span style={{ flex: 1, fontSize: 12.5 }}>{sa.name}</span>
                           <span
