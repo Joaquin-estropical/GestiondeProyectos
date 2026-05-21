@@ -116,9 +116,8 @@ function ProjectHeader({ project, tasks, onNewTask }: { project: NonNullable<Ret
         <ProjectActionsMenu projectId={project.id} projectName={project.name} />
       </div>
       <div className="row gap-16 items-center mt-12 f-xs text-2">
-        <span><Calendar size={12} /> Entrega {fmtDate(project.due)}</span>
-        <span><List size={12} /> {project.count} tareas</span>
-        <span><CheckSquare size={12} /> {project.progress}% completado</span>
+        <span><List size={12} /> {tasks.length} tareas</span>
+        <span><CheckSquare size={12} /> {tasks.filter(t => t.status === 'done').length}/{tasks.length} completadas</span>
       </div>
     </div>
   );
