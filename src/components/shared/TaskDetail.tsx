@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link2, X, Plus, Check, ChevronRight, GitMerge, AlertCircle, User, AlertTriangle } from 'lucide-react';
 import { useAppStore } from '@/stores/app';
-import { getProject, fmtDate } from '@/lib/mock-data';
+import { getProject, fmtDate, STATUS_LABELS, STATUS_ORDER, PRIORITY_LABELS } from '@/lib/mock-data';
 import { updateTask, createTaskDependency, deleteTaskDependency, fetchTaskDependencies, createTaskEvent } from '@/lib/db';
 import { useMembers } from '@/hooks/useSupabase';
 import { Avatar } from '@/components/shared/Avatar';
@@ -360,6 +360,42 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
           {/* FIELDS GRID */}
           <div style={{ padding: '18px 20px 0' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', rowGap: 14, alignItems: 'start' }}>
+
+              {/* Estado */}
+              <FieldLabel>Estado</FieldLabel>
+              <select
+                value={t.status}
+                onChange={e => save({ status: e.target.value })}
+                style={{
+                  background: 'var(--surface-2)', border: '1px solid var(--border)',
+                  borderRadius: 6, padding: '6px 10px', fontSize: 13, color: 'var(--text-1)',
+                  outline: 'none', cursor: 'pointer', width: '100%', boxSizing: 'border-box',
+                }}
+                onFocus={e => (e.currentTarget.style.borderColor = 'var(--teal)')}
+                onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+              >
+                {STATUS_ORDER.map(s => (
+                  <option key={s} value={s}>{STATUS_LABELS[s] ?? s}</option>
+                ))}
+              </select>
+
+              {/* Prioridad */}
+              <FieldLabel>Prioridad</FieldLabel>
+              <select
+                value={t.priority}
+                onChange={e => save({ priority: e.target.value })}
+                style={{
+                  background: 'var(--surface-2)', border: '1px solid var(--border)',
+                  borderRadius: 6, padding: '6px 10px', fontSize: 13, color: 'var(--text-1)',
+                  outline: 'none', cursor: 'pointer', width: '100%', boxSizing: 'border-box',
+                }}
+                onFocus={e => (e.currentTarget.style.borderColor = 'var(--teal)')}
+                onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+              >
+                {Object.entries(PRIORITY_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
 
               {/* Área (read-only) */}
               {area && (
