@@ -26,8 +26,9 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const navigate   = useNavigate()
   const location   = useLocation()
-  const { areas, projects, openNewArea, openNewProject, currentUser, mobileOpen, setMobileOpen, accessibleAreaIds, resetSession } = useAppStore()
-  const [expanded, setExpanded]         = useState<Record<string, boolean>>({})
+  const { areas, subareas, projects, openNewArea, openNewSubArea, openNewProject, currentUser, mobileOpen, setMobileOpen, accessibleAreaIds, resetSession } = useAppStore()
+  const [expanded,    setExpanded]    = useState<Record<string, boolean>>({})  // area ids
+  const [subExpanded, setSubExpanded] = useState<Record<string, boolean>>({})  // subarea ids
   const [showUserMenu, setShowUserMenu] = useState(false)
 
   // Detect tablet breakpoint reactively
@@ -55,6 +56,8 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
 
   const toggle = (id: string) =>
     setExpanded((s) => ({ ...s, [id]: !s[id] }))
+  const toggleSub = (id: string) =>
+    setSubExpanded((s) => ({ ...s, [id]: !s[id] }))
 
   const goTo = (path: string) => {
     navigate(path)
@@ -124,6 +127,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         {!c && <div className="sb-section">Áreas</div>}
 
         {areas.filter(a => currentUser.is_admin || !accessibleAreaIds || accessibleAreaIds.has(a.id)).map((a) => {
+          const areaSubAreas = subareas.filter(sa => sa.area === a.id)
           const areaProjects = projects.filter((p) => p.area === a.id)
           const isOpen  = expanded[a.id] ?? false
           const areaPath = `/area/${a.id}`
@@ -159,8 +163,8 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                   <span
                     className="btn btn-ghost btn-icon"
                     style={{ width: 18, height: 18, flexShrink: 0, opacity: 0.4 }}
-                    title={`Nuevo proyecto en ${a.name}`}
-                    onClick={(e) => { e.stopPropagation(); openNewProject(a.id) }}
+                    title={`Nueva sub-área en ${a.name}`}
+                    onClick={(e) => { e.stopPropagation(); openNewSubArea(a.id) }}
                   >
                     <Plus size={11} />
                   </span>
@@ -170,19 +174,70 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
 
               {!c && isOpen && (
                 <div className="sb-sub">
-                  {areaProjects.map((p) => {
-                    const projPath = `/proyecto/${p.id}`
+                  {areaSubAreas.map((sa) => {
+                    const subPath  = `/area/${a.id}/sub/${sa.id}`
+                    const subProjs = projects.filter(p => p.subarea === sa.id)
+                    const subOpen  = subExpanded[sa.id] ?? false
                     return (
-                      <div
-                        key={p.id}
-                        className={`sb-item${isActive(projPath) ? ' active' : ''}`}
-                        onClick={() => goTo(projPath)}
-                      >
-                        <span style={{ width: 6, height: 6, borderRadius: 1, background: a.color, flexShrink: 0 }} />
-                        <span>{p.name}</span>
+                      <div key={sa.id}>
+                        <div
+                          className={`sb-item${isActive(subPath) ? ' active' : ''}`}
+                          style={{ paddingRight: 4 }}
+                          title={sa.name}
+                        >
+                          <span
+                            style={{ display: 'inline-flex', cursor: 'pointer', padding: '2px 2px 2px 0' }}
+                            onClick={(e) => { e.stopPropagation(); toggleSub(sa.id) }}
+                          >
+                            {subOpen
+                              ? <ChevronDown size={11} color="var(--text-3)" />
+                              : <ChevronRight size={11} color="var(--text-3)" />}
+                          </span>
+                          <span
+                            style={{ width: 6, height: 6, borderRadius: 1, background: sa.color, flexShrink: 0 }}
+                            onClick={() => goTo(subPath)}
+                          />
+                          <span style={{ flex: 1, cursor: 'pointer', fontSize: 12.5 }} onClick={() => goTo(subPath)}>{sa.name}</span>
+                          <span
+                            className="btn btn-ghost btn-icon"
+                            style={{ width: 16, height: 16, flexShrink: 0, opacity: 0.4 }}
+                            title={`Nuevo proyecto en ${sa.name}`}
+                            onClick={(e) => { e.stopPropagation(); openNewProject(a.id, sa.id) }}
+                          >
+                            <Plus size={10} />
+                          </span>
+                          <span className="sb-count">{subProjs.length}</span>
+                        </div>
+                        {subOpen && (
+                          <div className="sb-sub" style={{ paddingLeft: 14 }}>
+                            {subProjs.map((p) => {
+                              const projPath = `/proyecto/${p.id}`
+                              return (
+                                <div
+                                  key={p.id}
+                                  className={`sb-item${isActive(projPath) ? ' active' : ''}`}
+                                  onClick={() => goTo(projPath)}
+                                >
+                                  <span style={{ width: 5, height: 5, borderRadius: 1, background: sa.color, flexShrink: 0, opacity: 0.8 }} />
+                                  <span>{p.name}</span>
+                                </div>
+                              )
+                            })}
+                            {subProjs.length === 0 && (
+                              <div style={{ padding: '4px 0 4px 18px', fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>
+                                Sin proyectos
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )
                   })}
+                  {areaSubAreas.length === 0 && (
+                    <div style={{ padding: '6px 0 6px 12px', fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>
+                      Sin sub-áreas. Hacé clic en "+" para crear una.
+                    </div>
+                  )}
                 </div>
               )}
             </div>

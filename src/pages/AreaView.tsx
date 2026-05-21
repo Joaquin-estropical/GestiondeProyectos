@@ -1,17 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Folder, ListTodo, Percent, Users, UserPlus, Plus, Pencil, MoreHorizontal, Pen, Trash2 } from 'lucide-react';
-import { useAreas, useProjects, useTasks } from '@/hooks/useSupabase';
+import { Folder, ListTodo, Percent, Users, UserPlus, Plus, Pencil, MoreHorizontal, Pen, Trash2, Layers } from 'lucide-react';
+import { useAreas, useSubAreas, useProjects, useTasks } from '@/hooks/useSupabase';
 import { getMember, fmtDate, dueColor } from '@/lib/mock-data';
 import { Avatar } from '@/components/shared/Avatar';
 import { StatusPill, PriorityPill } from '@/components/shared/Badges';
 import { PageHead } from '@/components/shared/PageHead';
 import { useAppStore } from '@/stores/app';
+import { deleteSubArea } from '@/lib/db';
 
 // ── Dropdown menu for project cards ──
 function ProjectMenu({ projectId, projectName, onEdit }: { projectId: string; projectName: string; onEdit: () => void }) {
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const { removeProject, refreshAll } = useAppStore();
   const navigate = useNavigate();
   const open = pos !== null;
@@ -19,7 +21,10 @@ function ProjectMenu({ projectId, projectName, onEdit }: { projectId: string; pr
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (btnRef.current && !btnRef.current.contains(e.target as Node)) setPos(null);
+      const target = e.target as Node;
+      const insideBtn  = btnRef.current?.contains(target);
+      const insideMenu = menuRef.current?.contains(target);
+      if (!insideBtn && !insideMenu) setPos(null);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -41,7 +46,7 @@ function ProjectMenu({ projectId, projectName, onEdit }: { projectId: string; pr
       await deleteProject(projectId);
       removeProject(projectId);
       await refreshAll();
-      navigate(window.location.pathname); // stay on area page
+      navigate(window.location.pathname);
     } catch (err) {
       alert('Error al eliminar: ' + (err instanceof Error ? err.message : String(err)));
     }
@@ -69,7 +74,7 @@ function ProjectMenu({ projectId, projectName, onEdit }: { projectId: string; pr
         <MoreHorizontal size={14} />
       </button>
       {open && pos && (
-        <div style={{
+        <div ref={menuRef} style={{
           position: 'fixed', top: pos.top, right: pos.right, zIndex: 9000,
           background: 'var(--surface-1)', border: '1px solid var(--border)',
           borderRadius: 8, padding: '4px 0', minWidth: 180,
@@ -84,39 +89,198 @@ function ProjectMenu({ projectId, projectName, onEdit }: { projectId: string; pr
   );
 }
 
+// ── Dropdown menu for subarea cards ──
+function SubAreaMenu({ subareaId, subareaName }: { subareaId: string; subareaName: string }) {
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const { openNewSubArea, removeSubArea, refreshAll } = useAppStore();
+  const open = pos !== null;
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (!btnRef.current?.contains(t) && !menuRef.current?.contains(t)) setPos(null);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const toggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (open) { setPos(null); return; }
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+  };
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPos(null);
+    if (!confirm(`¿Eliminar la sub-área "${subareaName}" y sus proyectos y tareas? Esta acción no se puede deshacer.`)) return;
+    try {
+      await deleteSubArea(subareaId);
+      removeSubArea(subareaId);
+      await refreshAll();
+    } catch (err) {
+      alert('Error: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
+  return (
+    <>
+      <button ref={btnRef} className="btn btn-ghost btn-sm btn-icon" style={{ width: 26, height: 26, opacity: 0.7 }} onClick={toggle}>
+        <MoreHorizontal size={14} />
+      </button>
+      {open && pos && (
+        <div ref={menuRef} style={{
+          position: 'fixed', top: pos.top, right: pos.right, zIndex: 9000,
+          background: 'var(--surface-1)', border: '1px solid var(--border)',
+          borderRadius: 8, padding: '4px 0', minWidth: 180,
+          boxShadow: '0 8px 24px rgba(0,0,0,.5)',
+        }}>
+          <button
+            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: 'var(--text-1)', fontSize: 13, cursor: 'pointer', textAlign: 'left' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+            onClick={() => { setPos(null); openNewSubArea(undefined, subareaId); }}
+          >
+            <Pen size={13} color="var(--text-2)" /> Renombrar / editar
+          </button>
+          <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+          <button
+            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: 'var(--red)', fontSize: 13, cursor: 'pointer', textAlign: 'left' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+            onClick={handleDelete}
+          >
+            <Trash2 size={13} color="var(--red)" /> Eliminar sub-área
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function AreaView() {
-  const { areaId } = useParams<{ areaId: string }>();
+  const { areaId, subareaId } = useParams<{ areaId: string; subareaId?: string }>();
   const navigate   = useNavigate();
-  const { openTask, openNewProject, openNewArea, openEditProject } = useAppStore();
+  const { openTask, openNewProject, openNewSubArea, openNewArea, openEditProject } = useAppStore();
 
   const id = areaId ?? '';
 
   const { data: areas    = [], loading } = useAreas();
-  const { data: projects = [] }          = useProjects(id);
+  const { data: subareas = [] }          = useSubAreas(id);
+  const { data: allProjects = [] }       = useProjects(id);
   const { data: tasks    = [] }          = useTasks({ areaId: id });
 
   const a = areas.find(x => x.id === id);
+  const sa = subareaId ? subareas.find(x => x.id === subareaId) : null;
+
+  // Filter projects by sub-area when viewing a sub-area
+  const projects = subareaId ? allProjects.filter(p => p.subarea === subareaId) : allProjects;
+
+  // For sub-area view, also filter tasks
+  const filteredTasks = subareaId
+    ? tasks.filter(t => projects.some(p => p.id === t.project))
+    : tasks;
 
   if (loading) return <div className="page-body" style={{ color: 'var(--text-3)', fontSize: 13 }}>Cargando área...</div>;
   if (!a) return <div className="page-body">Área no encontrada.</div>;
+  if (subareaId && !sa) return <div className="page-body">Sub-área no encontrada.</div>;
 
-  const open     = tasks.filter(t => t.status !== 'done').length;
-  const done     = tasks.filter(t => t.status === 'done').length;
-  const pct      = Math.round(done / Math.max(tasks.length, 1) * 100);
-  const critical = tasks
+  const open     = filteredTasks.filter(t => t.status !== 'done').length;
+  const done     = filteredTasks.filter(t => t.status === 'done').length;
+  const pct      = Math.round(done / Math.max(filteredTasks.length, 1) * 100);
+  const critical = filteredTasks
     .filter(t => t.priority === 'urg' || (t.status !== 'done' && new Date(t.due) <= new Date('2026-03-11')))
     .slice(0, 5);
 
+  // ─── Mode: AREA (list of sub-areas) ───────────────────────
+  if (!subareaId) {
+    return (
+      <>
+        <PageHead
+          title={a.name}
+          subtitle={`${subareas.length} sub-áreas · ${allProjects.length} proyectos · ${open} tareas abiertas`}
+          right={
+            <div className="row gap-8">
+              <button className="btn btn-ghost btn-md" onClick={() => openNewArea(a.id)}><Pencil size={14} /> <span className="hide-mob">Editar</span></button>
+              <button className="btn btn-secondary btn-md hide-mob"><UserPlus size={14} /> Invitar</button>
+              <button className="btn btn-primary btn-md" onClick={() => openNewSubArea(a.id)}><Plus size={14} /> <span className="hide-mob">Nueva sub-área</span></button>
+            </div>
+          }
+        />
+        <div className="page-body">
+          <div className="grid mb-24" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 12 }}>
+            <div className="card kpi">
+              <div className="lbl"><Layers size={13} /> Sub-áreas</div>
+              <div className="val">{subareas.length}</div>
+            </div>
+            <div className="card kpi">
+              <div className="lbl"><Folder size={13} /> Proyectos</div>
+              <div className="val">{allProjects.length}</div>
+            </div>
+            <div className="card kpi">
+              <div className="lbl"><ListTodo size={13} /> Tareas abiertas</div>
+              <div className="val">{open}</div>
+            </div>
+            <div className="card kpi">
+              <div className="lbl"><Percent size={13} /> Completado</div>
+              <div className="val">{pct}%</div>
+            </div>
+          </div>
+
+          <div className="section-title">Sub-áreas</div>
+          <div className="grid mb-24" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 12 }}>
+            {subareas.map(s => {
+              const subProjs = allProjects.filter(p => p.subarea === s.id);
+              const subTasks = tasks.filter(t => subProjs.some(p => p.id === t.project));
+              const subOpen  = subTasks.filter(t => t.status !== 'done').length;
+              return (
+                <div
+                  key={s.id}
+                  className="card"
+                  style={{ cursor: 'pointer', borderLeft: `3px solid ${s.color}` }}
+                  onClick={() => navigate(`/area/${a.id}/sub/${s.id}`)}
+                >
+                  <div className="card-pad">
+                    <div className="row between items-center">
+                      <span className="fw-6" style={{ fontSize: 14, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 8 }}>
+                        {s.name}
+                      </span>
+                      <SubAreaMenu subareaId={s.id} subareaName={s.name} />
+                    </div>
+                    <div className="text-2 f-xs mt-4">{subProjs.length} proyectos · {subOpen} tareas abiertas</div>
+                    {s.description && (
+                      <div className="text-3 f-xs mt-8" style={{ lineHeight: 1.4 }}>{s.description}</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {subareas.length === 0 && (
+              <div style={{ gridColumn: '1 / -1', padding: '32px 18px', textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>
+                Esta área no tiene sub-áreas todavía. Hacé clic en "Nueva sub-área" para crear una.
+              </div>
+            )}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ─── Mode: SUBAREA (list of projects) ─────────────────────
   return (
     <>
       <PageHead
-        title={a.name}
-        subtitle={`${projects.length} proyectos activos · ${open} tareas abiertas`}
+        title={sa!.name}
+        subtitle={`${a.name} · ${projects.length} proyectos · ${open} tareas abiertas`}
         right={
           <div className="row gap-8">
-            <button className="btn btn-ghost btn-md" onClick={() => openNewArea(a.id)}><Pencil size={14} /> <span className="hide-mob">Editar</span></button>
+            <button className="btn btn-ghost btn-md" onClick={() => navigate(`/area/${a.id}`)}>← <span className="hide-mob">{a.name}</span></button>
             <button className="btn btn-secondary btn-md hide-mob"><UserPlus size={14} /> Invitar</button>
-            <button className="btn btn-primary btn-md" onClick={() => openNewProject(a.id)}><Plus size={14} /> <span className="hide-mob">Nuevo proyecto</span></button>
+            <button className="btn btn-primary btn-md" onClick={() => openNewProject(a.id, sa!.id)}><Plus size={14} /> <span className="hide-mob">Nuevo proyecto</span></button>
           </div>
         }
       />
@@ -157,11 +321,16 @@ export default function AreaView() {
                 </div>
                 <div className="text-2 f-xs mt-4">Entrega {fmtDate(p.due)} · {p.count} tareas</div>
                 <div className="progress mt-16">
-                  <div style={{ width: p.progress + '%', background: a.color }}></div>
+                  <div style={{ width: p.progress + '%', background: sa!.color }}></div>
                 </div>
               </div>
             </div>
           ))}
+          {projects.length === 0 && (
+            <div style={{ gridColumn: '1 / -1', padding: '24px 18px', textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>
+              Sin proyectos en esta sub-área. Hacé clic en "Nuevo proyecto" para crear uno.
+            </div>
+          )}
         </div>
 
         <div className="section-title">Tareas críticas</div>

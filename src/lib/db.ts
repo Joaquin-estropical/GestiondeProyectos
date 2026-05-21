@@ -1,5 +1,5 @@
 import { supabase, supabaseWriter } from './supabase'
-import type { Area, Member, Project, Task, Template, TemplateTask, Subtask, Comment, TaskDependency, DependencyType, AreaType, TaskPriority, TaskStatus, TaskEvent, TaskEventType } from '@/types'
+import type { Area, SubArea, SubAreaType, Member, Project, Task, Template, TemplateTask, Subtask, Comment, TaskDependency, DependencyType, AreaType, TaskPriority, TaskStatus, TaskEvent, TaskEventType } from '@/types'
 
 // ── helpers ───────────────────────────────────────────────
 function normaliseTask(row: Record<string, unknown>): Task {
@@ -61,6 +61,54 @@ export async function deleteArea(id: string): Promise<void> {
 }
 
 // ═══════════════════════════════════════════════════════════
+// SUBAREAS
+// ═══════════════════════════════════════════════════════════
+export async function fetchSubAreas(areaId?: string): Promise<SubArea[]> {
+  let q = supabase.from('subareas').select('*').order('name')
+  if (areaId) q = q.eq('area', areaId)
+  const { data, error } = await q
+  if (error) throw error
+  return data as SubArea[]
+}
+
+export async function createSubArea(input: {
+  name: string; area: string; color: string; icon: string; type?: SubAreaType; description?: string
+}): Promise<SubArea> {
+  const baseSlug = input.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+  const slug = `sub-${input.area}-${baseSlug}-${Date.now().toString(36)}`
+  const id   = slug
+  const { data, error } = await supabaseWriter
+    .from('subareas')
+    .insert({
+      id, slug,
+      name:        input.name,
+      area:        input.area,
+      color:       input.color,
+      icon:        input.icon,
+      type:        input.type ?? 'general',
+      description: input.description ?? null,
+    })
+    .select()
+    .single()
+  if (error) throw new Error(`${error.message} | code:${error.code} | details:${error.details} | hint:${error.hint}`)
+  return data as SubArea
+}
+
+export async function updateSubArea(
+  id: string,
+  patch: Partial<Pick<SubArea, 'name' | 'color' | 'icon' | 'description' | 'type'>>
+): Promise<SubArea> {
+  const { data, error } = await supabaseWriter.from('subareas').update(patch).eq('id', id).select().single()
+  if (error) throw error
+  return data as SubArea
+}
+
+export async function deleteSubArea(id: string): Promise<void> {
+  const { error } = await supabaseWriter.from('subareas').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ═══════════════════════════════════════════════════════════
 // MEMBERS
 // ═══════════════════════════════════════════════════════════
 export async function fetchMembers(): Promise<Member[]> {
@@ -72,21 +120,30 @@ export async function fetchMembers(): Promise<Member[]> {
 // ═══════════════════════════════════════════════════════════
 // PROJECTS
 // ═══════════════════════════════════════════════════════════
-export async function fetchProjects(areaId?: string): Promise<Project[]> {
+export async function fetchProjects(areaId?: string, subareaId?: string): Promise<Project[]> {
   let q = supabase.from('projects').select('*').order('name')
-  if (areaId) q = q.eq('area', areaId)
+  if (areaId)    q = q.eq('area', areaId)
+  if (subareaId) q = q.eq('subarea', subareaId)
   const { data, error } = await q
   if (error) throw error
   return data as Project[]
 }
 
 export async function createProject(input: {
-  name: string; area: string; due?: string; templateId?: string; assignee?: string
+  name: string; area: string; subarea: string; due?: string; templateId?: string; assignee?: string
 }): Promise<Project> {
   const id = 'p-' + Date.now().toString(36)
   const { data, error } = await supabaseWriter
     .from('projects')
-    .insert({ id, name: input.name, area: input.area, due: input.due || '2099-12-31', progress: 0, count: 0 })
+    .insert({
+      id,
+      name:     input.name,
+      area:     input.area,
+      subarea:  input.subarea,
+      due:      input.due || '2099-12-31',
+      progress: 0,
+      count:    0,
+    })
     .select()
     .single()
   if (error) throw new Error(`${error.message} | code:${error.code} | hint:${error.hint ?? ''} | details:${error.details ?? ''}`)

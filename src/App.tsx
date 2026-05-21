@@ -6,6 +6,7 @@ import { AppShell }        from '@/components/layout/AppShell'
 import { TaskDetail }      from '@/components/shared/TaskDetail'
 import { CmdK }            from '@/components/shared/CmdK'
 import { NewAreaModal }     from '@/components/modals/NewAreaModal'
+import { NewSubAreaModal }  from '@/components/modals/NewSubAreaModal'
 import { NewProjectModal }  from '@/components/modals/NewProjectModal'
 import { EditProjectModal } from '@/components/modals/EditProjectModal'
 import { NewTaskModal }     from '@/components/modals/NewTaskModal'
@@ -38,7 +39,7 @@ function AppRoutes() {
     taskDetailId, closeTask,
     cmdkOpen, setCmdK,
     showLanding,
-    loadTasks, loadAreas, loadProjects,
+    loadTasks, loadAreas, loadSubAreas, loadProjects,
     setCurrentUser, resetSession, setAccessibleAreaIds,
   } = useAppStore()
 
@@ -93,9 +94,10 @@ function AppRoutes() {
   useEffect(() => {
     if (!user) return
     loadAreas()
+    loadSubAreas()
     loadProjects()
     loadTasks()
-  }, [user, loadAreas, loadProjects, loadTasks])
+  }, [user, loadAreas, loadSubAreas, loadProjects, loadTasks])
 
   // Global keyboard shortcut
   useEffect(() => {
@@ -139,6 +141,7 @@ function AppRoutes() {
           <Route path="/configuracion" element={<SettingsPage />} />
           <Route path="/empty-states"  element={<EmptyStates />}  />
           <Route path="/area/:areaId"  element={<AreaView />}     />
+          <Route path="/area/:areaId/sub/:subareaId" element={<AreaView />} />
           <Route path="/tareas"        element={<TasksListPage />} />
           <Route path="/proyecto/:projectId" element={<ProjectPage />} />
           <Route path="/planillas"                          element={<PlanillasPage />}       />
@@ -154,6 +157,7 @@ function AppRoutes() {
       {taskDetailId && <TaskDetail taskId={taskDetailId} onClose={closeTask} />}
       {cmdkOpen     && <CmdK onClose={() => setCmdK(false)} />}
       <NewAreaModal />
+      <NewSubAreaModal />
       <NewProjectModal />
       <EditProjectModal />
       <NewTaskModal />

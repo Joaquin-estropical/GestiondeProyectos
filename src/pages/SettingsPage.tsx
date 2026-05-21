@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, UserPlus, MoreHorizontal, Pencil, Trash2, X, Check, ChevronRight, ChevronDown, Layers, Shield, LogOut } from 'lucide-react';
 import { useTemplates, useTemplateTasks, useMembers } from '@/hooks/useSupabase';
-import { deleteArea, deleteTemplate, createTemplate, createTemplateTask, deleteTemplateTask } from '@/lib/db';
+import { deleteArea, deleteSubArea, deleteTemplate, createTemplate, createTemplateTask, deleteTemplateTask } from '@/lib/db';
 import { useAppStore } from '@/stores/app';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { signOut } from '@/lib/auth';
@@ -15,8 +15,12 @@ const AREA_TYPE_LABELS: Record<AreaType, string> = {
 
 // ── Tab: Áreas ───────────────────────────────────────────
 function AreasTab() {
-  const { areas, projects, tasks, openNewArea, refreshAll } = useAppStore();
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const { areas, subareas, projects, tasks, openNewArea, openNewSubArea, refreshAll } = useAppStore();
+  const [confirmDelete,    setConfirmDelete]    = useState<string | null>(null);
+  const [confirmDelSub,    setConfirmDelSub]    = useState<string | null>(null);
+  const [expanded,         setExpanded]         = useState<Record<string, boolean>>({});
+
+  const toggle = (id: string) => setExpanded(s => ({ ...s, [id]: !s[id] }));
 
   const handleDelete = async (id: string) => {
     await deleteArea(id);
@@ -24,12 +28,18 @@ function AreasTab() {
     setConfirmDelete(null);
   };
 
+  const handleDeleteSub = async (id: string) => {
+    await deleteSubArea(id);
+    await refreshAll();
+    setConfirmDelSub(null);
+  };
+
   return (
     <>
       <div className="row between items-center mb-16">
         <div>
           <div className="fw-6">Áreas del workspace</div>
-          <div className="f-xs text-2 mt-4">Cada área tiene un tipo, color único y agrupa sus proyectos.</div>
+          <div className="f-xs text-2 mt-4">Cada área agrupa sub-áreas, y cada sub-área agrupa sus proyectos.</div>
         </div>
         <button className="btn btn-primary btn-sm" onClick={() => openNewArea()}>
           <Plus size={14} /> Nueva área
@@ -37,30 +47,86 @@ function AreasTab() {
       </div>
       <div className="card">
         {areas.map((a, i) => {
+          const aSubAreas = subareas.filter(sa => sa.area === a.id);
           const aProjects = projects.filter(p => p.area === a.id);
           const aTasks    = tasks.filter(t => t.area === a.id);
+          const isOpen    = expanded[a.id] ?? false;
           return (
-            <div key={a.id} style={{ padding: '14px 18px', borderBottom: i < areas.length - 1 ? '1px solid var(--border)' : '', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ width: 12, height: 12, borderRadius: 999, background: a.color, flexShrink: 0 }} />
-              <div style={{ flex: 1 }}>
-                <div className="fw-5" style={{ fontSize: 14 }}>{a.name}</div>
-                <div className="f-xs text-2 mt-2">
-                  {AREA_TYPE_LABELS[a.type]} · {aProjects.length} proyectos · {aTasks.filter(t => t.status !== 'done').length} tareas abiertas
+            <div key={a.id} style={{ borderBottom: i < areas.length - 1 ? '1px solid var(--border)' : '' }}>
+              {/* Area row */}
+              <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span
+                  style={{ display: 'inline-flex', cursor: 'pointer', padding: '2px', color: 'var(--text-3)' }}
+                  onClick={() => toggle(a.id)}
+                >
+                  {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </span>
+                <span style={{ width: 12, height: 12, borderRadius: 999, background: a.color, flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div className="fw-5" style={{ fontSize: 14 }}>{a.name}</div>
+                  <div className="f-xs text-2 mt-2">
+                    {AREA_TYPE_LABELS[a.type]} · {aSubAreas.length} sub-áreas · {aProjects.length} proyectos · {aTasks.filter(t => t.status !== 'done').length} tareas abiertas
+                  </div>
+                </div>
+                <div className="row gap-6 items-center">
+                  <button className="btn btn-secondary btn-sm" onClick={() => openNewSubArea(a.id)} style={{ gap: 4 }}>
+                    <Plus size={12} /> Sub-área
+                  </button>
+                  <button className="btn btn-ghost btn-sm btn-icon" onClick={() => openNewArea(a.id)}><Pencil size={13} /></button>
+                  {confirmDelete === a.id ? (
+                    <div className="row gap-6">
+                      <button className="btn btn-destructive btn-sm" onClick={() => handleDelete(a.id)}>Confirmar</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDelete(null)}>Cancelar</button>
+                    </div>
+                  ) : (
+                    <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setConfirmDelete(a.id)} title="Eliminar área">
+                      <Trash2 size={13} color="var(--red)" />
+                    </button>
+                  )}
                 </div>
               </div>
-              <div className="row gap-6 items-center">
-                <button className="btn btn-ghost btn-sm btn-icon" onClick={() => openNewArea(a.id)}><Pencil size={13} /></button>
-                {confirmDelete === a.id ? (
-                  <div className="row gap-6">
-                    <button className="btn btn-destructive btn-sm" onClick={() => handleDelete(a.id)}>Confirmar</button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDelete(null)}>Cancelar</button>
-                  </div>
-                ) : (
-                  <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setConfirmDelete(a.id)} title="Eliminar área">
-                    <Trash2 size={13} color="var(--red)" />
-                  </button>
-                )}
-              </div>
+
+              {/* Sub-areas expanded */}
+              {isOpen && (
+                <div style={{ padding: '0 18px 12px 50px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {aSubAreas.map(sa => {
+                    const saProjects = projects.filter(p => p.subarea === sa.id);
+                    return (
+                      <div
+                        key={sa.id}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '8px 12px', borderRadius: 6,
+                          background: 'var(--surface-1)', border: '1px solid var(--border)',
+                          borderLeft: `3px solid ${sa.color}`,
+                        }}
+                      >
+                        <span style={{ width: 8, height: 8, borderRadius: 999, background: sa.color, flexShrink: 0 }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 500 }}>{sa.name}</div>
+                          <div className="f-xs text-3" style={{ marginTop: 1 }}>{saProjects.length} proyectos</div>
+                        </div>
+                        <button className="btn btn-ghost btn-sm btn-icon" onClick={() => openNewSubArea(undefined, sa.id)}><Pencil size={12} /></button>
+                        {confirmDelSub === sa.id ? (
+                          <div className="row gap-6">
+                            <button className="btn btn-destructive btn-sm" onClick={() => handleDeleteSub(sa.id)}>Confirmar</button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDelSub(null)}>Cancelar</button>
+                          </div>
+                        ) : (
+                          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setConfirmDelSub(sa.id)} title="Eliminar sub-área">
+                            <Trash2 size={12} color="var(--red)" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {aSubAreas.length === 0 && (
+                    <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic' }}>
+                      Esta área no tiene sub-áreas. Hacé clic en "+ Sub-área" para crear una.
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}

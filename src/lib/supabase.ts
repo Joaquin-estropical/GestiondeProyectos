@@ -9,3 +9,8 @@ export const supabase = createClient(url, anonKey)
 
 // Admin client — bypasses RLS for privileged writes (user/permission management)
 export const supabaseAdmin = createClient(url, serviceRoleKey)
+
+// Back-compat alias: pre-existing modules use `supabaseWriter` for all writes.
+// RLS on most tables is permissive (USING true), so the anon client is fine
+// for general writes. Only user/permission tables strictly need supabaseAdmin.
+export const supabaseWriter = supabase

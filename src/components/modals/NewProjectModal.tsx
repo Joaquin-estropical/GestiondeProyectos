@@ -10,24 +10,49 @@ const TYPE_ICONS: Record<string, string> = {
 }
 
 export function NewProjectModal() {
-  const { newProjectOpen, newProjectAreaId, closeNewProject, areas, addProject, refreshAll } = useAppStore()
+  const {
+    newProjectOpen, newProjectAreaId, newProjectSubAreaId,
+    closeNewProject, areas, subareas, addProject, refreshAll,
+  } = useAppStore()
 
   const area = newProjectAreaId ? areas.find(a => a.id === newProjectAreaId) : null
   const { data: templates } = useTemplates(area?.type as AreaType | undefined)
 
   const [name,       setName]       = useState('')
   const [areaId,     setAreaId]     = useState(newProjectAreaId ?? '')
+  const [subareaId,  setSubareaId]  = useState(newProjectSubAreaId ?? '')
   const [due,        setDue]        = useState('')
   const [templateId, setTemplateId] = useState('')
   const [saving,     setSaving]     = useState(false)
   const [error,      setError]      = useState('')
 
+  const areaSubAreas = subareas.filter(sa => sa.area === areaId)
+
   useEffect(() => {
     if (newProjectOpen) {
       setName(''); setDue(''); setTemplateId(''); setError('')
-      setAreaId(newProjectAreaId ?? (areas[0]?.id ?? ''))
+      const initialArea = newProjectAreaId ?? (areas[0]?.id ?? '')
+      setAreaId(initialArea)
+      // Auto-pick sub-area: prefer explicit, then only-one-available, then empty
+      const availableSubs = subareas.filter(sa => sa.area === initialArea)
+      const initialSub = newProjectSubAreaId
+        ?? (availableSubs.length === 1 ? availableSubs[0].id : '')
+      setSubareaId(initialSub)
     }
-  }, [newProjectOpen, newProjectAreaId, areas])
+  }, [newProjectOpen, newProjectAreaId, newProjectSubAreaId, areas, subareas])
+
+  // Re-evaluate sub-area when the area changes
+  useEffect(() => {
+    if (!areaId) return
+    const available = subareas.filter(sa => sa.area === areaId)
+    if (subareaId && !available.find(sa => sa.id === subareaId)) {
+      // current sub-area no longer belongs to area
+      setSubareaId(available.length === 1 ? available[0].id : '')
+    } else if (!subareaId && available.length === 1) {
+      setSubareaId(available[0].id)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [areaId, subareas])
 
   const selectedArea = areas.find(a => a.id === areaId)
   const areaTemplates = templates.filter(t => !selectedArea || t.area_type === selectedArea.type)
@@ -35,10 +60,11 @@ export function NewProjectModal() {
   const handleSave = async () => {
     if (!name.trim()) { setError('El nombre es obligatorio'); return }
     if (!areaId)      { setError('Seleccioná un área'); return }
+    if (!subareaId)   { setError('Seleccioná una sub-área'); return }
     setSaving(true); setError('')
     try {
       const project = await createProject({
-        name: name.trim(), area: areaId, due,
+        name: name.trim(), area: areaId, subarea: subareaId, due,
         templateId: templateId || undefined,
       })
       addProject(project)
@@ -79,6 +105,29 @@ export function NewProjectModal() {
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* Sub-área */}
+          <div className="form-group mt-16">
+            <label className="form-label">Sub-área <span style={{ color: 'var(--red)' }}>*</span></label>
+            {areaSubAreas.length === 0 ? (
+              <div style={{ fontSize: 12, color: 'var(--amber)', padding: '8px 0' }}>
+                El área seleccionada no tiene sub-áreas. Creá una primero desde el sidebar o desde Configuración.
+              </div>
+            ) : (
+              <div className="input" style={{ padding: 0 }}>
+                <select
+                  value={subareaId}
+                  onChange={e => setSubareaId(e.target.value)}
+                  style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 12px', height: 36, color: 'var(--text-1)', fontSize: 13, cursor: 'pointer' }}
+                >
+                  <option value="">Seleccionar sub-área...</option>
+                  {areaSubAreas.map(sa => (
+                    <option key={sa.id} value={sa.id}>{sa.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Nombre */}

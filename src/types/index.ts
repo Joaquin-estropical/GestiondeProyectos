@@ -1,14 +1,16 @@
 // ── Primitivos ────────────────────────────────────────────
 export type AreaType     = 'sucursal' | 'outlet' | 'edificio' | 'bodega' | 'general' | 'otros'
+export type SubAreaType  = 'general' | 'comercial' | 'tecnico' | 'otros'
 export type TaskStatus   = 'curso' | 'pend' | 'rev' | 'block' | 'done'
 export type TaskPriority = 'urg' | 'alta' | 'med' | 'baja'
 export type ActivityKind = 'done' | 'comment' | 'block' | 'assign' | 'create' | 'move'
 export type InboxKind    = 'block' | 'risk' | 'summary' | 'load' | 'win' | 'report'
 
 // IDs ahora son string libres (áreas y proyectos son dinámicos)
-export type AreaId    = string
-export type MemberId  = string
-export type ProjectId = string
+export type AreaId     = string
+export type SubAreaId  = string
+export type MemberId   = string
+export type ProjectId  = string
 
 // ── Entidades principales ─────────────────────────────────
 export interface Area {
@@ -18,6 +20,18 @@ export interface Area {
   icon:        string
   slug:        string
   type:        AreaType
+  description: string | null
+  created_at?: string
+}
+
+export interface SubArea {
+  id:          string
+  name:        string
+  area:        string        // FK → Area.id
+  color:       string
+  icon:        string
+  slug:        string
+  type:        SubAreaType
   description: string | null
   created_at?: string
 }
@@ -33,6 +47,7 @@ export interface Project {
   id:       string
   name:     string
   area:     string
+  subarea:  string            // FK → SubArea.id (introducida en 20260521_010)
   due:      string
   progress: number
   count:    number

@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  fetchAreas, fetchMembers, fetchProjects, fetchTasks,
+  fetchAreas, fetchSubAreas, fetchMembers, fetchProjects, fetchTasks,
   fetchSubtasks, fetchComments, fetchTemplates, fetchTemplateTasks
 } from '@/lib/db'
-import type { Area, Member, Project, Task, Subtask, Comment, Template, TemplateTask, AreaType } from '@/types'
+import type { Area, SubArea, Member, Project, Task, Subtask, Comment, Template, TemplateTask, AreaType } from '@/types'
 
 type State<T> = { data: T; loading: boolean; error: string | null }
 
@@ -26,6 +26,7 @@ function useQuery<T>(fn: () => Promise<T>, initial: T, deps: unknown[] = []): St
 }
 
 export const useAreas    = ()                => useQuery<Area[]>   (fetchAreas,                    [], [])
+export const useSubAreas = (areaId?: string) => useQuery<SubArea[]>(() => fetchSubAreas(areaId),   [], [areaId])
 export const useMembers  = ()                => useQuery<Member[]> (fetchMembers,                  [], [])
 export const useProjects = (areaId?: string) => useQuery<Project[]>(() => fetchProjects(areaId),   [], [areaId])
 export const useTasks    = (filters?: Parameters<typeof fetchTasks>[0]) =>
