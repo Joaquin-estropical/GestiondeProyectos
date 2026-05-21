@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, UserPlus, MoreHorizontal, Pencil, Trash2, X, Check, ChevronRight, ChevronDown, Layers, Shield, LogOut } from 'lucide-react';
 import { useTemplates, useTemplateTasks, useMembers } from '@/hooks/useSupabase';
 import { deleteArea, deleteTemplate, createTemplate, createTemplateTask, deleteTemplateTask } from '@/lib/db';
@@ -458,20 +458,110 @@ function MembersTab() {
 }
 
 // ── Tab: Usuarios y permisos (solo admin) ────────────────
+type AppUserRow = { id: string; name: string; email: string; role: string; is_admin: boolean }
+
+function NewUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [name,     setName]     = useState('')
+  const [email,    setEmail]    = useState('')
+  const [role,     setRole]     = useState('Miembro')
+  const [password, setPassword] = useState('Tropical2024!')
+  const [isAdmin,  setIsAdmin]  = useState(false)
+  const [saving,   setSaving]   = useState(false)
+  const [error,    setError]    = useState<string | null>(null)
+
+  const handle = async () => {
+    if (!name.trim() || !email.trim() || !password) { setError('Nombre, correo y contraseña son obligatorios'); return }
+    setSaving(true); setError(null)
+    try {
+      // 1. Create auth user
+      const { data, error: authErr } = await supabase.auth.signUp({ email: email.trim(), password })
+      if (authErr) throw new Error(authErr.message)
+      const uid = data.user?.id
+      if (!uid) throw new Error('No se pudo crear el usuario en Auth')
+      // 2. Create profile in app_users
+      const { error: profErr } = await supabase.from('app_users').insert({
+        id: uid, name: name.trim(), email: email.trim(),
+        role: role.trim() || 'Miembro',
+        short: name.trim().split(' ').slice(0, 2).map(w => w[0]).join('') + '.',
+        is_admin: isAdmin,
+      })
+      if (profErr) throw new Error(profErr.message)
+      onCreated()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al crear el usuario')
+    } finally { setSaving(false) }
+  }
+
+  const inp: React.CSSProperties = {
+    width: '100%', boxSizing: 'border-box', background: 'var(--surface-2)',
+    border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px',
+    fontSize: 13, color: 'var(--text-1)', outline: 'none',
+  }
+
+  return (
+    <>
+      <div className="modal-bd" onClick={onClose} />
+      <div className="modal" style={{ maxWidth: 440 }}>
+        <div className="modal-head">
+          <span className="fw-6" style={{ fontSize: 15 }}>Nuevo usuario</span>
+          <button className="btn btn-ghost btn-sm btn-icon" style={{ marginLeft: 'auto' }} onClick={onClose}><X size={14} /></button>
+        </div>
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Nombre completo *</label>
+            <input style={inp} value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Ana García" autoFocus />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Correo electrónico *</label>
+            <input style={inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="correo@empresa.com" />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Rol / Cargo</label>
+            <input style={inp} value={role} onChange={e => setRole(e.target.value)} placeholder="Ej: Coordinador, Técnico..." />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>Contraseña inicial *</label>
+            <input style={inp} value={password} onChange={e => setPassword(e.target.value)} placeholder="Mínimo 8 caracteres" />
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>El usuario podrá cambiarla después de su primer login.</div>
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px', borderRadius: 8, border: `1px solid ${isAdmin ? 'rgba(20,184,166,.4)' : 'var(--border)'}`, background: isAdmin ? 'rgba(20,184,166,.05)' : 'transparent', transition: 'all .15s' }}>
+            <input type="checkbox" checked={isAdmin} onChange={e => setIsAdmin(e.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--teal)', cursor: 'pointer' }} />
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: isAdmin ? 'var(--teal)' : 'var(--text-1)' }}>Administrador</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Puede gestionar usuarios, áreas y ver todo sin restricciones</div>
+            </div>
+          </label>
+          {error && <div style={{ padding: '8px 12px', borderRadius: 6, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', fontSize: 12, color: 'var(--red)' }}>{error}</div>}
+        </div>
+        <div className="modal-foot">
+          <button className="btn btn-secondary btn-md" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-primary btn-md" onClick={handle} disabled={saving || !name.trim() || !email.trim() || !password}>
+            {saving ? 'Creando...' : 'Crear usuario'}
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
+
 function UsersTab() {
   const { currentUser, areas } = useAppStore()
-  const [appUsers, setAppUsers] = useState<Array<{id:string;name:string;email:string;role:string;is_admin:boolean}>>([])
-  const [userAccess, setUserAccess] = useState<Record<string, string[]>>({})
-  const [loading, setLoading] = useState(true)
+  const [appUsers,    setAppUsers]    = useState<AppUserRow[]>([])
+  const [userAccess,  setUserAccess]  = useState<Record<string, string[]>>({})
+  const [loading,     setLoading]     = useState(true)
+  const [showNew,     setShowNew]     = useState(false)
+  const [confirmDel,  setConfirmDel]  = useState<string | null>(null)
 
-  useState(() => {
-    supabase.from('app_users').select('id,name,email,role,is_admin').then(({ data }) => {
-      if (data) setAppUsers(data)
-    })
-    supabase.from('user_area_access').select('user_id,area_id').then(({ data }) => {
-      if (data) {
+  const loadData = () => {
+    setLoading(true)
+    Promise.all([
+      supabase.from('app_users').select('id,name,email,role,is_admin').order('name'),
+      supabase.from('user_area_access').select('user_id,area_id'),
+    ]).then(([{ data: users }, { data: access }]) => {
+      if (users) setAppUsers(users as AppUserRow[])
+      if (access) {
         const map: Record<string, string[]> = {}
-        data.forEach(r => {
+        access.forEach((r: { user_id: string; area_id: string }) => {
           if (!map[r.user_id]) map[r.user_id] = []
           map[r.user_id].push(r.area_id)
         })
@@ -479,7 +569,9 @@ function UsersTab() {
       }
       setLoading(false)
     })
-  })
+  }
+
+  useEffect(() => { loadData() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleAreaAccess = async (userId: string, areaId: string, hasAccess: boolean) => {
     if (hasAccess) {
@@ -489,6 +581,12 @@ function UsersTab() {
       await supabase.from('user_area_access').insert({ user_id: userId, area_id: areaId })
       setUserAccess(prev => ({ ...prev, [userId]: [...(prev[userId] ?? []), areaId] }))
     }
+  }
+
+  const deleteUser = async (userId: string) => {
+    await supabase.from('app_users').delete().eq('id', userId)
+    setAppUsers(prev => prev.filter(u => u.id !== userId))
+    setConfirmDel(null)
   }
 
   if (!currentUser.is_admin) {
@@ -503,14 +601,16 @@ function UsersTab() {
 
   return (
     <>
+      {showNew && <NewUserModal onClose={() => setShowNew(false)} onCreated={() => { setShowNew(false); loadData() }} />}
+
       <div className="row between items-center mb-16">
         <div>
           <div className="fw-6">Usuarios y permisos</div>
-          <div className="f-xs text-2 mt-4">Gestioná el acceso de cada usuario a áreas y proyectos.</div>
+          <div className="f-xs text-2 mt-4">Gestioná quién accede y a qué áreas puede ver cada usuario.</div>
         </div>
-        <div style={{ fontSize: 12, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Shield size={13} /> Para crear usuarios nuevos usá el panel de Supabase
-        </div>
+        <button className="btn btn-primary btn-sm" onClick={() => setShowNew(true)}>
+          <UserPlus size={14} /> Nuevo usuario
+        </button>
       </div>
 
       {loading ? (
@@ -519,7 +619,6 @@ function UsersTab() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {appUsers.map(u => {
             const userAreas = userAccess[u.id] ?? []
-            const hasAllAccess = userAreas.length === 0
             return (
               <div key={u.id} style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
@@ -532,6 +631,18 @@ function UsersTab() {
                     <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--teal)', background: 'rgba(20,184,166,.1)', padding: '2px 8px', borderRadius: 999 }}>
                       Admin
                     </span>
+                  )}
+                  {confirmDel === u.id ? (
+                    <div className="row gap-6">
+                      <button className="btn btn-destructive btn-sm" onClick={() => deleteUser(u.id)}>Eliminar</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDel(null)}>Cancelar</button>
+                    </div>
+                  ) : (
+                    u.id !== currentUser.id && (
+                      <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setConfirmDel(u.id)} title="Eliminar usuario">
+                        <Trash2 size={13} color="var(--red)" />
+                      </button>
+                    )
                   )}
                 </div>
 
@@ -577,7 +688,7 @@ function UsersTab() {
           {appUsers.length === 0 && (
             <div className="empty" style={{ marginTop: 24 }}>
               <p className="t">Sin usuarios registrados</p>
-              <p className="d">Creá usuarios desde el panel de Supabase Authentication y ejecutá la migración SQL para registrarlos en app_users.</p>
+              <p className="d">Hacé clic en "Nuevo usuario" para crear el primero.</p>
             </div>
           )}
         </div>
