@@ -20,6 +20,19 @@ export default function LoginPage({ onLogin }: Props) {
     setLoading(true)
     setError(null)
     try {
+      // Log raw Supabase auth response for debugging
+      const { createClient } = await import('@supabase/supabase-js')
+      const sb = createClient(
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_ANON_KEY
+      )
+      const raw = await sb.auth.signInWithPassword({ email: email.trim(), password })
+      console.log('RAW AUTH RESPONSE:', JSON.stringify(raw, null, 2))
+      if (raw.error) {
+        setError(`[${raw.error.status}] ${raw.error.message} — code: ${raw.error.code ?? 'none'}`)
+        setLoading(false)
+        return
+      }
       const user = await signIn(email.trim(), password)
       onLogin(user)
     } catch (err) {
