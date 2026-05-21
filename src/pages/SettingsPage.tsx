@@ -39,7 +39,7 @@ function AreasTab() {
       <div className="row between items-center mb-16">
         <div>
           <div className="fw-6">Áreas del workspace</div>
-          <div className="f-xs text-2 mt-4">Cada área agrupa sub-áreas, y cada sub-área agrupa sus proyectos.</div>
+          <div className="f-xs text-2 mt-4">Cada área agrupa sus proyectos. Edificio además tiene sub-áreas.</div>
         </div>
         <button className="btn btn-primary btn-sm" onClick={() => openNewArea()}>
           <Plus size={14} /> Nueva área
@@ -47,6 +47,7 @@ function AreasTab() {
       </div>
       <div className="card">
         {areas.map((a, i) => {
+          const isEdificio = a.id === 'edificio';
           const aSubAreas = subareas.filter(sa => sa.area === a.id);
           const aProjects = projects.filter(p => p.area === a.id);
           const aTasks    = tasks.filter(t => t.area === a.id);
@@ -65,13 +66,15 @@ function AreasTab() {
                 <div style={{ flex: 1 }}>
                   <div className="fw-5" style={{ fontSize: 14 }}>{a.name}</div>
                   <div className="f-xs text-2 mt-2">
-                    {AREA_TYPE_LABELS[a.type]} · {aSubAreas.length} sub-áreas · {aProjects.length} proyectos · {aTasks.filter(t => t.status !== 'done').length} tareas abiertas
+                    {AREA_TYPE_LABELS[a.type]} · {isEdificio ? `${aSubAreas.length} sub-áreas · ` : ''}{aProjects.length} proyectos · {aTasks.filter(t => t.status !== 'done').length} tareas abiertas
                   </div>
                 </div>
                 <div className="row gap-6 items-center">
-                  <button className="btn btn-secondary btn-sm" onClick={() => openNewSubArea(a.id)} style={{ gap: 4 }}>
-                    <Plus size={12} /> Sub-área
-                  </button>
+                  {isEdificio && (
+                    <button className="btn btn-secondary btn-sm" onClick={() => openNewSubArea(a.id)} style={{ gap: 4 }}>
+                      <Plus size={12} /> Sub-área
+                    </button>
+                  )}
                   <button className="btn btn-ghost btn-sm btn-icon" onClick={() => openNewArea(a.id)}><Pencil size={13} /></button>
                   {confirmDelete === a.id ? (
                     <div className="row gap-6">
@@ -86,8 +89,8 @@ function AreasTab() {
                 </div>
               </div>
 
-              {/* Sub-areas expanded */}
-              {isOpen && (
+              {/* Sub-areas expanded (edificio only) */}
+              {isOpen && isEdificio && (
                 <div style={{ padding: '0 18px 12px 50px', display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {aSubAreas.map(sa => {
                     const saProjects = projects.filter(p => p.subarea === sa.id);

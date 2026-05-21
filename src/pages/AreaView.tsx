@@ -189,6 +189,8 @@ export default function AreaView() {
   if (!a) return <div className="page-body">Área no encontrada.</div>;
   if (subareaId && !sa) return <div className="page-body">Sub-área no encontrada.</div>;
 
+  const isEdificio = a.id === 'edificio';
+
   const open     = filteredTasks.filter(t => t.status !== 'done').length;
   const done     = filteredTasks.filter(t => t.status === 'done').length;
   const pct      = Math.round(done / Math.max(filteredTasks.length, 1) * 100);
@@ -196,7 +198,79 @@ export default function AreaView() {
     .filter(t => t.priority === 'urg' || (t.status !== 'done' && new Date(t.due) <= new Date('2026-03-11')))
     .slice(0, 5);
 
-  // ─── Mode: AREA (list of sub-areas) ───────────────────────
+  // ─── Mode: NON-EDIFICIO AREA (list of projects directly) ──
+  if (!isEdificio && !subareaId) {
+    return (
+      <>
+        <PageHead
+          title={a.name}
+          subtitle={`${allProjects.length} proyectos · ${open} tareas abiertas`}
+          right={
+            <div className="row gap-8">
+              <button className="btn btn-ghost btn-md" onClick={() => openNewArea(a.id)}><Pencil size={14} /> <span className="hide-mob">Editar</span></button>
+              <button className="btn btn-primary btn-md" onClick={() => openNewProject(a.id)}><Plus size={14} /> <span className="hide-mob">Nuevo proyecto</span></button>
+            </div>
+          }
+        />
+        <div className="page-body">
+          <div className="grid mb-24" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 12 }}>
+            <div className="card kpi"><div className="lbl"><Folder size={13} /> Proyectos</div><div className="val">{allProjects.length}</div></div>
+            <div className="card kpi"><div className="lbl"><ListTodo size={13} /> Tareas abiertas</div><div className="val">{open}</div></div>
+            <div className="card kpi"><div className="lbl"><Percent size={13} /> Completado</div><div className="val">{pct}%</div></div>
+          </div>
+          <div className="section-title">Proyectos</div>
+          <div className="grid mb-24" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 12 }}>
+            {allProjects.map(p => (
+              <div key={p.id} className="card" style={{ cursor: 'pointer' }} onClick={() => navigate(`/proyecto/${p.id}`)}>
+                <div className="card-pad">
+                  <div className="row between items-center">
+                    <span className="fw-6" style={{ fontSize: 14, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 8 }}>{p.name}</span>
+                    <span className="micro mono" style={{ flexShrink: 0 }}>{p.progress}%</span>
+                    <ProjectMenu projectId={p.id} projectName={p.name} onEdit={() => openEditProject(p.id)} />
+                  </div>
+                  <div className="text-2 f-xs mt-4">{fmtDate(p.due)} · {p.count} tareas</div>
+                  <div className="progress mt-16"><div style={{ width: p.progress + '%', background: a.color }}></div></div>
+                </div>
+              </div>
+            ))}
+            {allProjects.length === 0 && (
+              <div style={{ gridColumn: '1 / -1', padding: '24px 18px', textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>
+                Sin proyectos. Hacé clic en "Nuevo proyecto" para crear uno.
+              </div>
+            )}
+          </div>
+          {critical.length > 0 && (
+            <>
+              <div className="section-title">Tareas críticas</div>
+              <div className="card area-tasks-card" style={{ overflowX: 'auto' }}>
+                <table className="table" style={{ minWidth: 460 }}>
+                  <tbody>
+                    {critical.map(t => (
+                      <tr key={t.id} onClick={() => openTask(t.id)}>
+                        <td style={{ width: 30 }}><span className="check"></span></td>
+                        <td>{t.title}</td>
+                        <td style={{ width: 130 }}>
+                          <div className="row gap-8 items-center">
+                            <Avatar name={getMember(t.assignee)?.name ?? t.assignee} size={20} />
+                            <span className="f-xs text-2">{getMember(t.assignee)?.short ?? t.assignee}</span>
+                          </div>
+                        </td>
+                        <td style={{ width: 100 }}><span className="mono f-xs" style={{ color: dueColor(t.due) }}>{fmtDate(t.due)}</span></td>
+                        <td style={{ width: 90 }}><PriorityPill priority={t.priority} /></td>
+                        <td style={{ width: 120 }}><StatusPill status={t.status} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      </>
+    );
+  }
+
+  // ─── Mode: EDIFICIO (list of sub-areas) ───────────────────
   if (!subareaId) {
     return (
       <>
@@ -206,7 +280,6 @@ export default function AreaView() {
           right={
             <div className="row gap-8">
               <button className="btn btn-ghost btn-md" onClick={() => openNewArea(a.id)}><Pencil size={14} /> <span className="hide-mob">Editar</span></button>
-              <button className="btn btn-secondary btn-md hide-mob"><UserPlus size={14} /> Invitar</button>
               <button className="btn btn-primary btn-md" onClick={() => openNewSubArea(a.id)}><Plus size={14} /> <span className="hide-mob">Nueva sub-área</span></button>
             </div>
           }

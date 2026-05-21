@@ -92,14 +92,17 @@ export function getProject(id: string) { return PROJECTS.find(p => p.id === id) 
 
 export function avatarColor(name: string): string {
   const palette = ['#14B8A6','#3B82F6','#6366F1','#F59E0B','#EC4899','#22C55E','#A78BFA','#F97316']
+  const safe = name ?? ''
   let h = 0
-  for (let i = 0; i < name.length; i++) h = ((h * 31 + name.charCodeAt(i)) >>> 0)
+  for (let i = 0; i < safe.length; i++) h = ((h * 31 + safe.charCodeAt(i)) >>> 0)
   return palette[h % palette.length]
 }
 
 export function initials(name: string): string {
-  const p = name.trim().split(/\s+/)
-  return (p[0][0] + (p[1] ? p[1][0] : '')).toUpperCase()
+  const safe = (name ?? '').trim()
+  if (!safe) return '?'
+  const p = safe.split(/\s+/)
+  return ((p[0]?.[0] ?? '') + (p[1]?.[0] ?? '')).toUpperCase() || '?'
 }
 
 export function fmtDate(iso: string): string {

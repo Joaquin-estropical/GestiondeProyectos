@@ -130,16 +130,18 @@ export async function fetchProjects(areaId?: string, subareaId?: string): Promis
 }
 
 export async function createProject(input: {
-  name: string; area: string; subarea: string; due?: string; templateId?: string; assignee?: string
+  name: string; area: string; subarea?: string | null; due?: string; templateId?: string; assignee?: string
 }): Promise<Project> {
   const id = 'p-' + Date.now().toString(36)
+  // Sub-areas only apply to edificio; null for any other area
+  const subarea = input.area === 'edificio' ? (input.subarea ?? 'sub-edificio-generales') : null
   const { data, error } = await supabaseWriter
     .from('projects')
     .insert({
       id,
       name:     input.name,
       area:     input.area,
-      subarea:  input.subarea,
+      subarea,
       due:      input.due || '2099-12-31',
       progress: 0,
       count:    0,

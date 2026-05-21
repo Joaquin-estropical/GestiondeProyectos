@@ -57,14 +57,16 @@ export function NewProjectModal() {
   const selectedArea = areas.find(a => a.id === areaId)
   const areaTemplates = templates.filter(t => !selectedArea || t.area_type === selectedArea.type)
 
+  const needsSubArea = areaId === 'edificio'
+
   const handleSave = async () => {
     if (!name.trim()) { setError('El nombre es obligatorio'); return }
     if (!areaId)      { setError('Seleccioná un área'); return }
-    if (!subareaId)   { setError('Seleccioná una sub-área'); return }
+    if (needsSubArea && !subareaId) { setError('Seleccioná una sub-área'); return }
     setSaving(true); setError('')
     try {
       const project = await createProject({
-        name: name.trim(), area: areaId, subarea: subareaId, due,
+        name: name.trim(), area: areaId, subarea: needsSubArea ? subareaId : null, due,
         templateId: templateId || undefined,
       })
       addProject(project)
@@ -107,28 +109,30 @@ export function NewProjectModal() {
             </div>
           </div>
 
-          {/* Sub-área */}
-          <div className="form-group mt-16">
-            <label className="form-label">Sub-área <span style={{ color: 'var(--red)' }}>*</span></label>
-            {areaSubAreas.length === 0 ? (
-              <div style={{ fontSize: 12, color: 'var(--amber)', padding: '8px 0' }}>
-                El área seleccionada no tiene sub-áreas. Creá una primero desde el sidebar o desde Configuración.
-              </div>
-            ) : (
-              <div className="input" style={{ padding: 0 }}>
-                <select
-                  value={subareaId}
-                  onChange={e => setSubareaId(e.target.value)}
-                  style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 12px', height: 36, color: 'var(--text-1)', fontSize: 13, cursor: 'pointer' }}
-                >
-                  <option value="">Seleccionar sub-área...</option>
-                  {areaSubAreas.map(sa => (
-                    <option key={sa.id} value={sa.id}>{sa.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
+          {/* Sub-área (solo edificio) */}
+          {needsSubArea && (
+            <div className="form-group mt-16">
+              <label className="form-label">Sub-área <span style={{ color: 'var(--red)' }}>*</span></label>
+              {areaSubAreas.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--amber)', padding: '8px 0' }}>
+                  Edificio no tiene sub-áreas. Creá una primero desde el sidebar o desde Configuración.
+                </div>
+              ) : (
+                <div className="input" style={{ padding: 0 }}>
+                  <select
+                    value={subareaId}
+                    onChange={e => setSubareaId(e.target.value)}
+                    style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 12px', height: 36, color: 'var(--text-1)', fontSize: 13, cursor: 'pointer' }}
+                  >
+                    <option value="">Seleccionar sub-área...</option>
+                    {areaSubAreas.map(sa => (
+                      <option key={sa.id} value={sa.id}>{sa.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Nombre */}
           <div className="form-group mt-16">

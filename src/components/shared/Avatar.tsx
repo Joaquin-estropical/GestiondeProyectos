@@ -10,15 +10,16 @@ interface AvatarProps {
 }
 
 export function Avatar({ name, size = 24, title, className = '', style }: AvatarProps) {
+  const safeName = name ?? ''
   const fs = size <= 20 ? 9.5 : size <= 24 ? 10.5 : size <= 32 ? 12.5 : 18
   const sizeClass = size === 20 ? 'avatar-sm' : size === 32 ? 'avatar-lg' : size === 48 ? 'avatar-xl' : ''
   return (
     <span
-      title={title ?? name}
+      title={title ?? safeName}
       className={`avatar ${sizeClass} ${className}`}
-      style={{ width: size, height: size, fontSize: fs, background: avatarColor(name), ...style }}
+      style={{ width: size, height: size, fontSize: fs, background: avatarColor(safeName), ...style }}
     >
-      {initials(name)}
+      {initials(safeName)}
     </span>
   )
 }

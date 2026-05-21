@@ -127,13 +127,15 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         {!c && <div className="sb-section">Áreas</div>}
 
         {areas.filter(a => currentUser.is_admin || !accessibleAreaIds || accessibleAreaIds.has(a.id)).map((a) => {
-          const areaSubAreas = subareas.filter(sa => sa.area === a.id)
+          const isEdificio   = a.id === 'edificio'
+          const areaSubAreas = isEdificio ? subareas.filter(sa => sa.area === a.id) : []
           const areaProjects = projects.filter((p) => p.area === a.id)
-          const isOpen  = expanded[a.id] ?? false
-          const areaPath = `/area/${a.id}`
+          const isOpen       = expanded[a.id] ?? false
+          const areaPath     = `/area/${a.id}`
 
           return (
             <div key={a.id}>
+              {/* ── Area row ── */}
               <div
                 className={`sb-item${isActive(areaPath) ? ' active' : ''}${c ? ' sb-item-collapsed' : ''}`}
                 style={c
@@ -147,24 +149,30 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                     style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 4, flexShrink: 0, color: 'var(--text-3)' }}
                     onClick={(e) => { e.stopPropagation(); toggle(a.id) }}
                   >
-                    {isOpen
-                      ? <ChevronDown size={15} />
-                      : <ChevronRight size={15} />}
+                    {isOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                   </span>
                 )}
                 <span
                   className="sb-area-dot"
                   style={{ background: a.color, width: c ? 10 : 8, height: c ? 10 : 8, borderRadius: c ? 3 : 2 }}
                 />
-                {!c && (
-                  <span style={{ flex: 1 }}>{a.name}</span>
-                )}
-                {!c && (
+                {!c && <span style={{ flex: 1 }}>{a.name}</span>}
+                {!c && isEdificio && (
                   <span
                     className="btn btn-ghost btn-icon"
                     style={{ width: 18, height: 18, flexShrink: 0, opacity: 0.4 }}
-                    title={`Nueva sub-área en ${a.name}`}
+                    title="Nueva sub-área en Edificio"
                     onClick={(e) => { e.stopPropagation(); openNewSubArea(a.id) }}
+                  >
+                    <Plus size={11} />
+                  </span>
+                )}
+                {!c && !isEdificio && (
+                  <span
+                    className="btn btn-ghost btn-icon"
+                    style={{ width: 18, height: 18, flexShrink: 0, opacity: 0.4 }}
+                    title={`Nuevo proyecto en ${a.name}`}
+                    onClick={(e) => { e.stopPropagation(); openNewProject(a.id) }}
                   >
                     <Plus size={11} />
                   </span>
@@ -172,71 +180,92 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                 {!c && <span className="sb-count">{areaProjects.length}</span>}
               </div>
 
+              {/* ── Expanded content ── */}
               {!c && isOpen && (
                 <div className="sb-sub">
-                  {areaSubAreas.map((sa) => {
-                    const subPath  = `/area/${a.id}/sub/${sa.id}`
-                    const subProjs = projects.filter(p => p.subarea === sa.id)
-                    const subOpen  = subExpanded[sa.id] ?? false
-                    return (
-                      <div key={sa.id}>
-                        <div
-                          className={`sb-item${isActive(subPath) ? ' active' : ''}`}
-                          style={{ paddingRight: 4, cursor: 'pointer' }}
-                          title={sa.name}
-                          onClick={() => goTo(subPath)}
-                        >
-                          <span
-                            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 4, flexShrink: 0, color: 'var(--text-3)' }}
-                            onClick={(e) => { e.stopPropagation(); toggleSub(sa.id) }}
-                          >
-                            {subOpen
-                              ? <ChevronDown size={13} />
-                              : <ChevronRight size={13} />}
-                          </span>
-                          <span
-                            style={{ width: 6, height: 6, borderRadius: 1, background: sa.color, flexShrink: 0 }}
-                          />
-                          <span style={{ flex: 1, fontSize: 12.5 }}>{sa.name}</span>
-                          <span
-                            className="btn btn-ghost btn-icon"
-                            style={{ width: 16, height: 16, flexShrink: 0, opacity: 0.4 }}
-                            title={`Nuevo proyecto en ${sa.name}`}
-                            onClick={(e) => { e.stopPropagation(); openNewProject(a.id, sa.id) }}
-                          >
-                            <Plus size={10} />
-                          </span>
-                          <span className="sb-count">{subProjs.length}</span>
-                        </div>
-                        {subOpen && (
-                          <div className="sb-sub" style={{ paddingLeft: 14 }}>
-                            {subProjs.map((p) => {
-                              const projPath = `/proyecto/${p.id}`
-                              return (
-                                <div
-                                  key={p.id}
-                                  className={`sb-item${isActive(projPath) ? ' active' : ''}`}
-                                  onClick={() => goTo(projPath)}
-                                >
-                                  <span style={{ width: 5, height: 5, borderRadius: 1, background: sa.color, flexShrink: 0, opacity: 0.8 }} />
-                                  <span>{p.name}</span>
-                                </div>
-                              )
-                            })}
-                            {subProjs.length === 0 && (
-                              <div style={{ padding: '4px 0 4px 18px', fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>
-                                Sin proyectos
+                  {isEdificio ? (
+                    /* EDIFICIO: sub-areas → projects */
+                    <>
+                      {areaSubAreas.map((sa) => {
+                        const subPath  = `/area/${a.id}/sub/${sa.id}`
+                        const subProjs = projects.filter(p => p.subarea === sa.id)
+                        const subOpen  = subExpanded[sa.id] ?? false
+                        return (
+                          <div key={sa.id}>
+                            <div
+                              className={`sb-item${isActive(subPath) ? ' active' : ''}`}
+                              style={{ paddingRight: 4, cursor: 'pointer' }}
+                              title={sa.name}
+                              onClick={() => goTo(subPath)}
+                            >
+                              <span
+                                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 4, flexShrink: 0, color: 'var(--text-3)' }}
+                                onClick={(e) => { e.stopPropagation(); toggleSub(sa.id) }}
+                              >
+                                {subOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                              </span>
+                              <span style={{ width: 6, height: 6, borderRadius: 1, background: sa.color, flexShrink: 0 }} />
+                              <span style={{ flex: 1, fontSize: 12.5 }}>{sa.name}</span>
+                              <span
+                                className="btn btn-ghost btn-icon"
+                                style={{ width: 16, height: 16, flexShrink: 0, opacity: 0.4 }}
+                                title={`Nuevo proyecto en ${sa.name}`}
+                                onClick={(e) => { e.stopPropagation(); openNewProject(a.id, sa.id) }}
+                              >
+                                <Plus size={10} />
+                              </span>
+                              <span className="sb-count">{subProjs.length}</span>
+                            </div>
+                            {subOpen && (
+                              <div className="sb-sub" style={{ paddingLeft: 14 }}>
+                                {subProjs.map((p) => {
+                                  const projPath = `/proyecto/${p.id}`
+                                  return (
+                                    <div
+                                      key={p.id}
+                                      className={`sb-item${isActive(projPath) ? ' active' : ''}`}
+                                      onClick={() => goTo(projPath)}
+                                    >
+                                      <span style={{ width: 5, height: 5, borderRadius: 1, background: sa.color, flexShrink: 0, opacity: 0.8 }} />
+                                      <span>{p.name}</span>
+                                    </div>
+                                  )
+                                })}
+                                {subProjs.length === 0 && (
+                                  <div style={{ padding: '4px 0 4px 18px', fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>Sin proyectos</div>
+                                )}
                               </div>
                             )}
                           </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                  {areaSubAreas.length === 0 && (
-                    <div style={{ padding: '6px 0 6px 12px', fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>
-                      Sin sub-áreas. Hacé clic en "+" para crear una.
-                    </div>
+                        )
+                      })}
+                      {areaSubAreas.length === 0 && (
+                        <div style={{ padding: '6px 0 6px 12px', fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>
+                          Sin sub-áreas. Hacé clic en "+" para crear una.
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    /* OTHER AREAS: direct projects */
+                    <>
+                      {areaProjects.map((p) => {
+                        const projPath = `/proyecto/${p.id}`
+                        return (
+                          <div
+                            key={p.id}
+                            className={`sb-item${isActive(projPath) ? ' active' : ''}`}
+                            style={{ paddingLeft: 10 }}
+                            onClick={() => goTo(projPath)}
+                          >
+                            <span style={{ width: 5, height: 5, borderRadius: 1, background: a.color, flexShrink: 0, opacity: 0.8 }} />
+                            <span>{p.name}</span>
+                          </div>
+                        )
+                      })}
+                      {areaProjects.length === 0 && (
+                        <div style={{ padding: '4px 0 4px 18px', fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>Sin proyectos</div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
