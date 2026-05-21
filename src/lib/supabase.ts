@@ -1,8 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
 
-const url     = import.meta.env.VITE_SUPABASE_URL      as string
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+const url            = import.meta.env.VITE_SUPABASE_URL              as string
+const anonKey        = import.meta.env.VITE_SUPABASE_ANON_KEY         as string
+const serviceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY as string
 
-// Single client with anon key — RLS policies are permissive (USING true)
-export const supabase       = createClient(url, anonKey)
-export const supabaseWriter = supabase
+// Regular client for reads (RLS applies)
+export const supabase = createClient(url, anonKey)
+
+// Admin client — bypasses RLS for privileged writes (user/permission management)
+export const supabaseAdmin = createClient(url, serviceRoleKey)

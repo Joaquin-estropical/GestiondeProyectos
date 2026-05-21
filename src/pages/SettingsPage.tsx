@@ -3,7 +3,7 @@ import { Plus, UserPlus, MoreHorizontal, Pencil, Trash2, X, Check, ChevronRight,
 import { useTemplates, useTemplateTasks, useMembers } from '@/hooks/useSupabase';
 import { deleteArea, deleteTemplate, createTemplate, createTemplateTask, deleteTemplateTask } from '@/lib/db';
 import { useAppStore } from '@/stores/app';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { signOut } from '@/lib/auth';
 import { Avatar } from '@/components/shared/Avatar';
 import { PageHead } from '@/components/shared/PageHead';
@@ -539,7 +539,7 @@ function NewUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
       const uid = data.user?.id
       if (!uid) throw new Error('No se pudo crear el usuario en Auth')
       // 2. Create profile in app_users
-      const { error: profErr } = await supabase.from('app_users').insert({
+      const { error: profErr } = await supabaseAdmin.from('app_users').insert({
         id: uid, name: name.trim(), email: email.trim(),
         role: role.trim() || 'Miembro',
         short: name.trim().split(' ').slice(0, 2).map(w => w[0]).join('') + '.',
@@ -635,16 +635,16 @@ function UsersTab() {
 
   const toggleAreaAccess = async (userId: string, areaId: string, hasAccess: boolean) => {
     if (hasAccess) {
-      await supabase.from('user_area_access').delete().eq('user_id', userId).eq('area_id', areaId)
+      await supabaseAdmin.from('user_area_access').delete().eq('user_id', userId).eq('area_id', areaId)
       setUserAccess(prev => ({ ...prev, [userId]: (prev[userId] ?? []).filter(a => a !== areaId) }))
     } else {
-      await supabase.from('user_area_access').insert({ user_id: userId, area_id: areaId })
+      await supabaseAdmin.from('user_area_access').insert({ user_id: userId, area_id: areaId })
       setUserAccess(prev => ({ ...prev, [userId]: [...(prev[userId] ?? []), areaId] }))
     }
   }
 
   const deleteUser = async (userId: string) => {
-    await supabase.from('app_users').delete().eq('id', userId)
+    await supabaseAdmin.from('app_users').delete().eq('id', userId)
     setAppUsers(prev => prev.filter(u => u.id !== userId))
     setConfirmDel(null)
   }
