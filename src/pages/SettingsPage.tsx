@@ -430,8 +430,75 @@ function TemplatesTab() {
 }
 
 // ── Tab: Miembros ────────────────────────────────────────
+function MemberRow({ m, isLast, onDeleted }: { m: { id: string; name: string; role: string }; isLast: boolean; onDeleted: () => void }) {
+  const [open, setOpen]       = useState(false)
+  const [confirmDel, setConf] = useState(false)
+  const [saving, setSaving]   = useState(false)
+
+  const handleDelete = async () => {
+    setSaving(true)
+    await supabase.from('members').delete().eq('id', m.id)
+    setSaving(false)
+    onDeleted()
+  }
+
+  return (
+    <div style={{ padding: '12px 18px', borderBottom: isLast ? '' : '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, position: 'relative' }}>
+      <Avatar name={m.name} size={32} />
+      <div style={{ flex: 1 }}>
+        <div className="fw-5" style={{ fontSize: 13 }}>{m.name}</div>
+        <div className="f-xs text-2">{m.role}</div>
+      </div>
+      <span className="pill" style={{ fontSize: 11 }}>{m.role}</span>
+      <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setOpen(v => !v)}>
+        <MoreHorizontal size={13} />
+      </button>
+
+      {open && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 8999 }} onClick={() => { setOpen(false); setConf(false) }} />
+          <div style={{
+            position: 'absolute', top: '100%', right: 18, zIndex: 9000,
+            background: 'var(--surface-1)', border: '1px solid var(--border)',
+            borderRadius: 8, padding: '4px 0', minWidth: 180,
+            boxShadow: '0 8px 24px rgba(0,0,0,.5)',
+          }}>
+            {!confirmDel ? (
+              <button
+                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: 'var(--red)', fontSize: 13, cursor: 'pointer' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                onClick={() => setConf(true)}
+              >
+                <Trash2 size={13} /> Eliminar miembro
+              </button>
+            ) : (
+              <div style={{ padding: '10px 14px' }}>
+                <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 10 }}>
+                  ¿Eliminar a <strong>{m.name}</strong>?
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn btn-secondary btn-sm" onClick={() => setConf(false)}>Cancelar</button>
+                  <button
+                    className="btn btn-sm"
+                    style={{ background: 'var(--red)', color: '#fff', border: 'none' }}
+                    disabled={saving}
+                    onClick={handleDelete}
+                  >
+                    {saving ? 'Eliminando…' : 'Confirmar'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function MembersTab() {
-  const { data: members = [] } = useMembers()
+  const { data: members = [], reload } = useMembers()
   return (
     <>
       <div className="row between items-center mb-16">
@@ -443,15 +510,7 @@ function MembersTab() {
       </div>
       <div className="card">
         {members.map((m, i) => (
-          <div key={m.id} style={{ padding: '12px 18px', borderBottom: i < members.length - 1 ? '1px solid var(--border)' : '', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Avatar name={m.name} size={32} />
-            <div style={{ flex: 1 }}>
-              <div className="fw-5" style={{ fontSize: 13 }}>{m.name}</div>
-              <div className="f-xs text-2">{m.role}</div>
-            </div>
-            <span className="pill" style={{ fontSize: 11 }}>{m.role}</span>
-            <button className="btn btn-ghost btn-sm btn-icon"><MoreHorizontal size={13} /></button>
-          </div>
+          <MemberRow key={m.id} m={m} isLast={i === members.length - 1} onDeleted={reload} />
         ))}
       </div>
     </>
