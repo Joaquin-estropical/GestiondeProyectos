@@ -15,6 +15,7 @@ import type { Task, TaskStatus } from '@/types';
 function ProjectActionsMenu({ projectId, projectName }: { projectId: string; projectName: string }) {
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const { openEditProject, removeProject, refreshAll } = useAppStore();
   const navigate = useNavigate();
 
@@ -24,7 +25,9 @@ function ProjectActionsMenu({ projectId, projectName }: { projectId: string; pro
     if (!open) return;
     const handler = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (btnRef.current && !btnRef.current.contains(target)) setPos(null);
+      const insideBtn  = btnRef.current?.contains(target);
+      const insideMenu = menuRef.current?.contains(target);
+      if (!insideBtn && !insideMenu) setPos(null);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -67,7 +70,7 @@ function ProjectActionsMenu({ projectId, projectName }: { projectId: string; pro
         <MoreHorizontal size={14} />
       </button>
       {open && pos && (
-        <div style={{
+        <div ref={menuRef} style={{
           position: 'fixed', top: pos.top, right: pos.right, zIndex: 9000,
           background: 'var(--surface-1)', border: '1px solid var(--border)',
           borderRadius: 8, padding: '4px 0', minWidth: 200,
