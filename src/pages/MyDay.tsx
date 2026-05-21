@@ -212,7 +212,7 @@ export default function MyDay() {
   const today    = new Date().toISOString().slice(0, 10);
   const [tab, setTab] = useState<MyDayView>('list');
 
-  const { data: allTasks = [] } = useTasks({ assigneeId: currentUser.id });
+  const { data: allTasks = [] } = useTasks({ assigneeId: currentUser.memberId });
   const { data: projects = [] } = useProjects();
   const { data: areas    = [] } = useAreas();
   const [timing, setTiming]     = useState<string | null>(null);

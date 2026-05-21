@@ -1,12 +1,13 @@
 import { supabase } from './supabase'
 
 export interface AppUser {
-  id:       string
-  name:     string
-  role:     string
-  short:    string
-  email:    string
-  is_admin: boolean
+  id:        string   // UUID used for auth/session
+  memberId:  string   // short id matching members.id in DB (e.g. 'joa', 'fab')
+  name:      string
+  role:      string
+  short:     string
+  email:     string
+  is_admin:  boolean
 }
 
 // ── Usuarios locales con contraseña hasheada (sin Supabase Auth) ──────────────
@@ -15,31 +16,34 @@ export interface AppUser {
 
 const LOCAL_USERS: (AppUser & { password: string })[] = [
   {
-    id:       '82902ffa-f79e-4ef6-98ce-53a25ae54530',
-    name:     'Joaquin Abastoflor',
-    role:     'Jefe de Proyectos',
-    short:    'Joaquin A.',
-    email:    'jabastoflor@tropicaltower.com.bo',
-    is_admin: true,
-    password: 'Tropical2024!',
+    id:        '82902ffa-f79e-4ef6-98ce-53a25ae54530',
+    memberId:  'joa',
+    name:      'Joaquin Abastoflor',
+    role:      'Jefe de Proyectos',
+    short:     'Joaquin A.',
+    email:     'jabastoflor@tropicaltower.com.bo',
+    is_admin:  true,
+    password:  'Tropical2024!',
   },
   {
-    id:       '11e3c868-7925-4274-a34b-73b771fd0503',
-    name:     'Fabio Jimenez',
-    role:     'Coordinador Administrativo',
-    short:    'Fabio J.',
-    email:    'fjimenez@tropicaltower.com.bo',
-    is_admin: false,
-    password: 'Tropical2024!',
+    id:        '11e3c868-7925-4274-a34b-73b771fd0503',
+    memberId:  'fab',
+    name:      'Fabio Jimenez',
+    role:      'Coordinador Administrativo',
+    short:     'Fabio J.',
+    email:     'fjimenez@tropicaltower.com.bo',
+    is_admin:  false,
+    password:  'Tropical2024!',
   },
   {
-    id:       'a18d7af4-6abc-4c3d-a273-577f4a67c22a',
-    name:     'Marcelo Jaldin',
-    role:     'Director de Finanzas',
-    short:    'Marcelo J.',
-    email:    'mrjaldin@estropical.com',
-    is_admin: false,
-    password: 'Tropical2024!',
+    id:        'a18d7af4-6abc-4c3d-a273-577f4a67c22a',
+    memberId:  'mar',
+    name:      'Marcelo Jaldin',
+    role:      'Director de Finanzas',
+    short:     'Marcelo J.',
+    email:     'mrjaldin@estropical.com',
+    is_admin:  false,
+    password:  'Tropical2024!',
   },
 ]
 

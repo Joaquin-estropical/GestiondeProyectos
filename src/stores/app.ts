@@ -73,7 +73,7 @@ interface AppState {
   closeNewTask:    ()                => void
 }
 
-const DEFAULT_USER: AppUser = { id: '', name: '', role: '', short: '', email: '', is_admin: false }
+const DEFAULT_USER: AppUser = { id: '', memberId: '', name: '', role: '', short: '', email: '', is_admin: false }
 
 export const useAppStore = create<AppState>((set, get) => ({
   currentUser: DEFAULT_USER,

@@ -116,7 +116,7 @@ export default function Dashboard() {
   const doneCount = tasks.filter(t => t.status === 'done').length;
   const todayCount = tasks.filter(t => t.status !== 'done' && daysFromToday(t.due) === 0).length;
 
-  const myTasks  = tasks.filter(t => t.assignee === currentUser.id && t.status !== 'done').slice(0, 5);
+  const myTasks  = tasks.filter(t => t.assignee === currentUser.memberId && t.status !== 'done').slice(0, 5);
   const firstName = currentUser.name.split(' ')[0];
 
   const filtered  = applyFilters(tasks, filters);
