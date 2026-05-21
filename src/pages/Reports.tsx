@@ -335,6 +335,65 @@ export default function Reports() {
           </div>
         </div>
 
+        {/* Performance por persona */}
+        {members.length > 0 && (
+          <div className="card">
+            <div className="card-head">
+              <span className="title">Performance por persona</span>
+              <span className="micro" style={{ marginLeft: 'auto' }}>{period === 'all' ? 'Histórico' : `Últimos ${period}`}</span>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    {['Persona', 'Asignadas', 'Completadas', 'Tasa cumpl.', 'Vencidas', 'Promedio días'].map(h => (
+                      <th key={h} style={{ padding: '8px 14px', textAlign: h === 'Persona' ? 'left' : 'center', color: 'var(--text-3)', fontWeight: 500, whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {members.map(m => {
+                    const mTasks   = periodTasks.filter(t => t.assignee === m.id);
+                    const mDone    = mTasks.filter(t => t.status === 'done');
+                    const mOverdue = mTasks.filter(t => t.status !== 'done' && t.due < today);
+                    const rate     = mTasks.length > 0 ? Math.round(mDone.length / mTasks.length * 100) : 0;
+                    // Rough avg days: due - today for open, ignore closed timing (no completed_at in DB yet)
+                    const avgDays  = mDone.length > 0
+                      ? Math.round(mDone.reduce((s, t) => {
+                          const diff = (new Date(t.due).getTime() - new Date(t.start_date ?? t.due).getTime()) / 86400000;
+                          return s + Math.max(0, diff);
+                        }, 0) / mDone.length)
+                      : null;
+                    if (mTasks.length === 0) return null;
+                    return (
+                      <tr key={m.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '10px 14px', fontWeight: 500 }}>{m.name}</td>
+                        <td style={{ padding: '10px 14px', textAlign: 'center' }}>{mTasks.length}</td>
+                        <td style={{ padding: '10px 14px', textAlign: 'center', color: 'var(--green)' }}>{mDone.length}</td>
+                        <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                          <span style={{
+                            padding: '2px 8px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+                            background: rate >= 80 ? 'rgba(34,197,94,.12)' : rate >= 50 ? 'rgba(245,158,11,.12)' : 'rgba(239,68,68,.12)',
+                            color: rate >= 80 ? 'var(--green)' : rate >= 50 ? 'var(--amber)' : 'var(--red)',
+                          }}>
+                            {rate}%
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 14px', textAlign: 'center', color: mOverdue.length > 0 ? 'var(--red)' : 'var(--text-3)' }}>
+                          {mOverdue.length}
+                        </td>
+                        <td style={{ padding: '10px 14px', textAlign: 'center', color: 'var(--text-3)', fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>
+                          {avgDays !== null ? `${avgDays}d` : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* Tabla detalle */}
         <div className="card">
           <div className="card-head">

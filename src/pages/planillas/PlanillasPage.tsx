@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Plus, ChevronRight, CheckCircle2, Clock, AlertCircle,
   FolderOpen, X, Pencil, Check, Trash2, ChevronDown,
@@ -351,14 +351,15 @@ interface AssignModalProps {
   template: ChecklistTemplate
   onClose: () => void
   onCreated: () => void
+  initialProjectId?: string
 }
 
-function AssignModal({ template, onClose, onCreated }: AssignModalProps) {
+function AssignModal({ template, onClose, onCreated, initialProjectId }: AssignModalProps) {
   const { projects, areas } = useAppStore()
   const navigate = useNavigate()
 
   const [targetType, setTargetType] = useState<'project' | 'area'>('project')
-  const [projectId,  setProjectId]  = useState('')
+  const [projectId,  setProjectId]  = useState(initialProjectId ?? '')
   const [areaId,     setAreaId]     = useState('')
   const [firstType,  setFirstType]  = useState<'reception' | 'delivery'>('reception')
   const [creating,   setCreating]   = useState(false)
@@ -459,6 +460,7 @@ interface AssignedGroup {
 
 export default function PlanillasPage() {
   const navigate            = useNavigate()
+  const [searchParams]      = useSearchParams()
   const { projects, areas } = useAppStore()
 
   const [templates, setTemplates]       = useState<ChecklistTemplate[]>([])
@@ -499,6 +501,14 @@ export default function PlanillasPage() {
   }, [allIds])
 
   useEffect(() => { load() }, [load])
+
+  // Open assign modal if navigated with ?assign=projectId (from ProjectPage)
+  useEffect(() => {
+    const assignId = searchParams.get('assign')
+    if (!assignId || templates.length === 0) return
+    setAssigningTemplate(templates[0])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.get('assign'), templates.length])
 
   async function handleCreate() {
     if (!newName.trim()) return
@@ -762,6 +772,7 @@ export default function PlanillasPage() {
           template={assigningTemplate}
           onClose={() => setAssigningTemplate(null)}
           onCreated={() => { setAssigningTemplate(null); load() }}
+          initialProjectId={searchParams.get('assign') ?? undefined}
         />
       )}
     </div>

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { List, Kanban, GanttChart as GanttIcon, Calendar, Table, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, ChevronLeft, ChevronRight, X, Pen, Trash2, User, AlertTriangle } from 'lucide-react';
 import { useProjects, useTasks, useMembers } from '@/hooks/useSupabase';
 import { getMember, STATUS_ORDER, STATUS_LABELS, fmtDate, dueColor } from '@/lib/mock-data';
@@ -84,6 +84,7 @@ function ProjectActionsMenu({ projectId, projectName }: { projectId: string; pro
 // ─── Project Header (info only, no tabs) ───
 function ProjectHeader({ project, tasks, onNewTask }: { project: NonNullable<ReturnType<typeof useProjects>['data']>[0]; tasks: Task[]; onNewTask: () => void }) {
   const { data: members = [] } = useMembers();
+  const navigate = useNavigate();
   const assigneeIds = [...new Set(tasks.map(t => t.assignee))].slice(0, 5);
   return (
     <div className="proj-header" style={{ padding: '20px 32px 12px' }}>
@@ -98,6 +99,13 @@ function ProjectHeader({ project, tasks, onNewTask }: { project: NonNullable<Ret
           })}
         </span>
         <button className="btn btn-secondary btn-sm"><UserPlus size={14} /></button>
+        <button
+          className="btn btn-secondary btn-sm"
+          title="Asignar planilla a este proyecto"
+          onClick={() => navigate(`/planillas?assign=${project.id}`)}
+        >
+          <CheckSquare size={14} /> <span className="view-tab-label">Planilla</span>
+        </button>
         <button className="btn btn-primary btn-sm" onClick={onNewTask}>
           <Plus size={14} /> <span className="view-tab-label">Nueva tarea</span>
         </button>
@@ -645,10 +653,19 @@ const HEADER_DEFAULT = 210;
 
 export default function ProjectPage() {
   const { projectId }       = useParams<{ projectId: string }>();
+  const [searchParams]      = useSearchParams();
   const { openTask, openNewTask } = useAppStore();
   const [view, setView]     = useState('list');
   const [headerH, setHeaderH] = useState(HEADER_DEFAULT);
   const id                  = projectId ?? '';
+
+  // Open task from query param (e.g. navigating from Mi Día)
+  useEffect(() => {
+    const taskParam = searchParams.get('task');
+    if (taskParam) openTask(taskParam);
+  // Only on mount / when taskParam changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.get('task')]);
 
   const { data: projects = [], loading } = useProjects();
   const { data: tasks    = [] }          = useTasks({ projectId: id });

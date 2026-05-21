@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Play, Pause, Plus, CalendarDays, List } from 'lucide-react';
+import { Play, Pause, Plus, CalendarDays, List, AlertCircle, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useTasks, useProjects, useAreas } from '@/hooks/useSupabase';
 import { fmtDate, dueColor, DAYS_ES, MONTHS_SHORT } from '@/lib/mock-data';
 import { AreaPill, PriorityPill, StatusPill } from '@/components/shared/Badges';
@@ -206,7 +207,8 @@ function ScheduleView({ tasks, todayIso, onOpenTask, onNewTask, areas }: {
 
 // ── Main ──────────────────────────────────────────────────
 export default function MyDay() {
-  const { openTask, openNewTask, currentUser } = useAppStore();
+  const navigate = useNavigate();
+  const { openNewTask, currentUser } = useAppStore();
   const today    = new Date().toISOString().slice(0, 10);
   const [tab, setTab] = useState<MyDayView>('list');
 
@@ -215,9 +217,15 @@ export default function MyDay() {
   const { data: areas    = [] } = useAreas();
   const [timing, setTiming]     = useState<string | null>(null);
 
-  const todayTasks = allTasks.filter(t => t.status !== 'done' && t.due <= today);
-  const upcoming   = allTasks.filter(t => t.status !== 'done' && t.due > today);
-  const review     = allTasks.filter(t => t.status === 'rev');
+  const overdueTasks = allTasks.filter(t => t.status !== 'done' && t.due < today);
+  const todayTasks   = allTasks.filter(t => t.status !== 'done' && t.due === today);
+  const upcoming     = allTasks.filter(t => t.status !== 'done' && t.due > today);
+  const review       = allTasks.filter(t => t.status === 'rev');
+
+  // Navigate to project page with task open in side panel
+  const goToTask = (t: Task) => {
+    navigate(`/proyecto/${t.project}?task=${t.id}`)
+  };
 
   const grouped = (list: Task[]) => {
     const map: Record<string, Task[]> = {};
@@ -227,22 +235,49 @@ export default function MyDay() {
 
   function TaskRow({ t }: { t: Task }) {
     const isTiming = timing === t.id;
+    const isOverdue = t.due < today && t.status !== 'done';
+    const project = projects.find(p => p.id === t.project);
     return (
       <div
-        style={{ padding: '10px 0', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
-        onClick={() => openTask(t.id)}
+        style={{
+          padding: '11px 0', borderBottom: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
+          background: isOverdue ? 'rgba(239,68,68,.03)' : 'transparent',
+        }}
+        onClick={() => goToTask(t)}
       >
-        <span className="check"></span>
-        <span style={{ flex: 1, fontSize: 13.5 }}>{t.title}</span>
+        <span className="check" style={{ flexShrink: 0 }}></span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13.5, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.title}</div>
+          {project && (
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <AreaPill areaId={t.area} mini />
+              {project.name}
+            </div>
+          )}
+        </div>
+        {isOverdue && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '2px 6px', borderRadius: 999, background: 'rgba(239,68,68,.12)', fontSize: 10, color: 'var(--red)', fontWeight: 600, flexShrink: 0 }}>
+            <AlertCircle size={9} /> VENCIDA
+          </div>
+        )}
         <PriorityPill priority={t.priority} iconOnly />
-        <span className="mono" style={{ fontSize: 12, color: dueColor(t.due), minWidth: 60, textAlign: 'right' }}>{fmtDate(t.due)}</span>
+        <span className="mono" style={{ fontSize: 12, color: dueColor(t.due), minWidth: 60, textAlign: 'right', flexShrink: 0 }}>{fmtDate(t.due)}</span>
         <button
           className="btn btn-ghost btn-sm"
           onClick={e => { e.stopPropagation(); setTiming(isTiming ? null : t.id); }}
-          style={isTiming ? { color: 'var(--teal)' } : {}}
+          style={isTiming ? { color: 'var(--teal)', flexShrink: 0 } : { flexShrink: 0 }}
         >
           {isTiming ? <Pause size={12} /> : <Play size={12} />}
           <span className="mono">{t.time}</span>
+        </button>
+        <button
+          className="btn btn-ghost btn-sm btn-icon"
+          onClick={e => { e.stopPropagation(); goToTask(t); }}
+          title="Ir al proyecto"
+          style={{ width: 24, height: 24, flexShrink: 0 }}
+        >
+          <ExternalLink size={11} color="var(--text-3)" />
         </button>
       </div>
     );
@@ -286,25 +321,27 @@ export default function MyDay() {
       ) : (
         /* ── Lista ── */
         <div className="page-body" style={{ maxWidth: '100%' }}>
+          {/* Vencidas */}
+          {overdueTasks.length > 0 && (
+            <div className="card mb-16" style={{ borderColor: 'rgba(239,68,68,.3)' }}>
+              <div className="card-head" style={{ background: 'rgba(239,68,68,.05)' }}>
+                <AlertCircle size={14} color="var(--red)" />
+                <span className="title" style={{ color: 'var(--red)' }}>Vencidas</span>
+                <span className="micro" style={{ marginLeft: 'auto', color: 'var(--red)' }}>{overdueTasks.length} tarea{overdueTasks.length !== 1 ? 's' : ''}</span>
+              </div>
+              <div style={{ padding: '0 18px 8px' }}>
+                {overdueTasks.map(t => <TaskRow key={t.id} t={t} />)}
+              </div>
+            </div>
+          )}
+
           <div className="card mb-16">
             <div className="card-head">
               <span className="title">Para hoy</span>
               <span className="micro" style={{ marginLeft: 'auto' }}>{todayTasks.length} tareas</span>
             </div>
             <div style={{ padding: '0 18px 8px' }}>
-              {Object.entries(grouped(todayTasks)).map(([pid, list]) => {
-                const p = projects.find(x => x.id === pid);
-                if (!p) return null;
-                return (
-                  <div key={pid} style={{ marginTop: 14 }}>
-                    <div className="row gap-8 items-center mb-8">
-                      <AreaPill areaId={p.area} mini />
-                      <span className="micro">{p.name}</span>
-                    </div>
-                    {list.map(t => <TaskRow key={t.id} t={t} />)}
-                  </div>
-                );
-              })}
+              {todayTasks.map(t => <TaskRow key={t.id} t={t} />)}
               {todayTasks.length === 0 && (
                 <div style={{ padding: '18px 0', color: 'var(--text-3)', fontSize: 13 }}>
                   {allTasks.length === 0 ? `No hay tareas asignadas a ${firstName} todavía.` : 'Sin tareas para hoy. ¡Todo al día!'}

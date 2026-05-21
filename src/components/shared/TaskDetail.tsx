@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Link2, MoreHorizontal, X, Plus, AtSign, ArrowUp, Check, Flag, Calendar, ChevronRight, Trash2, AlertTriangle, User } from 'lucide-react';
+import { Link2, MoreHorizontal, X, Plus, AtSign, ArrowUp, Check, Flag, Calendar, ChevronRight, Trash2, AlertTriangle, User, GitMerge, Clock, AlertCircle } from 'lucide-react';
 import { useAppStore } from '@/stores/app';
 import { getMember, getProject, fmtDate, dueColor, STATUS_LABELS } from '@/lib/mock-data';
-import { updateTask, deleteTask, createSubtask, toggleSubtask, createComment, createTaskDependency } from '@/lib/db';
+import { updateTask, deleteTask, createSubtask, toggleSubtask, createComment, createTaskDependency, deleteTaskDependency, fetchTaskDependencies, fetchTaskEvents, createTaskEvent } from '@/lib/db';
 import { useSubtasks, useComments, useMembers } from '@/hooks/useSupabase';
 import { Avatar } from '@/components/shared/Avatar';
 import { StatusPill, PriorityPill } from '@/components/shared/Badges';
 import { sortedMembers } from '@/lib/auth';
-import type { TaskStatus, TaskPriority } from '@/types';
+import type { TaskStatus, TaskPriority, TaskDependency, TaskEvent } from '@/types';
 
 interface TaskDetailProps {
   taskId: string;
@@ -177,8 +177,26 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
   const subInputRef = useRef<HTMLInputElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Dependencies
+  const [deps, setDeps]           = useState<TaskDependency[]>([]);
+  const [addingDep, setAddingDep] = useState(false);
+  const [newDepId, setNewDepId]   = useState('');
+  const [newDepType, setNewDepType] = useState<'finish_to_start' | 'start_to_start' | 'finish_to_finish'>('finish_to_start');
+
+  // Task events / history
+  const [events, setEvents]       = useState<TaskEvent[]>([]);
+  const [rescheduleReason, setRescheduleReason] = useState('');
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [pendingDateChange, setPendingDateChange] = useState<string | null>(null);
+
   useEffect(() => {
     if (t) { setTitleDraft(t.title); setDescDraft(t.description ?? ''); }
+  }, [taskId, t]);
+
+  useEffect(() => {
+    if (!t) return;
+    fetchTaskDependencies(t.project).then(setDeps).catch(() => {});
+    fetchTaskEvents(taskId).then(setEvents).catch(() => {});
   }, [taskId, t]);
 
   const flashSaved = useCallback(() => {
@@ -209,6 +227,52 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
   const handleTitleSave = async () => {
     setEditTitle(false);
     if (titleDraft.trim() && titleDraft !== t.title) await save({ title: titleDraft.trim() });
+  };
+
+  const handleDueSave = (newDue: string) => {
+    if (!t || newDue === t.due) return;
+    if (t.status !== 'done') {
+      // Intercept date change to ask for reason
+      setPendingDateChange(newDue);
+      setShowRescheduleModal(true);
+    } else {
+      save({ due: newDue });
+    }
+  };
+
+  const confirmReschedule = async () => {
+    if (!t || !pendingDateChange) return;
+    await save({ due: pendingDateChange });
+    await createTaskEvent({
+      task_id: t.id, user_id: currentUser.id,
+      event_type: 'date_changed',
+      old_value: { due: t.due },
+      new_value: { due: pendingDateChange },
+      reason: rescheduleReason.trim() || undefined,
+    }).catch(() => {});
+    setShowRescheduleModal(false);
+    setPendingDateChange(null);
+    setRescheduleReason('');
+    fetchTaskEvents(taskId).then(setEvents).catch(() => {});
+  };
+
+  const handleAddDep = async () => {
+    if (!t || !newDepId || newDepId === t.id) return;
+    setAddingDep(true);
+    try {
+      await createTaskDependency(t.project, newDepId, t.id, newDepType);
+      const updated = await fetchTaskDependencies(t.project);
+      setDeps(updated);
+      setNewDepId('');
+    } catch {}
+    setAddingDep(false);
+  };
+
+  const handleRemoveDep = async (dep: TaskDependency) => {
+    if (!t) return;
+    await deleteTaskDependency(dep.predecessor_id, dep.successor_id).catch(() => {});
+    const updated = await fetchTaskDependencies(t.project);
+    setDeps(updated);
   };
 
   const handleDescSave = async () => {
@@ -266,6 +330,47 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
 
   return (
     <>
+      {/* Modal: justificación de reprogramación */}
+      {showRescheduleModal && (
+        <>
+          <div className="modal-bd" style={{ zIndex: 310 }} onClick={() => setShowRescheduleModal(false)} />
+          <div className="modal" style={{ zIndex: 320, maxWidth: 420 }}>
+            <div className="modal-head">
+              <AlertTriangle size={15} color="var(--amber)" />
+              <span className="fw-6" style={{ fontSize: 14 }}>Motivo del cambio de fecha</span>
+              <button className="btn btn-ghost btn-sm btn-icon" style={{ marginLeft: 'auto' }} onClick={() => setShowRescheduleModal(false)}>
+                <X size={14} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 12 }}>
+                Estás cambiando la fecha límite de una tarea no completada. Ingresá el motivo (opcional pero recomendado para el historial).
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>De: <b style={{ color: 'var(--text-1)' }}>{t.due}</b></span>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>→ A: <b style={{ color: 'var(--teal)' }}>{pendingDateChange}</b></span>
+              </div>
+              <textarea
+                autoFocus
+                value={rescheduleReason}
+                onChange={e => setRescheduleReason(e.target.value)}
+                placeholder="Ej: Cliente solicitó extensión, tarea depende de entrega externa..."
+                style={{
+                  width: '100%', boxSizing: 'border-box', minHeight: 80,
+                  background: 'var(--surface-2)', border: '1px solid var(--border)',
+                  borderRadius: 6, padding: '8px 12px', color: 'var(--text-1)',
+                  fontSize: 13, resize: 'vertical', outline: 'none', lineHeight: 1.5,
+                }}
+              />
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-secondary btn-md" onClick={() => { setShowRescheduleModal(false); setPendingDateChange(null); }}>Cancelar</button>
+              <button className="btn btn-primary btn-md" onClick={confirmReschedule}>Confirmar cambio</button>
+            </div>
+          </div>
+        </>
+      )}
+
       <div className="slide-bd" onClick={onClose} />
       <aside className="slide-over" style={{ width: 520 }}>
 
@@ -391,7 +496,14 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
 
               {/* Fecha límite */}
               <FieldLabel>Fecha límite</FieldLabel>
-              <DateField value={t.due} onChange={due => save({ due })} />
+              <div>
+                <DateField value={t.due} onChange={handleDueSave} />
+                {t.status !== 'done' && t.due < new Date().toISOString().split('T')[0] && (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, padding: '2px 8px', borderRadius: 999, background: 'rgba(239,68,68,.12)', border: '1px solid rgba(239,68,68,.25)', fontSize: 11, color: 'var(--red)', fontWeight: 600 }}>
+                    <AlertCircle size={10} /> ATRASADA
+                  </div>
+                )}
+              </div>
 
               {/* Estado */}
               <FieldLabel>Estado</FieldLabel>
@@ -603,6 +715,127 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* DEPENDENCIAS */}
+          <SectionDivider
+            label="Dependencias"
+            action={
+              <button className="btn btn-ghost btn-sm" style={{ height: 24, fontSize: 12 }} onClick={() => setAddingDep(v => !v)}>
+                <Plus size={12} /> Agregar
+              </button>
+            }
+          />
+          <div style={{ padding: '0 20px' }}>
+            {(() => {
+              const projectTasks = tasks.filter(x => x.project === t.project && x.id !== t.id);
+              const myDeps = deps.filter(d => d.successor_id === t.id || d.predecessor_id === t.id);
+              const DEP_LABELS: Record<string, string> = {
+                finish_to_start: 'FS', start_to_start: 'SS', finish_to_finish: 'FF',
+              };
+              return (
+                <>
+                  {myDeps.length === 0 && !addingDep && (
+                    <p style={{ margin: '4px 10px', fontSize: 12, color: 'var(--text-3)' }}>Sin dependencias. Presioná "Agregar" para crear una.</p>
+                  )}
+                  {myDeps.map(dep => {
+                    const isPred = dep.predecessor_id !== t.id;
+                    const otherId = isPred ? dep.predecessor_id : dep.successor_id;
+                    const other = tasks.find(x => x.id === otherId);
+                    return (
+                      <div key={dep.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 6, marginBottom: 4, background: 'var(--surface-2)' }}>
+                        <GitMerge size={11} color="var(--text-3)" />
+                        <span style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'monospace' }}>{DEP_LABELS[dep.type]}</span>
+                        <span style={{ flex: 1, fontSize: 13, color: 'var(--text-1)' }}>
+                          {isPred ? '← ' : '→ '}{other?.title ?? otherId}
+                        </span>
+                        <button
+                          className="btn btn-ghost btn-sm btn-icon" style={{ width: 20, height: 20 }}
+                          onClick={() => handleRemoveDep(dep)}
+                        >
+                          <X size={10} color="var(--text-3)" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  {addingDep && (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+                      <select
+                        value={newDepId}
+                        onChange={e => setNewDepId(e.target.value)}
+                        style={{ flex: 1, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 8px', color: 'var(--text-1)', fontSize: 13, outline: 'none' }}
+                      >
+                        <option value="">Predecesora...</option>
+                        {projectTasks.map(x => <option key={x.id} value={x.id}>{x.title}</option>)}
+                      </select>
+                      <select
+                        value={newDepType}
+                        onChange={e => setNewDepType(e.target.value as typeof newDepType)}
+                        style={{ width: 60, background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 6px', color: 'var(--text-1)', fontSize: 12, outline: 'none' }}
+                      >
+                        <option value="finish_to_start">FS</option>
+                        <option value="start_to_start">SS</option>
+                        <option value="finish_to_finish">FF</option>
+                      </select>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={handleAddDep}
+                        disabled={addingDep || !newDepId}
+                        style={{ height: 30, whiteSpace: 'nowrap' }}
+                      >
+                        <Check size={11} />
+                      </button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => { setAddingDep(false); setNewDepId(''); }} style={{ height: 30 }}>
+                        <X size={11} />
+                      </button>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+
+          {/* HISTORIAL */}
+          <SectionDivider label="Historial" />
+          <div style={{ padding: '0 20px' }}>
+            {events.length === 0 ? (
+              <p style={{ margin: '4px 10px', fontSize: 12, color: 'var(--text-3)' }}>Sin eventos registrados.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {events.slice(0, 10).map(ev => {
+                  const EVENT_LABELS: Record<string, { label: string; color: string }> = {
+                    date_changed:    { label: 'Fecha cambiada',  color: 'var(--amber)' },
+                    status_changed:  { label: 'Estado cambiado', color: 'var(--blue)'  },
+                    overdue_flagged: { label: 'Marcada vencida', color: 'var(--red)'   },
+                    comment:         { label: 'Comentario',      color: 'var(--text-3)'},
+                    reschedule:      { label: 'Reprogramada',    color: 'var(--amber)' },
+                  };
+                  const meta = EVENT_LABELS[ev.event_type] ?? { label: ev.event_type, color: 'var(--text-3)' };
+                  const author = allMembers.find(m => m.id === ev.user_id)?.name ?? ev.user_id;
+                  const d = new Date(ev.created_at);
+                  const dateStr = `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+                  return (
+                    <div key={ev.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <Clock size={12} color={meta.color} style={{ marginTop: 3, flexShrink: 0 }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 2 }}>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: meta.color }}>{meta.label}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{author} · {dateStr}</span>
+                        </div>
+                        {ev.reason && (
+                          <div style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.4 }}>{ev.reason}</div>
+                        )}
+                        {ev.event_type === 'date_changed' && ev.old_value && ev.new_value && (
+                          <div style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'monospace' }}>
+                            {String(ev.old_value.due ?? '')} → {String(ev.new_value.due ?? '')}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* DANGER ZONE */}

@@ -186,26 +186,25 @@ export default function Dashboard() {
         {/* KPIs */}
         {!hasFilter && (
           <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-            <div className="card kpi">
-              <div className="lbl"><ListTodo size={13} /> Tareas hoy</div>
-              <div className="val">{todayCount}</div>
-              <div className="sub">asignadas para hoy</div>
-            </div>
-            <div className="card kpi danger">
-              <div className="lbl"><CircleAlert size={13} /> Vencidas</div>
-              <div className="val">{overdue.length}</div>
-              <div className="sub">requieren atención</div>
-            </div>
-            <div className="card kpi warn">
-              <div className="lbl"><TriangleAlert size={13} /> En riesgo</div>
-              <div className="val">{atRisk.length}</div>
-              <div className="sub">vencen en 48h</div>
-            </div>
-            <div className="card kpi ok">
-              <div className="lbl"><CircleCheck size={13} /> Completadas</div>
-              <div className="val">{doneCount}</div>
-              <div className="sub">total completadas</div>
-            </div>
+            {[
+              { label: 'Tareas hoy',  val: todayCount,     icon: <ListTodo size={13} />,    cls: '',       filter: 'today',   sub: 'asignadas para hoy' },
+              { label: 'Vencidas',    val: overdue.length, icon: <CircleAlert size={13} />, cls: ' danger', filter: 'overdue', sub: 'requieren atención'  },
+              { label: 'En riesgo',   val: atRisk.length,  icon: <TriangleAlert size={13}/>, cls: ' warn',  filter: 'at_risk', sub: 'vencen en 48h'       },
+              { label: 'Completadas', val: doneCount,      icon: <CircleCheck size={13} />, cls: ' ok',    filter: 'done',    sub: 'total completadas'    },
+            ].map(kpi => (
+              <div
+                key={kpi.filter}
+                className={`card kpi${kpi.cls}`}
+                onClick={() => navigate(`/tareas?filter=${kpi.filter}`)}
+                style={{ cursor: 'pointer', transition: 'transform .1s, box-shadow .1s' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,.3)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = ''; }}
+              >
+                <div className="lbl">{kpi.icon} {kpi.label}</div>
+                <div className="val">{kpi.val}</div>
+                <div className="sub">{kpi.sub}</div>
+              </div>
+            ))}
           </div>
         )}
 

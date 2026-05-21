@@ -1,5 +1,5 @@
 import { supabase, supabaseWriter } from './supabase'
-import type { Area, Member, Project, Task, Template, TemplateTask, Subtask, Comment, TaskDependency, DependencyType, AreaType, TaskPriority, TaskStatus } from '@/types'
+import type { Area, Member, Project, Task, Template, TemplateTask, Subtask, Comment, TaskDependency, DependencyType, AreaType, TaskPriority, TaskStatus, TaskEvent, TaskEventType } from '@/types'
 
 // ── helpers ───────────────────────────────────────────────
 function normaliseTask(row: Record<string, unknown>): Task {
@@ -366,5 +366,38 @@ export async function updateTaskGantt(
   patch: { start_date?: string; end_date?: string; progress?: number; is_milestone?: boolean; sort_order?: number }
 ): Promise<void> {
   const { error } = await supabaseWriter.from('tasks').update(patch).eq('id', id)
+  if (error) throw error
+}
+
+// ═══════════════════════════════════════════════════════════
+// TASK EVENTS (historial de cambios)
+// ═══════════════════════════════════════════════════════════
+
+export async function fetchTaskEvents(taskId: string): Promise<TaskEvent[]> {
+  const { data, error } = await supabase
+    .from('task_events')
+    .select('*')
+    .eq('task_id', taskId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data as TaskEvent[]
+}
+
+export async function createTaskEvent(input: {
+  task_id: string
+  user_id: string
+  event_type: TaskEventType
+  old_value?: Record<string, unknown>
+  new_value?: Record<string, unknown>
+  reason?: string
+}): Promise<void> {
+  const { error } = await supabaseWriter.from('task_events').insert({
+    task_id:    input.task_id,
+    user_id:    input.user_id,
+    event_type: input.event_type,
+    old_value:  input.old_value  ?? null,
+    new_value:  input.new_value  ?? null,
+    reason:     input.reason     ?? null,
+  })
   if (error) throw error
 }

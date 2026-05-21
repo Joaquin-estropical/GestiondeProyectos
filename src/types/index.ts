@@ -147,6 +147,20 @@ export interface InboxItem {
   target: string | null
 }
 
+// ── Task Events (historial de cambios) ────────────────────
+export type TaskEventType = 'overdue_flagged' | 'date_changed' | 'status_changed' | 'comment' | 'reschedule'
+
+export interface TaskEvent {
+  id:         string
+  task_id:    string
+  user_id:    string
+  event_type: TaskEventType
+  old_value:  Record<string, unknown> | null
+  new_value:  Record<string, unknown> | null
+  reason:     string | null
+  created_at: string
+}
+
 // ── Planillas (checklist de recepción/entrega de locales) ──
 
 export type ChecklistType      = 'reception' | 'delivery'
