@@ -329,30 +329,6 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
             </span>
           )}
           <button className="btn btn-ghost btn-sm btn-icon" title="Copiar enlace"><Link2 size={13} /></button>
-          {confirmDelete ? (
-            <>
-              <span style={{ fontSize: 12, color: 'var(--red)', fontWeight: 500 }}>¿Eliminar?</span>
-              <button
-                className="btn btn-sm"
-                style={{ background: 'rgba(239,68,68,.15)', color: 'var(--red)', border: '1px solid rgba(239,68,68,.3)', height: 28 }}
-                onClick={handleDelete}
-              >
-                Sí, eliminar
-              </button>
-              <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDelete(false)}>Cancelar</button>
-            </>
-          ) : (
-            <button
-              className="btn btn-ghost btn-sm btn-icon"
-              title="Eliminar tarea"
-              onClick={() => setConfirmDelete(true)}
-              style={{ color: 'var(--text-3)' }}
-              onMouseEnter={e => (e.currentTarget.style.color = 'var(--red)')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-3)')}
-            >
-              <Trash2 size={13} />
-            </button>
-          )}
           <button className="btn btn-ghost btn-sm btn-icon" onClick={onClose}><X size={14} /></button>
         </div>
 
@@ -642,6 +618,34 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
               </div>
             </div>
           )}
+
+          {/* ELIMINAR TAREA */}
+          <div style={{ padding: '32px 20px 0', borderTop: '1px solid var(--border)', marginTop: 24 }}>
+            {confirmDelete ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8 }}>
+                <AlertCircle size={15} color="var(--red)" style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: 13, color: 'var(--text-2)', flex: 1 }}>¿Eliminar esta tarea? No se puede deshacer.</span>
+                <button
+                  className="btn btn-sm"
+                  style={{ background: 'rgba(239,68,68,.18)', color: 'var(--red)', border: '1px solid rgba(239,68,68,.35)', fontWeight: 600 }}
+                  onClick={handleDelete}
+                >
+                  Eliminar
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDelete(false)}>Cancelar</button>
+              </div>
+            ) : (
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}
+                onClick={() => setConfirmDelete(true)}
+                onMouseEnter={e => { e.currentTarget.style.color = 'var(--red)' }}
+                onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-3)' }}
+              >
+                <Trash2 size={14} /> Eliminar tarea
+              </button>
+            )}
+          </div>
 
         </div>
       </aside>
