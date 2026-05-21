@@ -4,6 +4,7 @@ import { useTemplates, useTemplateTasks, useMembers } from '@/hooks/useSupabase'
 import { deleteArea, deleteTemplate, createTemplate, createTemplateTask, deleteTemplateTask } from '@/lib/db';
 import { useAppStore } from '@/stores/app';
 import { supabase } from '@/lib/supabase';
+import { signOut } from '@/lib/auth';
 import { Avatar } from '@/components/shared/Avatar';
 import { PageHead } from '@/components/shared/PageHead';
 import type { AreaType, TemplateTask } from '@/types';
@@ -702,9 +703,11 @@ export default function SettingsPage() {
   const [tab, setTab] = useState('areas');
   const { currentUser } = useAppStore();
 
+  const { resetSession } = useAppStore();
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    window.location.reload()
+    await signOut()
+    resetSession()
+    window.dispatchEvent(new CustomEvent('ot-auth-logout'))
   }
 
   const TABS = [

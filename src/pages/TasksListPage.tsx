@@ -1,4 +1,5 @@
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
 import { useAppStore } from '@/stores/app'
 import { PageHead } from '@/components/shared/PageHead'
 import { StatusPill, PriorityPill } from '@/components/shared/Badges'
@@ -32,6 +33,7 @@ function applyFilter(tasks: Task[], filter: FilterKey): Task[] {
 
 export default function TasksListPage() {
   const [params]  = useSearchParams()
+  const navigate  = useNavigate()
   const filter    = (params.get('filter') ?? 'all') as FilterKey
   const { tasks, projects, areas, openTask } = useAppStore()
 
@@ -40,7 +42,19 @@ export default function TasksListPage() {
 
   return (
     <>
-      <PageHead title={label} subtitle={`${filtered.length} tarea${filtered.length !== 1 ? 's' : ''}`} />
+      <PageHead
+        title={label}
+        subtitle={`${filtered.length} tarea${filtered.length !== 1 ? 's' : ''}`}
+        right={
+          <button
+            className="btn btn-ghost btn-md"
+            onClick={() => navigate(-1)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}
+          >
+            <ArrowLeft size={14} /> Volver
+          </button>
+        }
+      />
       <div className="page-body" style={{ maxWidth: 860 }}>
         {filtered.length === 0 ? (
           <div className="empty" style={{ marginTop: 60 }}>

@@ -26,7 +26,7 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const navigate   = useNavigate()
   const location   = useLocation()
-  const { areas, projects, openNewArea, openNewProject, currentUser, mobileOpen, setMobileOpen } = useAppStore()
+  const { areas, projects, openNewArea, openNewProject, currentUser, mobileOpen, setMobileOpen, accessibleAreaIds, resetSession } = useAppStore()
   const [expanded, setExpanded]         = useState<Record<string, boolean>>({})
   const [showUserMenu, setShowUserMenu] = useState(false)
 
@@ -64,7 +64,9 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
 
   const logout = async () => {
     await signOut()
-    window.location.reload()
+    resetSession()
+    // Dispatch event for App.tsx to reset user state → shows LoginPage
+    window.dispatchEvent(new CustomEvent('ot-auth-logout'))
   }
 
   const icoSize = c ? 18 : 14
@@ -121,7 +123,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         {c && <div style={{ height: 6, borderTop: '1px solid var(--border)', margin: '6px 8px' }} />}
         {!c && <div className="sb-section">Áreas</div>}
 
-        {areas.map((a) => {
+        {areas.filter(a => currentUser.is_admin || !accessibleAreaIds || accessibleAreaIds.has(a.id)).map((a) => {
           const areaProjects = projects.filter((p) => p.area === a.id)
           const isOpen  = expanded[a.id] ?? true
           const areaPath = `/area/${a.id}`

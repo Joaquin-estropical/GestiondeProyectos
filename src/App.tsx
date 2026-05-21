@@ -11,6 +11,7 @@ import { EditProjectModal } from '@/components/modals/EditProjectModal'
 import { NewTaskModal }     from '@/components/modals/NewTaskModal'
 import { useAppStore }     from '@/stores/app'
 import { getSessionUser, onAuthChange } from '@/lib/auth'
+import { supabase } from '@/lib/supabase'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import type { AppUser }    from '@/lib/auth'
 
@@ -38,7 +39,7 @@ function AppRoutes() {
     cmdkOpen, setCmdK,
     showLanding,
     loadTasks, loadAreas, loadProjects,
-    setCurrentUser,
+    setCurrentUser, resetSession, setAccessibleAreaIds,
   } = useAppStore()
 
   const [user,         setUser]         = useState<AppUser | null>(null)
@@ -47,22 +48,46 @@ function AppRoutes() {
   // Enable realtime sync when logged in
   useRealtimeSync(!!user)
 
+  // Load area access permissions for non-admin users
+  const loadAccess = async (u: AppUser) => {
+    if (u.is_admin) {
+      setAccessibleAreaIds(null) // null = see everything
+      return
+    }
+    const { data } = await supabase
+      .from('user_area_access')
+      .select('area_id')
+      .eq('user_id', u.id)
+    if (data) {
+      setAccessibleAreaIds(new Set(data.map((r: { area_id: string }) => r.area_id)))
+    } else {
+      setAccessibleAreaIds(new Set()) // no access to any area
+    }
+  }
+
   // Check existing session on mount
   useEffect(() => {
     getSessionUser().then(u => {
-      if (u) { setCurrentUser(u); setUser(u) }
+      if (u) { setCurrentUser(u); setUser(u); loadAccess(u) }
       setAuthChecking(false)
     })
   }, [setCurrentUser])
 
-  // Listen to auth state changes (logout from another tab, token refresh, etc.)
+  // Listen to auth state changes (logout from another tab)
   useEffect(() => {
     const { data: { subscription } } = onAuthChange(u => {
-      if (u) { setCurrentUser(u); setUser(u) }
+      if (u) { setCurrentUser(u); setUser(u); loadAccess(u) }
       else { setUser(null) }
     })
     return () => subscription.unsubscribe()
   }, [setCurrentUser])
+
+  // Listen for logout event dispatched by Sidebar/SettingsPage
+  useEffect(() => {
+    const handleLogout = () => { resetSession(); setUser(null) }
+    window.addEventListener('ot-auth-logout', handleLogout)
+    return () => window.removeEventListener('ot-auth-logout', handleLogout)
+  }, [resetSession])
 
   // Load data once logged in
   useEffect(() => {
@@ -87,6 +112,7 @@ function AppRoutes() {
   const handleLogin = (u: AppUser) => {
     setCurrentUser(u)
     setUser(u)
+    loadAccess(u)
   }
 
   if (authChecking) {

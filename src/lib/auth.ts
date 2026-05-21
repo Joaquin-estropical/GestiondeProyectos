@@ -90,8 +90,17 @@ export const APP_USER_IDS = new Set<string>(LOCAL_USERS.map(u => u.id))
 export const APP_USERS: AppUser[] = LOCAL_USERS.map(({ password: _pw, ...u }) => u)
 export function setCurrentUser(_id: string) {}
 export function clearCurrentUser() {}
+const PRIORITY_IDS = ['joa', 'fab', 'mar']
+
 export function sortedMembers<T extends { id: string; name: string }>(members: T[]): T[] {
-  return [...members].sort((a, b) => a.name.localeCompare(b.name, 'es'))
+  return [...members].sort((a, b) => {
+    const ai = PRIORITY_IDS.indexOf(a.id)
+    const bi = PRIORITY_IDS.indexOf(b.id)
+    if (ai !== -1 && bi !== -1) return ai - bi  // both priority → maintain order
+    if (ai !== -1) return -1                      // a is priority → a first
+    if (bi !== -1) return 1                       // b is priority → b first
+    return a.name.localeCompare(b.name, 'es')    // rest alphabetical
+  })
 }
 
 export async function createAppUser(_input: {

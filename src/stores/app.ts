@@ -7,6 +7,9 @@ interface AppState {
   // auth
   currentUser: AppUser
   setCurrentUser: (u: AppUser) => void
+  accessibleAreaIds: Set<string> | null   // null = no restriction (admin or not loaded)
+  setAccessibleAreaIds: (ids: Set<string> | null) => void
+  resetSession: () => void
   // data
   tasks:        Task[]
   areas:        Area[]
@@ -64,6 +67,15 @@ const DEFAULT_USER: AppUser = { id: '', name: '', role: '', short: '', email: ''
 export const useAppStore = create<AppState>((set, get) => ({
   currentUser: DEFAULT_USER,
   setCurrentUser: (u) => set({ currentUser: u }),
+  accessibleAreaIds: null,
+  setAccessibleAreaIds: (ids) => set({ accessibleAreaIds: ids }),
+  resetSession: () => set({
+    currentUser: DEFAULT_USER,
+    accessibleAreaIds: null,
+    tasks: [], areas: [], projects: [],
+    tasksLoaded: false, areasLoaded: false,
+    taskDetailId: null,
+  }),
 
   tasks:        [],
   areas:        [],
