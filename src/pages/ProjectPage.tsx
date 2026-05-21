@@ -157,6 +157,8 @@ function ViewTabsBar({ view, setView }: { view: string; setView: (v: string) => 
 // ─── Project List ───
 function ProjectList({ tasks, openTask, projectId }: { tasks: Task[]; openTask: (id: string) => void; projectId: string }) {
   const { openNewTask } = useAppStore();
+  const { data: members = [] } = useMembers();
+  const resolveMember = (id: string) => members.find(x => x.id === id) ?? getMember(id) ?? { name: id, short: id, id, role: '' };
   const grouped = STATUS_ORDER.map(s => ({ status: s as TaskStatus, tasks: tasks.filter(t => t.status === s) })).filter(g => g.tasks.length > 0);
 
   const dotColor = (s: string) =>
@@ -189,7 +191,7 @@ function ProjectList({ tasks, openTask, projectId }: { tasks: Task[]; openTask: 
                 </td>
               </tr>
               {g.tasks.map(t => {
-                const m = getMember(t.assignee)!;
+                const m = resolveMember(t.assignee);
                 const done = t.status === 'done';
                 return (
                   <tr key={t.id} onClick={() => openTask(t.id)}>
@@ -199,7 +201,7 @@ function ProjectList({ tasks, openTask, projectId }: { tasks: Task[]; openTask: 
                       <div className="row gap-6 items-center">
                         <Avatar name={m.name} size={22} />
                         <span className="f-xs text-2">{m.short}</span>
-                        {t.helper && (() => { const h = getMember(t.helper); return h ? <Avatar name={h.name} size={18} style={{ opacity: 0.7 }} title={`Auxiliar: ${h.name}`} /> : null; })()}
+                        {t.helper && (() => { const h = members.find(x => x.id === t.helper) ?? getMember(t.helper ?? ''); return h ? <Avatar name={h.name} size={18} style={{ opacity: 0.7 }} title={`Auxiliar: ${h.name}`} /> : null; })()}
                       </div>
                     </td>
                     <td><span className="mono f-xs" style={{ color: dueColor(t.due) }}>{fmtDate(t.due)}</span></td>
@@ -336,6 +338,7 @@ function KanDraggable({ id, children }: { id: string; children: React.ReactNode 
 function ProjectKanban({ tasks: _tasksProp, openTask, projectId }: { tasks: Task[]; openTask: (id: string) => void; projectId: string }) {
   const { tasks: storeTasks, updateTaskStatus, patchTask, openNewTask } = useAppStore();
   const { data: members = [] } = useMembers();
+  const resolveMember = (id: string) => members.find(x => x.id === id) ?? getMember(id) ?? { name: id, short: id, id, role: '' };
 
   const tasks = storeTasks.filter(t => t.project === projectId);
 
@@ -423,7 +426,7 @@ function ProjectKanban({ tasks: _tasksProp, openTask, projectId }: { tasks: Task
 
               <KanDroppable id={s} isOver={overCol === s}>
                 {list.map(t => {
-                  const m        = getMember(t.assignee);
+                  const m        = resolveMember(t.assignee);
                   const isSaving = saving === t.id;
                   const isDone   = t.status === 'done';
                   const blockNote = getBlockNote(t);
@@ -501,7 +504,7 @@ function ProjectKanban({ tasks: _tasksProp, openTask, projectId }: { tasks: Task
                       {/* Bottom meta */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
                         {m && <Avatar name={m.name} size={22} title={m.name} />}
-                        {t.helper && (() => { const h = getMember(t.helper); return h ? <Avatar name={h.name} size={18} style={{ opacity: 0.6 }} title={`Auxiliar: ${h.name}`} /> : null; })()}
+                        {t.helper && (() => { const h = members.find(x => x.id === t.helper) ?? getMember(t.helper ?? ''); return h ? <Avatar name={h.name} size={18} style={{ opacity: 0.6 }} title={`Auxiliar: ${h.name}`} /> : null; })()}
                         <span style={{ flex: 1, fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: dueColor(t.due) }}>{fmtDate(t.due)}</span>
                         {t.comments > 0 && (
                           <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--text-3)' }}>
