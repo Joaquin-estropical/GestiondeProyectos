@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Link2, X, Plus, Check, ChevronRight, GitMerge, AlertCircle, User, AlertTriangle } from 'lucide-react';
+import { Link2, X, Plus, Check, ChevronRight, GitMerge, AlertCircle, User, AlertTriangle, Trash2 } from 'lucide-react';
 import { useAppStore } from '@/stores/app';
 import { getProject, fmtDate, STATUS_LABELS, STATUS_ORDER, PRIORITY_LABELS } from '@/lib/mock-data';
-import { updateTask, createTaskDependency, deleteTaskDependency, fetchTaskDependencies, createTaskEvent } from '@/lib/db';
+import { updateTask, createTaskDependency, deleteTaskDependency, fetchTaskDependencies, createTaskEvent, deleteTask } from '@/lib/db';
 import { useMembers } from '@/hooks/useSupabase';
 import { Avatar } from '@/components/shared/Avatar';
 import { sortedMembers } from '@/lib/auth';
@@ -123,7 +123,7 @@ const DEP_TYPE_INFO: Record<string, { short: string; label: string; tooltip: str
 };
 
 export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
-  const { tasks, projects, areas, updateTaskStatus, patchTask, currentUser } = useAppStore();
+  const { tasks, projects, areas, updateTaskStatus, patchTask, removeTask, currentUser } = useAppStore();
   const { data: membersFromDB = [] } = useMembers();
   const allMembers = sortedMembers(membersFromDB);
 
@@ -144,6 +144,9 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
   // Overdue reason
   const [overdueNote, setOverdueNote] = useState('');
   const [overdueNoteSaved, setOverdueNoteSaved] = useState(false);
+
+  // Delete confirmation
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Reschedule modal
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
@@ -248,6 +251,12 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
     setDeps(updated);
   };
 
+  const handleDelete = async () => {
+    removeTask(t.id);
+    onClose();
+    await deleteTask(t.id).catch(() => {});
+  };
+
   const handleSaveOverdueNote = async () => {
     if (!overdueNote.trim()) return;
     await createTaskEvent({
@@ -320,6 +329,30 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
             </span>
           )}
           <button className="btn btn-ghost btn-sm btn-icon" title="Copiar enlace"><Link2 size={13} /></button>
+          {confirmDelete ? (
+            <>
+              <span style={{ fontSize: 12, color: 'var(--red)', fontWeight: 500 }}>¿Eliminar?</span>
+              <button
+                className="btn btn-sm"
+                style={{ background: 'rgba(239,68,68,.15)', color: 'var(--red)', border: '1px solid rgba(239,68,68,.3)', height: 28 }}
+                onClick={handleDelete}
+              >
+                Sí, eliminar
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDelete(false)}>Cancelar</button>
+            </>
+          ) : (
+            <button
+              className="btn btn-ghost btn-sm btn-icon"
+              title="Eliminar tarea"
+              onClick={() => setConfirmDelete(true)}
+              style={{ color: 'var(--text-3)' }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--red)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-3)')}
+            >
+              <Trash2 size={13} />
+            </button>
+          )}
           <button className="btn btn-ghost btn-sm btn-icon" onClick={onClose}><X size={14} /></button>
         </div>
 
