@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import { fetchTasks, fetchAreas, fetchProjects, updateTaskStatus as dbUpdateTaskStatus } from '@/lib/db'
-import { getCurrentUser } from '@/lib/auth'
 import type { Task, Area, Project, TaskStatus } from '@/types'
 import type { AppUser } from '@/lib/auth'
 
@@ -60,8 +59,10 @@ interface AppState {
   closeNewTask:    ()                => void
 }
 
+const DEFAULT_USER: AppUser = { id: '', name: '', role: '', short: '', email: '', is_admin: false }
+
 export const useAppStore = create<AppState>((set, get) => ({
-  currentUser: getCurrentUser(),
+  currentUser: DEFAULT_USER,
   setCurrentUser: (u) => set({ currentUser: u }),
 
   tasks:        [],

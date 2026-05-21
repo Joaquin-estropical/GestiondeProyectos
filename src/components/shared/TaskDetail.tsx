@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link2, MoreHorizontal, X, Plus, AtSign, ArrowUp, Check, Flag, Calendar, ChevronRight, Trash2, AlertTriangle, User } from 'lucide-react';
 import { useAppStore } from '@/stores/app';
 import { getMember, getProject, fmtDate, dueColor, STATUS_LABELS } from '@/lib/mock-data';
@@ -6,7 +6,7 @@ import { updateTask, deleteTask, createSubtask, toggleSubtask, createComment, cr
 import { useSubtasks, useComments, useMembers } from '@/hooks/useSupabase';
 import { Avatar } from '@/components/shared/Avatar';
 import { StatusPill, PriorityPill } from '@/components/shared/Badges';
-import { APP_USERS, APP_USER_IDS, sortedMembers } from '@/lib/auth';
+import { sortedMembers } from '@/lib/auth';
 import type { TaskStatus, TaskPriority } from '@/types';
 
 interface TaskDetailProps {
@@ -133,9 +133,7 @@ function MemberPicker({ value, members, onSelect, placeholder = 'Sin asignar' }:
             {!value && <Check size={11} color="var(--teal)" style={{ marginLeft: 'auto' }} />}
           </button>
           <div style={{ height: 1, background: 'var(--border)', margin: '2px 8px' }} />
-          {members.map(m => {
-            const isApp = APP_USER_IDS.has(m.id);
-            return (
+          {members.map(m => (
               <button
                 key={m.id}
                 onClick={() => { onSelect(m.id); setOpen(false); }}
@@ -145,13 +143,12 @@ function MemberPicker({ value, members, onSelect, placeholder = 'Sin asignar' }:
               >
                 <Avatar name={m.name} size={20} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: isApp ? 600 : 400 }}>{m.name}</div>
+                  <div style={{ fontWeight: 400 }}>{m.name}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{m.role}</div>
                 </div>
                 {m.id === value && <Check size={11} color="var(--teal)" />}
               </button>
-            );
-          })}
+          ))}
         </div>
       )}
     </div>
@@ -161,7 +158,7 @@ function MemberPicker({ value, members, onSelect, placeholder = 'Sin asignar' }:
 export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
   const { tasks, projects, areas, updateTaskStatus, patchTask, removeTask, currentUser } = useAppStore();
   const { data: membersFromDB = [] } = useMembers();
-  const allMembers = sortedMembers(membersFromDB.length > 0 ? membersFromDB : APP_USERS.map(u => ({ id: u.id, name: u.name, role: u.role, short: u.short })));
+  const allMembers = sortedMembers(membersFromDB);
 
   const t = tasks.find(x => x.id === taskId);
 
@@ -176,11 +173,18 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
   const [titleDraft,setTitleDraft]= useState('');
   const [editDesc,  setEditDesc]  = useState(false);
   const [descDraft, setDescDraft] = useState('');
+  const [savedFlash, setSavedFlash] = useState(false);
   const subInputRef = useRef<HTMLInputElement>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (t) { setTitleDraft(t.title); setDescDraft(t.description ?? ''); }
   }, [taskId, t]);
+
+  const flashSaved = useCallback(() => {
+    setSavedFlash(true);
+    setTimeout(() => setSavedFlash(false), 1800);
+  }, []);
 
   if (!t) return null;
 
@@ -188,14 +192,19 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
   const area = areas.find(x => x.id === t.area);
 
   // ── Handlers ──
-  const save = async (patch: Parameters<typeof updateTask>[1]) => {
-    // Optimistic store update for status
+  const save = useCallback(async (patch: Parameters<typeof updateTask>[1]) => {
+    if (!t) return;
+    // Optimistic store update immediately
     if (patch.status) updateTaskStatus(t.id, patch.status);
-    // Optimistic store patch for other fields
     const { status: _, ...rest } = patch;
     if (Object.keys(rest).length) patchTask(t.id, rest as Partial<typeof t>);
-    await updateTask(t.id, patch);
-  };
+    // Debounced DB write
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(async () => {
+      await updateTask(t.id, patch);
+      flashSaved();
+    }, 400);
+  }, [t, updateTaskStatus, patchTask, flashSaved]);
 
   const handleTitleSave = async () => {
     setEditTitle(false);
@@ -268,6 +277,11 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
         }}>
           <span className="mono" style={{ fontSize: 11, color: 'var(--text-3)', letterSpacing: '.04em' }}>{t.code}</span>
           <span style={{ flex: 1 }} />
+          {savedFlash && (
+            <span style={{ fontSize: 11, color: 'var(--teal)', fontWeight: 500, transition: 'opacity .3s' }}>
+              <Check size={11} style={{ verticalAlign: 'middle', marginRight: 3 }} />Guardado
+            </span>
+          )}
           <button className="btn btn-ghost btn-sm btn-icon" title="Copiar enlace"><Link2 size={13} /></button>
           <button className="btn btn-ghost btn-sm btn-icon"><MoreHorizontal size={13} /></button>
           <button className="btn btn-ghost btn-sm btn-icon" onClick={onClose}><X size={14} /></button>

@@ -1,18 +1,12 @@
 import { useState } from 'react';
-import { Plus, UserPlus, MoreHorizontal, Pencil, Trash2, X, Check, ChevronRight, ChevronDown, Layers } from 'lucide-react';
+import { Plus, UserPlus, MoreHorizontal, Pencil, Trash2, X, Check, ChevronRight, ChevronDown, Layers, Shield, LogOut } from 'lucide-react';
 import { useTemplates, useTemplateTasks, useMembers } from '@/hooks/useSupabase';
 import { deleteArea, deleteTemplate, createTemplate, createTemplateTask, deleteTemplateTask } from '@/lib/db';
 import { useAppStore } from '@/stores/app';
+import { supabase } from '@/lib/supabase';
 import { Avatar } from '@/components/shared/Avatar';
 import { PageHead } from '@/components/shared/PageHead';
 import type { AreaType, TemplateTask } from '@/types';
-
-const TABS = [
-  { id: 'areas',     label: 'Áreas'      },
-  { id: 'templates', label: 'Plantillas' },
-  { id: 'members',   label: 'Miembros'   },
-  { id: 'billing',   label: 'Facturación'},
-];
 
 const AREA_TYPE_LABELS: Record<AreaType, string> = {
   sucursal: 'Sucursal', outlet: 'Outlet', edificio: 'Edificio', bodega: 'Bodega', general: 'General', otros: 'Otros',
@@ -463,13 +457,168 @@ function MembersTab() {
   );
 }
 
-// ── Main ─────────────────────────────────────────────────
-export default function SettingsPage() {
-  const [tab, setTab] = useState('areas');
+// ── Tab: Usuarios y permisos (solo admin) ────────────────
+function UsersTab() {
+  const { currentUser, areas } = useAppStore()
+  const [appUsers, setAppUsers] = useState<Array<{id:string;name:string;email:string;role:string;is_admin:boolean}>>([])
+  const [userAccess, setUserAccess] = useState<Record<string, string[]>>({})
+  const [loading, setLoading] = useState(true)
+
+  useState(() => {
+    supabase.from('app_users').select('id,name,email,role,is_admin').then(({ data }) => {
+      if (data) setAppUsers(data)
+    })
+    supabase.from('user_area_access').select('user_id,area_id').then(({ data }) => {
+      if (data) {
+        const map: Record<string, string[]> = {}
+        data.forEach(r => {
+          if (!map[r.user_id]) map[r.user_id] = []
+          map[r.user_id].push(r.area_id)
+        })
+        setUserAccess(map)
+      }
+      setLoading(false)
+    })
+  })
+
+  const toggleAreaAccess = async (userId: string, areaId: string, hasAccess: boolean) => {
+    if (hasAccess) {
+      await supabase.from('user_area_access').delete().eq('user_id', userId).eq('area_id', areaId)
+      setUserAccess(prev => ({ ...prev, [userId]: (prev[userId] ?? []).filter(a => a !== areaId) }))
+    } else {
+      await supabase.from('user_area_access').insert({ user_id: userId, area_id: areaId })
+      setUserAccess(prev => ({ ...prev, [userId]: [...(prev[userId] ?? []), areaId] }))
+    }
+  }
+
+  if (!currentUser.is_admin) {
+    return (
+      <div className="empty" style={{ marginTop: 48 }}>
+        <div className="ill"><Shield size={22} /></div>
+        <p className="t">Acceso restringido</p>
+        <p className="d">Solo los administradores pueden gestionar usuarios y permisos.</p>
+      </div>
+    )
+  }
 
   return (
     <>
-      <PageHead title="Configuración" subtitle="Áreas, plantillas y miembros del workspace" />
+      <div className="row between items-center mb-16">
+        <div>
+          <div className="fw-6">Usuarios y permisos</div>
+          <div className="f-xs text-2 mt-4">Gestioná el acceso de cada usuario a áreas y proyectos.</div>
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Shield size={13} /> Para crear usuarios nuevos usá el panel de Supabase
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)' }}>Cargando usuarios...</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {appUsers.map(u => {
+            const userAreas = userAccess[u.id] ?? []
+            const hasAllAccess = userAreas.length === 0
+            return (
+              <div key={u.id} style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
+                  <Avatar name={u.name} size={36} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{u.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{u.email} · {u.role}</div>
+                  </div>
+                  {u.is_admin && (
+                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--teal)', background: 'rgba(20,184,166,.1)', padding: '2px 8px', borderRadius: 999 }}>
+                      Admin
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ padding: '12px 18px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)', marginBottom: 10 }}>
+                    Acceso a áreas
+                  </div>
+                  {u.is_admin ? (
+                    <div style={{ fontSize: 13, color: 'var(--teal)' }}>Acceso total (administrador)</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {areas.map(a => {
+                        const has = userAreas.includes(a.id)
+                        return (
+                          <button
+                            key={a.id}
+                            onClick={() => toggleAreaAccess(u.id, a.id, has)}
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 6,
+                              padding: '5px 12px', borderRadius: 999, fontSize: 12, cursor: 'pointer',
+                              border: `1px solid ${has ? a.color : 'var(--border)'}`,
+                              background: has ? `${a.color}22` : 'transparent',
+                              color: has ? 'var(--text-1)' : 'var(--text-3)',
+                              transition: 'all .12s',
+                            }}
+                          >
+                            <span style={{ width: 6, height: 6, borderRadius: 2, background: has ? a.color : 'var(--text-3)', flexShrink: 0 }} />
+                            {a.name}
+                            {has && <Check size={10} color={a.color} />}
+                          </button>
+                        )
+                      })}
+                      {areas.length === 0 && <span style={{ fontSize: 13, color: 'var(--text-3)' }}>Sin áreas creadas</span>}
+                      {userAreas.length === 0 && areas.length > 0 && (
+                        <span style={{ fontSize: 12, color: 'var(--amber)' }}>Sin acceso a ningún área (habilitá al menos una)</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+          {appUsers.length === 0 && (
+            <div className="empty" style={{ marginTop: 24 }}>
+              <p className="t">Sin usuarios registrados</p>
+              <p className="d">Creá usuarios desde el panel de Supabase Authentication y ejecutá la migración SQL para registrarlos en app_users.</p>
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  )
+}
+
+// ── Main ─────────────────────────────────────────────────
+export default function SettingsPage() {
+  const [tab, setTab] = useState('areas');
+  const { currentUser } = useAppStore();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    window.location.reload()
+  }
+
+  const TABS = [
+    { id: 'areas',     label: 'Áreas'      },
+    { id: 'templates', label: 'Plantillas' },
+    { id: 'members',   label: 'Miembros'   },
+    ...(currentUser.is_admin ? [{ id: 'users', label: 'Usuarios' }] : []),
+    { id: 'billing',   label: 'Facturación'},
+  ];
+
+  return (
+    <>
+      <PageHead
+        title="Configuración"
+        subtitle="Áreas, plantillas y miembros del workspace"
+        right={
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={handleLogout}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-3)' }}
+          >
+            <LogOut size={14} /> Cerrar sesión
+          </button>
+        }
+      />
       <div style={{ padding: '0 32px', borderBottom: '1px solid var(--border)' }}>
         <div className="tabs" style={{ background: 'transparent', border: 0, padding: 0 }}>
           {TABS.map(t => (
@@ -488,6 +637,7 @@ export default function SettingsPage() {
         {tab === 'areas'     && <AreasTab />}
         {tab === 'templates' && <TemplatesTab />}
         {tab === 'members'   && <MembersTab />}
+        {tab === 'users'     && <UsersTab />}
         {tab === 'billing'   && (
           <div className="empty" style={{ marginTop: 48 }}>
             <div className="ill">💳</div>

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { useAppStore } from '@/stores/app'
 import { Avatar } from '@/components/shared/Avatar'
-import { APP_USERS, clearCurrentUser, setCurrentUser as saveUser } from '@/lib/auth'
+import { signOut } from '@/lib/auth'
 
 const WS_ITEMS = [
   { id: 'dashboard', label: 'Inicio',            Icon: Home,          path: '/'             },
@@ -62,18 +62,8 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
     if (isMobile || isTablet) setMobileOpen(false)
   }
 
-  const switchUser = (uid: string) => {
-    const u = APP_USERS.find(x => x.id === uid)
-    if (!u) return
-    saveUser(uid)
-    setCurrentUser(u)
-    setShowUserMenu(false)
-    navigate('/')
-    window.location.reload()
-  }
-
-  const logout = () => {
-    clearCurrentUser()
+  const logout = async () => {
+    await signOut()
     window.location.reload()
   }
 
@@ -248,29 +238,12 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
             background: 'var(--surface-2)', border: '1px solid var(--border)',
             borderRadius: 8, padding: 6, zIndex: 50, marginBottom: 4,
           }}>
-            <div style={{ fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--text-3)', padding: '4px 8px 8px' }}>
-              Cambiar usuario
+            <div style={{ padding: '6px 10px 10px' }}>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-1)' }}>{currentUser.name}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{currentUser.email}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{currentUser.role}</div>
             </div>
-            {APP_USERS.map(u => (
-              <button
-                key={u.id}
-                onClick={() => switchUser(u.id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                  padding: '8px 10px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                  background: u.id === currentUser.id ? 'var(--teal-bg)' : 'transparent',
-                  color: u.id === currentUser.id ? 'var(--teal)' : 'var(--text-1)',
-                }}
-              >
-                <Avatar name={u.name} size={22} />
-                <div style={{ flex: 1, textAlign: 'left' }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 500 }}>{u.name.split(' ')[0]} {u.name.split(' ')[1]}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{u.role}</div>
-                </div>
-                {u.id === currentUser.id && <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--teal)' }} />}
-              </button>
-            ))}
-            <div style={{ borderTop: '1px solid var(--border)', marginTop: 6, paddingTop: 6 }}>
+            <div style={{ borderTop: '1px solid var(--border)', marginTop: 4, paddingTop: 6 }}>
               <button
                 onClick={logout}
                 style={{

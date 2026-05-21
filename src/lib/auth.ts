@@ -1,48 +1,77 @@
-// Simple localStorage-based user session for 3 fixed users.
-// No passwords — just user selection persisted across reloads.
+import { supabase } from './supabase'
 
 export interface AppUser {
-  id:    string
-  name:  string
-  role:  string
-  short: string
-  email: string
+  id:       string   // UUID de auth.users (o legacy id como 'joa','fab','mar')
+  name:     string
+  role:     string
+  short:    string
+  email:    string
+  is_admin: boolean
 }
 
-export const APP_USERS: AppUser[] = [
-  { id: 'joa', name: 'Joaquin Abastoflor', role: 'Jefe de Proyectos',         short: 'Joaquin A.', email: 'joaquin@tropical.bo'  },
-  { id: 'fab', name: 'Fabio Jimenez',      role: 'Coordinador Administrativo', short: 'Fabio J.',   email: 'fabio@tropical.bo'    },
-  { id: 'mar', name: 'Marcelo Jaldin',     role: 'Director de Finanzas',       short: 'Marcelo J.', email: 'marcelo@tropical.bo'  },
-]
+// Fetch profile from app_users table using auth UID
+export async function fetchAppUser(uid: string): Promise<AppUser | null> {
+  const { data, error } = await supabase
+    .from('app_users')
+    .select('id,name,role,short,email,is_admin')
+    .eq('id', uid)
+    .single()
+  if (error || !data) return null
+  return data as AppUser
+}
 
-// IDs of app login users — they appear first and highlighted in member lists
-export const APP_USER_IDS = new Set(APP_USERS.map(u => u.id))
+// Login with email + password via Supabase Auth
+export async function signIn(email: string, password: string): Promise<AppUser> {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+  if (error) throw new Error(error.message)
+  if (!data.user) throw new Error('No se pudo iniciar sesión')
+  const profile = await fetchAppUser(data.user.id)
+  if (!profile) throw new Error('Perfil de usuario no encontrado')
+  return profile
+}
 
-// Sort a member list so app users come first, then alphabetically
-export function sortedMembers<T extends { id: string; name: string }>(members: T[]): T[] {
-  return [...members].sort((a, b) => {
-    const aApp = APP_USER_IDS.has(a.id)
-    const bApp = APP_USER_IDS.has(b.id)
-    if (aApp !== bApp) return aApp ? -1 : 1
-    return a.name.localeCompare(b.name, 'es')
+// Logout
+export async function signOut(): Promise<void> {
+  await supabase.auth.signOut()
+}
+
+// Get current session user (returns null if not logged in)
+export async function getSessionUser(): Promise<AppUser | null> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) return null
+  return fetchAppUser(session.user.id)
+}
+
+// Listen to auth state changes
+export function onAuthChange(cb: (user: AppUser | null) => void) {
+  return supabase.auth.onAuthStateChange(async (_event, session) => {
+    if (!session?.user) { cb(null); return }
+    const profile = await fetchAppUser(session.user.id)
+    cb(profile)
   })
 }
 
-const KEY = 'ot_current_user'
-
-export function getCurrentUser(): AppUser {
-  const saved = localStorage.getItem(KEY)
-  if (saved) {
-    const found = APP_USERS.find(u => u.id === saved)
-    if (found) return found
-  }
-  return APP_USERS[0]
+// Create a new user (admin only — uses service role via backend or admin dashboard)
+// Returns the created user's profile
+export async function createAppUser(input: {
+  email: string; password: string; name: string; role: string; short: string; is_admin?: boolean
+}): Promise<void> {
+  // Note: creating auth.users requires service role key.
+  // This is a placeholder — actual user creation is done via Supabase Dashboard
+  // or a server-side function. Frontend shows the form, admin completes via dashboard.
+  throw new Error('La creación de usuarios debe hacerse desde el panel de Supabase o usando la CLI.')
 }
 
-export function setCurrentUser(id: string) {
-  localStorage.setItem(KEY, id)
+// ── Legacy helpers (kept for sortedMembers in TaskDetail/MemberPicker) ──────
+
+export const APP_USER_IDS = new Set<string>() // populated after login
+
+// Sort member list (app users first — will be updated once we know who's logged in)
+export function sortedMembers<T extends { id: string; name: string }>(members: T[]): T[] {
+  return [...members].sort((a, b) => a.name.localeCompare(b.name, 'es'))
 }
 
-export function clearCurrentUser() {
-  localStorage.removeItem(KEY)
-}
+// Deprecated — kept for LoginPage compatibility during transition
+export const APP_USERS: AppUser[] = []
+export function setCurrentUser(_id: string) {}
+export function clearCurrentUser() {}

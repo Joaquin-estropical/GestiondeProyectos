@@ -1,21 +1,32 @@
 import { useState } from 'react'
-import { APP_USERS, setCurrentUser } from '@/lib/auth'
+import { signIn } from '@/lib/auth'
 import type { AppUser } from '@/lib/auth'
-import { Avatar } from '@/components/shared/Avatar'
-import { ChevronRight, Shield } from 'lucide-react'
+import { Shield, Eye, EyeOff, LogIn } from 'lucide-react'
 
 interface Props {
   onLogin: (user: AppUser) => void
 }
 
 export default function LoginPage({ onLogin }: Props) {
-  const [hovered, setHovered] = useState<string | null>(null)
-  const [loading, setLoading] = useState<string | null>(null)
+  const [email,    setEmail]    = useState('')
+  const [password, setPassword] = useState('')
+  const [showPwd,  setShowPwd]  = useState(false)
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState<string | null>(null)
 
-  const handle = (u: AppUser) => {
-    setLoading(u.id)
-    setCurrentUser(u.id)
-    setTimeout(() => onLogin(u), 180)
+  const handle = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email.trim() || !password) return
+    setLoading(true)
+    setError(null)
+    try {
+      const user = await signIn(email.trim(), password)
+      onLogin(user)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al iniciar sesión')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -27,14 +38,13 @@ export default function LoginPage({ onLogin }: Props) {
       justifyContent: 'center',
       padding: '24px',
     }}>
-      {/* Background grid texture */}
       <div style={{
         position: 'fixed', inset: 0, pointerEvents: 'none',
         backgroundImage: `radial-gradient(circle at 25% 30%, rgba(20,184,166,.06) 0%, transparent 55%),
                           radial-gradient(circle at 75% 75%, rgba(59,130,246,.04) 0%, transparent 50%)`,
       }} />
 
-      <div style={{ width: '100%', maxWidth: 400, position: 'relative', zIndex: 1 }}>
+      <div style={{ width: '100%', maxWidth: 380, position: 'relative', zIndex: 1 }}>
         {/* Logo + brand */}
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <div style={{
@@ -49,55 +59,107 @@ export default function LoginPage({ onLogin }: Props) {
             Operaciones Tropical
           </h1>
           <p style={{ margin: '8px 0 0', color: 'var(--text-3)', fontSize: 13.5, lineHeight: 1.5 }}>
-            Seleccioná tu perfil para continuar
+            Ingresá con tu cuenta para continuar
           </p>
         </div>
 
-        {/* User cards */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {APP_USERS.map((u, i) => {
-            const isHov = hovered === u.id
-            const isLoad = loading === u.id
-            return (
-              <button
-                key={u.id}
-                onClick={() => handle(u)}
-                onMouseEnter={() => setHovered(u.id)}
-                onMouseLeave={() => setHovered(null)}
-                disabled={loading !== null}
+        {/* Form */}
+        <form onSubmit={handle} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Email */}
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-2)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+              Correo electrónico
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => { setEmail(e.target.value); setError(null) }}
+              placeholder="tu@tropical.bo"
+              autoComplete="email"
+              autoFocus
+              required
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                background: 'var(--surface-1)', border: `1px solid ${error ? 'var(--red)' : 'var(--border)'}`,
+                borderRadius: 8, padding: '10px 14px', fontSize: 14, color: 'var(--text-1)',
+                outline: 'none', transition: 'border-color .12s',
+              }}
+              onFocus={e => (e.currentTarget.style.borderColor = 'var(--teal)')}
+              onBlur={e => (e.currentTarget.style.borderColor = error ? 'var(--red)' : 'var(--border)')}
+            />
+          </div>
+
+          {/* Password */}
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-2)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+              Contraseña
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPwd ? 'text' : 'password'}
+                value={password}
+                onChange={e => { setPassword(e.target.value); setError(null) }}
+                placeholder="••••••••"
+                autoComplete="current-password"
+                required
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 14,
-                  padding: '14px 16px', borderRadius: 10, cursor: loading ? 'default' : 'pointer',
-                  background: isHov ? 'var(--surface-2)' : 'var(--surface-1)',
-                  border: `1px solid ${isHov ? 'rgba(20,184,166,.35)' : 'var(--border)'}`,
-                  textAlign: 'left',
-                  transition: 'border-color .15s, background .15s, transform .12s, box-shadow .15s',
-                  transform: isHov && !loading ? 'translateY(-1px)' : 'none',
-                  boxShadow: isHov && !loading ? '0 4px 16px rgba(0,0,0,.25)' : 'none',
-                  opacity: loading && !isLoad ? 0.4 : 1,
-                  animationDelay: `${i * 60}ms`,
+                  width: '100%', boxSizing: 'border-box',
+                  background: 'var(--surface-1)', border: `1px solid ${error ? 'var(--red)' : 'var(--border)'}`,
+                  borderRadius: 8, padding: '10px 42px 10px 14px', fontSize: 14, color: 'var(--text-1)',
+                  outline: 'none', transition: 'border-color .12s',
+                }}
+                onFocus={e => (e.currentTarget.style.borderColor = 'var(--teal)')}
+                onBlur={e => (e.currentTarget.style.borderColor = error ? 'var(--red)' : 'var(--border)')}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPwd(v => !v)}
+                style={{
+                  position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4,
                 }}
               >
-                <Avatar name={u.name} size={40} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', marginBottom: 2 }}>
-                    {u.name}
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{u.role}</div>
-                </div>
-                {isLoad ? (
-                  <div style={{
-                    width: 18, height: 18, borderRadius: '50%',
-                    border: '2px solid var(--teal)', borderTopColor: 'transparent',
-                    animation: 'spin .6s linear infinite', flexShrink: 0,
-                  }} />
-                ) : (
-                  <ChevronRight size={16} style={{ color: isHov ? 'var(--teal)' : 'var(--text-3)', flexShrink: 0, transition: 'color .15s' }} />
-                )}
+                {showPwd ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
-            )
-          })}
-        </div>
+            </div>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div style={{
+              padding: '10px 14px', borderRadius: 8,
+              background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)',
+              fontSize: 13, color: 'var(--red)',
+            }}>
+              {error}
+            </div>
+          )}
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={loading || !email.trim() || !password}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              width: '100%', padding: '11px 0', borderRadius: 8, border: 'none',
+              background: loading ? 'var(--surface-2)' : 'var(--teal)',
+              color: loading ? 'var(--text-3)' : '#00302A',
+              fontSize: 14, fontWeight: 600, cursor: loading ? 'default' : 'pointer',
+              transition: 'background .15s, opacity .15s',
+              opacity: (!email.trim() || !password) && !loading ? 0.5 : 1,
+              marginTop: 4,
+            }}
+          >
+            {loading ? (
+              <>
+                <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid var(--teal)', borderTopColor: 'transparent', animation: 'spin .6s linear infinite' }} />
+                Ingresando...
+              </>
+            ) : (
+              <><LogIn size={15} /> Ingresar</>
+            )}
+          </button>
+        </form>
 
         {/* Footer */}
         <div style={{
@@ -105,13 +167,11 @@ export default function LoginPage({ onLogin }: Props) {
           gap: 6, color: 'var(--text-3)', fontSize: 12,
         }}>
           <Shield size={12} />
-          <span>Todos los usuarios tienen acceso completo a proyectos y áreas</span>
+          <span>Acceso restringido — solo usuarios autorizados</span>
         </div>
       </div>
 
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
