@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
-import { Plus, ZoomIn, ZoomOut, Target, Printer, AlertTriangle, ChevronDown, ChevronRight, X, Calendar, Milestone, GripVertical } from 'lucide-react'
+import { Plus, ZoomIn, ZoomOut, Target, Printer, AlertTriangle, ChevronDown, ChevronRight, GripVertical } from 'lucide-react'
 import type { Task, TaskDependency, GanttTask } from '@/types'
-import { fetchTaskDependencies, createTaskDependency, deleteTaskDependency, updateTaskGantt } from '@/lib/db'
+import { fetchTaskDependencies, updateTaskGantt } from '@/lib/db'
+import { useAppStore } from '@/stores/app'
 import { format, addDays, differenceInCalendarDays, parseISO, isValid } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -11,7 +12,6 @@ const HEADER_H   = 52   // total: 22 (month) + 30 (weeks)
 const MONTH_H    = 22
 const WEEK_H     = 30
 const LEFT_W     = 320
-const PANEL_W    = 480
 
 const ZOOM_LEVELS = [18, 28, 44] as const
 type ZoomLevel = typeof ZOOM_LEVELS[number]
@@ -65,16 +65,6 @@ function calcCPM(tasks: GanttTask[]): GanttTask[] {
   return tasks
 }
 
-function hasCycle(tasks: GanttTask[], from: string, to: string): boolean {
-  const vis = new Set<string>()
-  const dfs = (id: string): boolean => {
-    if (id === from) return true
-    if (vis.has(id)) return false
-    vis.add(id)
-    return !!tasks.find(t => t.id === id)?.deps.some(dfs)
-  }
-  return dfs(to)
-}
 
 function toGantt(task: Task, deps: string[], origin: Date): GanttTask {
   const s = task.start_date && isValid(parseISO(task.start_date)) ? parseISO(task.start_date) : parseISO(task.due)
@@ -121,224 +111,6 @@ function Tooltip({ gt, preds, x, y }: { gt: GanttTask; preds: GanttTask[]; x: nu
         </div>
       )}
     </div>
-  )
-}
-
-// ─── Side Panel (fixed overlay — nunca se corta) ──────────
-function TaskPanel({ gt, all, deps, onClose, onUpdate, onAddDep, onRemoveDep }: {
-  gt: GanttTask; all: GanttTask[]; deps: TaskDependency[]
-  onClose: () => void
-  onUpdate: (id: string, p: Partial<Task>) => Promise<void>
-  onAddDep: (pred: string, succ: string) => Promise<void>
-  onRemoveDep: (pred: string, succ: string) => Promise<void>
-}) {
-  const orig = gt.originalTask
-  const [title,  setTitle]  = useState(orig.title)
-  const [start,  setStart]  = useState(orig.start_date ?? orig.due)
-  const [end,    setEnd]    = useState(orig.end_date ?? orig.due)
-  const [pct,    setPct]    = useState(orig.progress)
-  const [mile,   setMile]   = useState(orig.is_milestone)
-  const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    setTitle(orig.title); setStart(orig.start_date ?? orig.due)
-    setEnd(orig.end_date ?? orig.due); setPct(orig.progress); setMile(orig.is_milestone)
-  }, [gt.id]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const preds = deps.filter(d => d.successor_id === gt.id)
-    .map(d => all.find(t => t.id === d.predecessor_id)).filter(Boolean) as GanttTask[]
-  const available = all.filter(t => t.id !== gt.id && !preds.some(p => p.id === t.id) && !hasCycle(all, gt.id, t.id))
-
-  const durDays = isValid(parseISO(end)) && isValid(parseISO(start))
-    ? differenceInCalendarDays(parseISO(end), parseISO(start)) : 0
-
-  const save = async () => {
-    setSaving(true)
-    try { await onUpdate(gt.id, { title, start_date: start, end_date: end, progress: pct, is_milestone: mile }) }
-    finally { setSaving(false) }
-  }
-
-  const inp: React.CSSProperties = {
-    width: '100%', padding: '9px 12px', background: '#111116',
-    border: '1px solid #2A2A35', borderRadius: 8, color: '#E8E8EA',
-    fontSize: 13.5, outline: 'none', boxSizing: 'border-box',
-  }
-  const lbl: React.CSSProperties = {
-    fontSize: 11, color: '#5A5A68', textTransform: 'uppercase',
-    letterSpacing: '.08em', fontWeight: 700, display: 'block', marginBottom: 6,
-  }
-
-  return (
-    <>
-      {/* Backdrop semitransparente */}
-      <div
-        style={{ position: 'fixed', inset: 0, zIndex: 1998, background: 'transparent' }}
-        onClick={onClose}
-      />
-      {/* Panel */}
-      <div style={{
-        position: 'fixed', top: 0, right: 0, bottom: 0, width: PANEL_W,
-        background: '#111116', borderLeft: '1px solid #2A2A35',
-        display: 'flex', flexDirection: 'column', zIndex: 1999,
-        boxShadow: '-20px 0 60px rgba(0,0,0,.6)',
-        overflowY: 'hidden',
-      }}>
-
-        {/* Header */}
-        <div style={{
-          padding: '18px 22px 16px', borderBottom: '1px solid #1E1E28',
-          display: 'flex', alignItems: 'flex-start', gap: 12, flexShrink: 0,
-        }}>
-          <div style={{
-            width: 12, height: 12, borderRadius: '50%', flexShrink: 0, marginTop: 3,
-            background: gt.critical ? C.critical : C.normal,
-            boxShadow: `0 0 8px ${gt.critical ? C.critical : C.normal}80`,
-          }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#E8E8EA', lineHeight: 1.3, wordBreak: 'break-word' }}>
-              {orig.title}
-            </div>
-            <div style={{ fontSize: 12, color: '#5A5A68', marginTop: 3 }}>
-              {gt.critical ? '● En ruta crítica' : `○ Holgura: ${gt.float}d disponibles`}
-            </div>
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#5A5A68', padding: 4, flexShrink: 0 }}>
-            <X size={16} />
-          </button>
-        </div>
-
-        {/* Scrollable body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 22px' }}>
-
-          {/* Nombre */}
-          <div style={{ marginBottom: 20 }}>
-            <label style={lbl}>Nombre</label>
-            <input value={title} onChange={e => setTitle(e.target.value)} style={inp} />
-          </div>
-
-          {/* Hito toggle */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20,
-            padding: '12px 14px', background: '#18181F', borderRadius: 10, border: '1px solid #2A2A35',
-          }}>
-            <Milestone size={16} color='#5A5A68' />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13.5, color: '#E8E8EA', fontWeight: 500 }}>Es hito (milestone)</div>
-              <div style={{ fontSize: 12, color: '#5A5A68', marginTop: 2 }}>Se muestra como ◆ en el diagrama</div>
-            </div>
-            <button onClick={() => setMile(v => !v)} style={{
-              width: 44, height: 26, borderRadius: 13, border: 'none', cursor: 'pointer', flexShrink: 0,
-              background: mile ? 'var(--teal)' : '#2A2A35', position: 'relative', transition: 'background .2s',
-            }}>
-              <span style={{
-                position: 'absolute', top: 3, left: mile ? 21 : 3,
-                width: 20, height: 20, borderRadius: '50%',
-                background: '#fff', transition: 'left .18s', boxShadow: '0 1px 4px rgba(0,0,0,.4)',
-              }} />
-            </button>
-          </div>
-
-          {/* Fechas */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 8 }}>
-            <div>
-              <label style={lbl}>Fecha inicio</label>
-              <input type="date" value={start} onChange={e => setStart(e.target.value)} style={inp} />
-            </div>
-            <div>
-              <label style={lbl}>Fecha fin</label>
-              <input type="date" value={end} onChange={e => setEnd(e.target.value)} style={inp} />
-            </div>
-          </div>
-          {!mile && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 20, fontSize: 13, color: '#5A5A68' }}>
-              <Calendar size={13} />
-              Duración: <strong style={{ color: durDays >= 0 ? '#E8E8EA' : C.critical }}>{durDays >= 0 ? `${durDays} días` : 'Fechas inválidas'}</strong>
-            </div>
-          )}
-
-          {/* Progreso */}
-          {!mile && (
-            <div style={{ marginBottom: 20 }}>
-              <label style={lbl}>Avance — {pct}%</label>
-              <input type="range" min={0} max={100} value={pct} onChange={e => setPct(Number(e.target.value))}
-                style={{ width: '100%', accentColor: 'var(--teal)', marginBottom: 8 }} />
-              <div style={{ height: 5, borderRadius: 3, background: '#1E1E28', overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${pct}%`, background: 'var(--teal)', borderRadius: 3, transition: 'width .15s' }} />
-              </div>
-            </div>
-          )}
-
-          {/* CPM box */}
-          <div style={{
-            marginBottom: 20, padding: '14px 16px',
-            background: gt.critical ? `${C.critical}10` : '#18181F',
-            border: `1px solid ${gt.critical ? C.critical + '40' : '#2A2A35'}`,
-            borderRadius: 10,
-          }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#5A5A68', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 12 }}>
-              Análisis de ruta crítica
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              {[
-                { label: 'Estado', value: gt.critical ? '● Crítica' : '○ Normal', color: gt.critical ? C.critical : C.done },
-                { label: 'Holgura total', value: `${gt.float}d`, color: gt.float === 0 ? C.critical : '#E8E8EA' },
-                { label: 'Inicio temprano', value: `Día ${gt.es}`, color: '#E8E8EA' },
-                { label: 'Fin tardío', value: `Día ${gt.lf}`, color: '#E8E8EA' },
-              ].map(item => (
-                <div key={item.label} style={{ background: '#111116', borderRadius: 8, padding: '8px 10px' }}>
-                  <div style={{ fontSize: 11, color: '#5A5A68', marginBottom: 4 }}>{item.label}</div>
-                  <div style={{ fontSize: 13.5, fontWeight: 700, color: item.color }}>{item.value}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Dependencias */}
-          <div style={{ marginBottom: 8 }}>
-            <label style={lbl}>Depende de</label>
-            {preds.length === 0 && (
-              <div style={{ fontSize: 13, color: '#5A5A68', padding: '8px 0 12px' }}>Sin predecesoras asignadas</div>
-            )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
-              {preds.map(p => (
-                <div key={p.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
-                  background: '#18181F', borderRadius: 8, border: '1px solid #2A2A35',
-                }}>
-                  <span style={{
-                    width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                    background: p.critical ? C.critical : C.normal,
-                  }} />
-                  <span style={{ flex: 1, fontSize: 13.5, color: '#E8E8EA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {p.name}
-                  </span>
-                  <span style={{ fontSize: 11, color: '#5A5A68', flexShrink: 0, fontFamily: 'JetBrains Mono, monospace' }}>{p.duration}d</span>
-                  <button onClick={() => onRemoveDep(p.id, gt.id)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#5A5A68', padding: '2px 4px', lineHeight: 1 }}>
-                    <X size={13} />
-                  </button>
-                </div>
-              ))}
-            </div>
-            {available.length > 0 && (
-              <select defaultValue="" onChange={e => { if (e.target.value) { onAddDep(e.target.value, gt.id); e.target.value = '' } }}
-                style={{ ...inp, color: '#5A5A68' }}>
-                <option value="">+ Agregar predecesora…</option>
-                {available.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
-            )}
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div style={{ padding: '16px 22px', borderTop: '1px solid #1E1E28', flexShrink: 0, background: '#111116' }}>
-          <button onClick={save} disabled={saving} className="btn btn-primary"
-            style={{ width: '100%', height: 42, fontSize: 14, fontWeight: 700 }}>
-            {saving ? 'Guardando…' : 'Guardar cambios'}
-          </button>
-        </div>
-      </div>
-    </>
   )
 }
 
@@ -428,6 +200,7 @@ export interface GanttChartProps {
 }
 
 export function GanttChart({ tasks, projectId, projectName = '', onTaskCreated }: GanttChartProps) {
+  const { openTask } = useAppStore()
   const [dw,     setDw]     = useState<ZoomLevel>(28)
   const [deps,   setDeps]   = useState<TaskDependency[]>([])
   const [selId,  setSelId]  = useState<string | null>(null)
@@ -537,24 +310,6 @@ export function GanttChart({ tasks, projectId, projectName = '', onTaskCreated }
     document.addEventListener('mouseup', up)
   }, [dw, tasks])
 
-  const doUpdate = useCallback(async (id: string, p: Partial<Task>) => {
-    await updateTaskGantt(id, { start_date: p.start_date ?? undefined, end_date: p.end_date ?? undefined, progress: p.progress, is_milestone: p.is_milestone })
-    if (p.end_date && p.start_date) {
-      const d = differenceInCalendarDays(parseISO(p.end_date), parseISO(p.start_date))
-      setLocalDur(prev => ({ ...prev, [id]: Math.max(1, d) }))
-    }
-    setTimeout(() => setLocalDur(prev => { const n = { ...prev }; delete n[id]; return n }), 600)
-  }, [])
-
-  const addDep = useCallback(async (pred: string, succ: string) => {
-    try { const nd = await createTaskDependency(projectId, pred, succ); setDeps(prev => [...prev, nd]) }
-    catch (e) { console.error(e) }
-  }, [projectId])
-
-  const rmDep = useCallback(async (pred: string, succ: string) => {
-    try { await deleteTaskDependency(pred, succ); setDeps(prev => prev.filter(d => !(d.predecessor_id === pred && d.successor_id === succ))) }
-    catch (e) { console.error(e) }
-  }, [])
 
   // ── Drag-to-reorder handlers ──
   const onRowDragStart = useCallback((id: string) => {
@@ -590,7 +345,6 @@ export function GanttChart({ tasks, projectId, projectName = '', onTaskCreated }
     dragOverRef.current = null
   }, [])
 
-  const selTask = ganttTasks.find(t => t.id === selId) ?? null
   const color   = (gt: GanttTask) => gt.originalTask.status === 'done' ? C.done : gt.critical ? C.critical : C.normal
 
   if (!tasks.length) {
@@ -681,7 +435,7 @@ export function GanttChart({ tasks, projectId, projectName = '', onTaskCreated }
                   borderBottom: '1px solid #141418', cursor: 'pointer', gap: 6, transition: 'background .1s',
                   background: selId === gt.id ? '#1A1A26' : dragOverRef.current === gt.id ? '#1E1E2E' : 'transparent',
                 }}
-                onClick={() => setSelId(id => id === gt.id ? null : gt.id)}
+                onClick={() => { setSelId(null); openTask(gt.id) }}
                 onMouseEnter={e => { if (selId !== gt.id) (e.currentTarget as HTMLElement).style.background = '#141418' }}
                 onMouseLeave={e => { if (selId !== gt.id) (e.currentTarget as HTMLElement).style.background = 'transparent' }}
               >
@@ -816,7 +570,7 @@ export function GanttChart({ tasks, projectId, projectName = '', onTaskCreated }
                       borderRadius: 3, pointerEvents: 'all', cursor: 'pointer',
                       boxShadow: `0 3px 10px ${C.milestone}60`,
                     }}
-                      onClick={() => setSelId(id => id === gt.id ? null : gt.id)}
+                      onClick={() => { setSelId(null); openTask(gt.id) }}
                       onMouseEnter={e => { setTip({ gt, x: e.clientX, y: e.clientY }) }}
                       onMouseLeave={() => setTip(null)}
                     />
@@ -831,7 +585,7 @@ export function GanttChart({ tasks, projectId, projectName = '', onTaskCreated }
                       boxShadow: selected ? `0 0 0 2px ${c}80, 0 4px 12px ${c}30` : dragging ? `0 0 0 2px ${c}50` : 'none',
                       transition: 'box-shadow .1s',
                     }}
-                      onClick={() => { if (!drag) setSelId(id => id === gt.id ? null : gt.id) }}
+                      onClick={() => { if (!drag) { setSelId(null); openTask(gt.id) } }}
                       onMouseEnter={e => { if (!drag) setTip({ gt, x: e.clientX, y: e.clientY }) }}
                       onMouseLeave={() => setTip(null)}
                     >
@@ -885,13 +639,6 @@ export function GanttChart({ tasks, projectId, projectName = '', onTaskCreated }
         <Tooltip gt={tip.gt}
           preds={deps.filter(d => d.successor_id === tip.gt.id).map(d => ganttTasks.find(t => t.id === d.predecessor_id)).filter(Boolean) as GanttTask[]}
           x={tip.x} y={tip.y} />
-      )}
-
-      {/* Side panel (fixed, always fully visible) */}
-      {selTask && (
-        <TaskPanel gt={selTask} all={ganttTasks} deps={deps}
-          onClose={() => setSelId(null)}
-          onUpdate={doUpdate} onAddDep={addDep} onRemoveDep={rmDep} />
       )}
 
       <style>{`@media print { .gantt-toolbar { display: none !important; } }`}</style>
