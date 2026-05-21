@@ -349,13 +349,13 @@ export default function AreaView() {
   return (
     <>
       <PageHead
-        title={sa!.name}
+        title={sa?.name ?? ''}
         subtitle={`${a.name} · ${projects.length} proyectos · ${open} tareas abiertas`}
         right={
           <div className="row gap-8">
             <button className="btn btn-ghost btn-md" onClick={() => navigate(`/area/${a.id}`)}>← <span className="hide-mob">{a.name}</span></button>
             <button className="btn btn-secondary btn-md hide-mob"><UserPlus size={14} /> Invitar</button>
-            <button className="btn btn-primary btn-md" onClick={() => openNewProject(a.id, sa!.id)}><Plus size={14} /> <span className="hide-mob">Nuevo proyecto</span></button>
+            <button className="btn btn-primary btn-md" onClick={() => openNewProject(a.id, sa?.id)}><Plus size={14} /> <span className="hide-mob">Nuevo proyecto</span></button>
           </div>
         }
       />
@@ -396,7 +396,7 @@ export default function AreaView() {
                 </div>
                 <div className="text-2 f-xs mt-4">Entrega {fmtDate(p.due)} · {p.count} tareas</div>
                 <div className="progress mt-16">
-                  <div style={{ width: p.progress + '%', background: sa!.color }}></div>
+                  <div style={{ width: p.progress + '%', background: sa?.color ?? a.color }}></div>
                 </div>
               </div>
             </div>

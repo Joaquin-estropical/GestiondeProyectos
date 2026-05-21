@@ -51,7 +51,7 @@ export default function TasksListPage() {
         right={
           <button
             className="btn btn-ghost btn-md"
-            onClick={() => navigate(-1)}
+            onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/')}
             style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}
           >
             <ArrowLeft size={14} /> Volver

@@ -89,9 +89,9 @@ export function CmdK({ onClose }: CmdKProps) {
       { kind: 'Crear', label: 'Nueva tarea',             Icon: Plus,         go: () => { openNewTask(); onClose(); },    k: 'nueva tarea' },
       { kind: 'Crear', label: 'Nuevo proyecto',          Icon: FolderPlus,   go: () => { openNewProject(); onClose(); }, k: 'nuevo proyecto' },
       { kind: 'Crear', label: 'Nueva área',              Icon: MapPin,       go: () => { openNewArea(); onClose(); },    k: 'nueva area' },
-      { kind: 'IA',    label: 'Resumen del día',         Icon: Sparkles,     k: 'resumen ia' },
-      { kind: 'IA',    label: 'Detector de bloqueos',    Icon: OctagonAlert, k: 'bloqueos' },
-      { kind: 'IA',    label: 'Generar reporte semanal', Icon: FileBarChart, k: 'reporte ia' },
+      { kind: 'IA',    label: 'Resumen del día',         Icon: Sparkles,     go: () => nav('/asistente-ia?q=resumen+del+dia'),      k: 'resumen ia' },
+      { kind: 'IA',    label: 'Detector de bloqueos',    Icon: OctagonAlert, go: () => nav('/asistente-ia?q=tareas+bloqueadas'),     k: 'bloqueos' },
+      { kind: 'IA',    label: 'Generar reporte semanal', Icon: FileBarChart, go: () => nav('/asistente-ia?q=reporte+semanal'),       k: 'reporte ia' },
     ];
 
     const all = [...navItems, ...proj, ...taskItems, ...memberItems, ...actions];

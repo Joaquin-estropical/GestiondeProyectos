@@ -169,7 +169,7 @@ export async function createProject(input: {
           title:    tt.title,
           project:  project.id,
           area:     input.area,
-          assignee: input.assignee ?? 'joa',
+          assignee: input.assignee ?? '',
           due:      due.toISOString().split('T')[0],
           priority: tt.priority,
           status:   'pend' as TaskStatus,

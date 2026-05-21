@@ -1,9 +1,9 @@
-import { Flag, Store, Building2, Warehouse, MapPin } from 'lucide-react'
+import { Flag, Store, Building2, Warehouse, MapPin, Layers, MoreHorizontal } from 'lucide-react'
 import { STATUS_LABELS, PRIORITY_LABELS } from '@/lib/mock-data'
 import { useAppStore } from '@/stores/app'
 
 type IconComponent = React.ComponentType<{ size?: number }>
-const AREA_ICONS: Record<string, IconComponent> = { store: Store, 'building-2': Building2, warehouse: Warehouse, 'map-pin': MapPin }
+const AREA_ICONS: Record<string, IconComponent> = { store: Store, 'building-2': Building2, warehouse: Warehouse, 'map-pin': MapPin, layers: Layers, 'more-horizontal': MoreHorizontal }
 
 interface StatusPillProps { status: string }
 export function StatusPill({ status }: StatusPillProps) {

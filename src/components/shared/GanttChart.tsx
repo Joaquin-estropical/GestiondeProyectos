@@ -326,7 +326,7 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
       // append any visible tasks not in sortOverride (e.g., newly added)
       visibleTasks.forEach(t => { if (!sortOverride.includes(t.id)) sorted.push(t) })
     } else {
-      sorted = visibleTasks.slice().sort((a, b) => a.sort_order - b.sort_order || a.due.localeCompare(b.due))
+      sorted = visibleTasks.slice().sort((a, b) => a.sort_order - b.sort_order || (a.due ?? '').localeCompare(b.due ?? ''))
     }
     const gt = sorted.map(t => {
         const g = toGantt(t, dm.get(t.id) ?? [], origin)
@@ -433,7 +433,7 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
     dragOverRef.current = null
   }, [])
 
-  const color   = (gt: GanttTask) => gt.originalTask.status === 'done' ? C.done : gt.critical ? C.critical : C.normal
+  const color   = (gt: GanttTask) => gt.noScope ? C.noScope : gt.originalTask.status === 'done' ? C.done : gt.critical ? C.critical : C.normal
 
   if (!tasks.length) {
     return (

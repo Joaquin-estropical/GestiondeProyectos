@@ -21,7 +21,7 @@ export function NewTaskModal() {
   const [title,     setTitle]     = useState('')
   const [areaId,    setAreaId]    = useState('')
   const [projectId, setProjectId] = useState('')
-  const [assignee,  setAssignee]  = useState(currentUser.id)
+  const [assignee,  setAssignee]  = useState(currentUser.memberId)
   const [helper,    setHelper]    = useState('')
   const [startDate, setStartDate] = useState('')
   const [duration,  setDuration]  = useState('')
@@ -92,7 +92,7 @@ export function NewTaskModal() {
     setTitle(''); setDesc(''); setError(''); setHelper(''); setBulkText(''); setBulkMode(false)
     setStartDate(''); setDuration(''); setDue(newTaskDate ?? '')
     setPriority('med')
-    setAssignee(currentUser.id)
+    setAssignee(currentUser.memberId)
 
     const pid  = newTaskProjectId ?? ''
     const proj = _projects.find(p => p.id === pid)
@@ -107,7 +107,7 @@ export function NewTaskModal() {
     }
   // Only re-initialize when the modal opens or its pre-filled values change
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [newTaskOpen, newTaskProjectId, newTaskAreaId, newTaskDate, currentUser.id])
+  }, [newTaskOpen, newTaskProjectId, newTaskAreaId, newTaskDate, currentUser.memberId])
 
   const handleAreaChange = (aid: string) => {
     setAreaId(aid)
