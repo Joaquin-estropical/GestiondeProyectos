@@ -132,11 +132,6 @@ function Tooltip({ gt, preds, x, y }: { gt: GanttTask; preds: GanttTask[]; x: nu
         <span style={{ color: gt.noScope ? '#F59E0B' : '#C8C8D0' }}>
           {gt.noScope ? 's/f' : `${gt.duration}d`}
         </span>
-        <span>Holgura</span>
-        <span style={{ color: gt.noScope ? '#6B6B7A' : gt.float > 0 ? C.done : C.critical, fontWeight: 600 }}>
-          {gt.noScope ? '—' : gt.float > 0 ? `${gt.float}d libres` : 'Sin holgura'}
-        </span>
-        <span>Avance</span>     <span style={{ color: '#C8C8D0' }}>{t.progress}%</span>
         <span>Crítica</span>
         <span style={{ color: gt.critical ? C.critical : C.done, fontWeight: 700 }}>
           {gt.critical ? '● Sí' : '○ No'}
