@@ -26,7 +26,7 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const navigate   = useNavigate()
   const location   = useLocation()
-  const { areas, projects, openNewArea, openNewProject, currentUser, setCurrentUser, mobileOpen, setMobileOpen } = useAppStore()
+  const { areas, projects, openNewArea, openNewProject, currentUser, mobileOpen, setMobileOpen } = useAppStore()
   const [expanded, setExpanded]         = useState<Record<string, boolean>>({})
   const [showUserMenu, setShowUserMenu] = useState(false)
 

@@ -53,7 +53,7 @@ export function onAuthChange(cb: (user: AppUser | null) => void) {
 
 // Create a new user (admin only — uses service role via backend or admin dashboard)
 // Returns the created user's profile
-export async function createAppUser(input: {
+export async function createAppUser(_input: {
   email: string; password: string; name: string; role: string; short: string; is_admin?: boolean
 }): Promise<void> {
   // Note: creating auth.users requires service role key.

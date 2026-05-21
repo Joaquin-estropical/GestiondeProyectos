@@ -5,7 +5,7 @@ import {
   FolderOpen, X, Pencil, Check, Trash2, ChevronDown,
   Copy, Save, ClipboardList,
 } from 'lucide-react'
-import type { EventChecklist, ChecklistTemplate, TemplateItem, TemplateKind } from '@/types'
+import type { EventChecklist, ChecklistTemplate, TemplateItem } from '@/types'
 import { DEFAULT_CATEGORIES } from '@/types'
 import {
   fetchEventChecklists, fetchChecklistTemplates,
@@ -19,18 +19,7 @@ import { useAppStore } from '@/stores/app'
 
 // ── Colores y helpers ─────────────────────────────────────────────────────────
 
-const KIND_COLORS: Record<TemplateKind, string> = {
-  event_delivery:  '#6366f1',
-  branch_delivery: '#0d9488',
-  local_return:    '#f59e0b',
-  custom:          '#6b7280',
-}
-const KIND_EMOJI: Record<TemplateKind, string> = {
-  event_delivery:  '🎪',
-  branch_delivery: '🏪',
-  local_return:    '🔄',
-  custom:          '📋',
-}
+
 const CAT_COLORS: Record<string, string> = {
   'Mobiliario': '#6366f1', 'Telas y textiles': '#ec4899', 'Decoración': '#f59e0b',
   'Iluminación': '#eab308', 'Audiovisual': '#3b82f6', 'Instalaciones': '#10b981',

@@ -208,7 +208,7 @@ function ScheduleView({ tasks, todayIso, onOpenTask, onNewTask, areas }: {
 // ── Main ──────────────────────────────────────────────────
 export default function MyDay() {
   const navigate = useNavigate();
-  const { openNewTask, currentUser } = useAppStore();
+  const { openNewTask, openTask, currentUser } = useAppStore();
   const today    = new Date().toISOString().slice(0, 10);
   const [tab, setTab] = useState<MyDayView>('list');
 
@@ -225,12 +225,6 @@ export default function MyDay() {
   // Navigate to project page with task open in side panel
   const goToTask = (t: Task) => {
     navigate(`/proyecto/${t.project}?task=${t.id}`)
-  };
-
-  const grouped = (list: Task[]) => {
-    const map: Record<string, Task[]> = {};
-    list.forEach(t => { (map[t.project] = map[t.project] || []).push(t); });
-    return map;
   };
 
   function TaskRow({ t }: { t: Task }) {

@@ -30,9 +30,9 @@ BEGIN
       'authenticated', 'authenticated'
     );
     INSERT INTO auth.identities (
-      id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
+      id, provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
     ) VALUES (
-      gen_random_uuid(), uid_joa,
+      gen_random_uuid(), uid_joa::text, uid_joa,
       jsonb_build_object('sub', uid_joa::text, 'email', 'jabastoflor@tropicaltower.com.bo'),
       'email', now(), now(), now()
     );
@@ -63,9 +63,9 @@ BEGIN
       'authenticated', 'authenticated'
     );
     INSERT INTO auth.identities (
-      id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
+      id, provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
     ) VALUES (
-      gen_random_uuid(), uid_fab,
+      gen_random_uuid(), uid_fab::text, uid_fab,
       jsonb_build_object('sub', uid_fab::text, 'email', 'fjimenez@tropicaltower.com.bo'),
       'email', now(), now(), now()
     );
@@ -95,9 +95,9 @@ BEGIN
       'authenticated', 'authenticated'
     );
     INSERT INTO auth.identities (
-      id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
+      id, provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
     ) VALUES (
-      gen_random_uuid(), uid_mar,
+      gen_random_uuid(), uid_mar::text, uid_mar,
       jsonb_build_object('sub', uid_mar::text, 'email', 'mrjaldin@estropical.com'),
       'email', now(), now(), now()
     );
