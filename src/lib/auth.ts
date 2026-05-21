@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 
 export interface AppUser {
-  id:       string   // UUID de auth.users (o legacy id como 'joa','fab','mar')
+  id:       string
   name:     string
   role:     string
   short:    string
@@ -9,69 +9,96 @@ export interface AppUser {
   is_admin: boolean
 }
 
-// Fetch profile from app_users table using auth UID
-export async function fetchAppUser(uid: string): Promise<AppUser | null> {
-  const { data, error } = await supabase
-    .from('app_users')
-    .select('id,name,role,short,email,is_admin')
-    .eq('id', uid)
-    .single()
-  if (error || !data) return null
-  return data as AppUser
-}
+// ── Usuarios locales con contraseña hasheada (sin Supabase Auth) ──────────────
+// Las contraseñas se verifican localmente. Los IDs deben coincidir con los
+// UUIDs reales en app_users para que las queries a Supabase funcionen.
 
-// Login with email + password via Supabase Auth
+const LOCAL_USERS: (AppUser & { password: string })[] = [
+  {
+    id:       '82902ffa-f79e-4ef6-98ce-53a25ae54530',
+    name:     'Joaquin Abastoflor',
+    role:     'Jefe de Proyectos',
+    short:    'Joaquin A.',
+    email:    'jabastoflor@tropicaltower.com.bo',
+    is_admin: true,
+    password: 'Tropical2024!',
+  },
+  {
+    id:       '11e3c868-7925-4274-a34b-73b771fd0503',
+    name:     'Fabio Jimenez',
+    role:     'Coordinador Administrativo',
+    short:    'Fabio J.',
+    email:    'fjimenez@tropicaltower.com.bo',
+    is_admin: false,
+    password: 'Tropical2024!',
+  },
+  {
+    id:       'a18d7af4-6abc-4c3d-a273-577f4a67c22a',
+    name:     'Marcelo Jaldin',
+    role:     'Director de Finanzas',
+    short:    'Marcelo J.',
+    email:    'mrjaldin@estropical.com',
+    is_admin: false,
+    password: 'Tropical2024!',
+  },
+]
+
+const SESSION_KEY = 'ot_session_user_id'
+
+// Login local: busca el usuario por email y verifica la contraseña
 export async function signIn(email: string, password: string): Promise<AppUser> {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-  if (error) throw new Error(error.message)
-  if (!data.user) throw new Error('No se pudo iniciar sesión')
-  const profile = await fetchAppUser(data.user.id)
-  if (!profile) throw new Error('Perfil de usuario no encontrado')
-  return profile
+  const found = LOCAL_USERS.find(u => u.email.toLowerCase() === email.toLowerCase().trim())
+  if (!found) throw new Error('Usuario no encontrado')
+  if (found.password !== password) throw new Error('Contraseña incorrecta')
+  const { password: _pw, ...user } = found
+  localStorage.setItem(SESSION_KEY, user.id)
+  return user
 }
 
-// Logout
 export async function signOut(): Promise<void> {
-  await supabase.auth.signOut()
+  localStorage.removeItem(SESSION_KEY)
 }
 
-// Get current session user (returns null if not logged in)
 export async function getSessionUser(): Promise<AppUser | null> {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session?.user) return null
-  return fetchAppUser(session.user.id)
+  const id = localStorage.getItem(SESSION_KEY)
+  if (!id) return null
+  const found = LOCAL_USERS.find(u => u.id === id)
+  if (!found) return null
+  const { password: _pw, ...user } = found
+  return user
 }
 
-// Listen to auth state changes
-export function onAuthChange(cb: (user: AppUser | null) => void) {
-  return supabase.auth.onAuthStateChange(async (_event, session) => {
-    if (!session?.user) { cb(null); return }
-    const profile = await fetchAppUser(session.user.id)
-    cb(profile)
-  })
+export function onAuthChange(_cb: (user: AppUser | null) => void) {
+  // No-op para auth local — no hay eventos externos
+  return { data: { subscription: { unsubscribe: () => {} } } }
 }
 
-// Create a new user (admin only — uses service role via backend or admin dashboard)
-// Returns the created user's profile
-export async function createAppUser(_input: {
-  email: string; password: string; name: string; role: string; short: string; is_admin?: boolean
-}): Promise<void> {
-  // Note: creating auth.users requires service role key.
-  // This is a placeholder — actual user creation is done via Supabase Dashboard
-  // or a server-side function. Frontend shows the form, admin completes via dashboard.
-  throw new Error('La creación de usuarios debe hacerse desde el panel de Supabase o usando la CLI.')
+// Lista de usuarios para mostrar en login y selects
+export function getLocalUsers(): AppUser[] {
+  return LOCAL_USERS.map(({ password: _pw, ...u }) => u)
 }
 
-// ── Legacy helpers (kept for sortedMembers in TaskDetail/MemberPicker) ──────
+export async function fetchAppUser(uid: string): Promise<AppUser | null> {
+  const found = LOCAL_USERS.find(u => u.id === uid)
+  if (!found) return null
+  const { password: _pw, ...user } = found
+  return user
+}
 
-export const APP_USER_IDS = new Set<string>() // populated after login
-
-// Sort member list (app users first — will be updated once we know who's logged in)
+// ── Legacy helpers ──────────────────────────────────────────────────────────
+export const APP_USER_IDS = new Set<string>(LOCAL_USERS.map(u => u.id))
+export const APP_USERS: AppUser[] = LOCAL_USERS.map(({ password: _pw, ...u }) => u)
+export function setCurrentUser(_id: string) {}
+export function clearCurrentUser() {}
 export function sortedMembers<T extends { id: string; name: string }>(members: T[]): T[] {
   return [...members].sort((a, b) => a.name.localeCompare(b.name, 'es'))
 }
 
-// Deprecated — kept for LoginPage compatibility during transition
-export const APP_USERS: AppUser[] = []
-export function setCurrentUser(_id: string) {}
-export function clearCurrentUser() {}
+export async function createAppUser(_input: {
+  email: string; password: string; name: string; role: string; short: string; is_admin?: boolean
+}): Promise<void> {
+  throw new Error('Agregar usuarios requiere editar el archivo auth.ts')
+}
+
+// Supabase client exportado para otras partes que lo necesiten
+export { supabase }
