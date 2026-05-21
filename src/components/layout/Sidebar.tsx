@@ -125,7 +125,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
 
         {areas.filter(a => currentUser.is_admin || !accessibleAreaIds || accessibleAreaIds.has(a.id)).map((a) => {
           const areaProjects = projects.filter((p) => p.area === a.id)
-          const isOpen  = expanded[a.id] ?? true
+          const isOpen  = expanded[a.id] ?? false
           const areaPath = `/area/${a.id}`
 
           return (
