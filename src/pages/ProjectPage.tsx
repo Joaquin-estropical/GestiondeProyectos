@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay, useDroppable, useDraggable } from '@dnd-kit/core';
 import { List, Kanban, GanttChart as GanttIcon, Calendar, Table, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, ChevronLeft, ChevronRight, X, Pen, Trash2, User, AlertTriangle } from 'lucide-react';
 import { useProjects, useTasks, useMembers } from '@/hooks/useSupabase';
 import { getMember, STATUS_ORDER, STATUS_LABELS, fmtDate, dueColor } from '@/lib/mock-data';
@@ -193,9 +194,10 @@ function ProjectList({ tasks, openTask, projectId }: { tasks: Task[]; openTask: 
                     <td><span className={`check ${done ? 'done' : ''}`}></span></td>
                     <td><span style={done ? { textDecoration: 'line-through', color: 'var(--text-2)' } : {}}>{t.title}</span></td>
                     <td className="table-col-assignee">
-                      <div className="row gap-8 items-center">
+                      <div className="row gap-6 items-center">
                         <Avatar name={m.name} size={22} />
                         <span className="f-xs text-2">{m.short}</span>
+                        {t.helper && (() => { const h = getMember(t.helper); return h ? <Avatar name={h.name} size={18} style={{ opacity: 0.7 }} title={`Auxiliar: ${h.name}`} /> : null; })()}
                       </div>
                     </td>
                     <td><span className="mono f-xs" style={{ color: dueColor(t.due) }}>{fmtDate(t.due)}</span></td>
@@ -309,49 +311,62 @@ function getBlockNote(t: Task): string | null {
   return tag ? tag.slice(11) : null;
 }
 
+// Droppable column wrapper for dnd-kit
+function KanDroppable({ id, children, isOver }: { id: string; children: React.ReactNode; isOver: boolean }) {
+  const { setNodeRef } = useDroppable({ id });
+  return (
+    <div ref={setNodeRef} className={`kan-col-body ${isOver ? 'dragover' : ''}`} style={{ minHeight: 100 }}>
+      {children}
+    </div>
+  );
+}
+
+// Draggable card wrapper for dnd-kit
+function KanDraggable({ id, children }: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id });
+  return (
+    <div ref={setNodeRef} {...listeners} {...attributes} style={{ opacity: isDragging ? 0.4 : 1, touchAction: 'none' }}>
+      {children}
+    </div>
+  );
+}
+
 function ProjectKanban({ tasks: _tasksProp, openTask, projectId }: { tasks: Task[]; openTask: (id: string) => void; projectId: string }) {
-  // Read from global store — survives view switches without re-fetching
   const { tasks: storeTasks, updateTaskStatus, patchTask, openNewTask } = useAppStore();
   const { data: members = [] } = useMembers();
 
   const tasks = storeTasks.filter(t => t.project === projectId);
 
-  const [drag,   setDrag]   = useState<string | null>(null);
-  const [over,   setOver]   = useState<string | null>(null);
-  const [saving, setSaving] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [overCol,  setOverCol]  = useState<string | null>(null);
+  const [saving,   setSaving]   = useState<string | null>(null);
+  const [prompt,   setPrompt]   = useState<{ taskId: string; newStatus: TaskStatus } | null>(null);
 
-  const [prompt, setPrompt] = useState<{ taskId: string; newStatus: TaskStatus } | null>(null);
-
-  const onDragStart = (e: React.DragEvent, id: string) => {
-    setDrag(id); e.dataTransfer.setData('text/plain', id); e.dataTransfer.effectAllowed = 'move';
-  };
-  const onDragEnd   = () => { setDrag(null); setOver(null); };
-  const onDragOver  = (e: React.DragEvent, s: string) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setOver(s); };
-  const onDragLeave = (e: React.DragEvent) => {
-    if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) setOver(null);
-  };
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor,   { activationConstraint: { delay: 250, tolerance: 5 } })
+  );
 
   const commitMove = async (id: string, newStatus: TaskStatus, patch?: { helper?: string | null; tags?: string[] }) => {
-    // Update store immediately — this is what all views read from
     updateTaskStatus(id, newStatus);
     if (patch) patchTask(id, patch);
     setSaving(id);
-    // Persist to DB with any extra fields (reviewer, block note)
     await updateTask(id, { status: newStatus, ...patch }).catch(console.error);
     setSaving(null);
   };
 
-  const onDrop = async (e: React.DragEvent, newStatus: TaskStatus) => {
-    e.preventDefault();
-    const id = e.dataTransfer.getData('text/plain') || drag;
-    setDrag(null); setOver(null);
-    if (!id) return;
+  const onDragStart = (event: DragStartEvent) => setActiveId(String(event.active.id));
+  const onDragOver  = (event: DragOverEvent)  => setOverCol(event.over ? String(event.over.id) : null);
+  const onDragEnd   = async (event: DragEndEvent) => {
+    setActiveId(null); setOverCol(null);
+    const id = String(event.active.id);
+    const newStatus = event.over ? String(event.over.id) as TaskStatus : null;
+    if (!newStatus) return;
     const task = tasks.find(t => t.id === id);
     if (!task || task.status === newStatus) return;
     if (newStatus === 'rev' || newStatus === 'block') {
       setPrompt({ taskId: id, newStatus });
     } else {
-      // Clear reviewer/block-note when moving out of rev/block
       const cleanTags = task.tags.filter(x => !x.startsWith('block-note:'));
       commitMove(id, newStatus, { tags: cleanTags });
     }
@@ -370,6 +385,8 @@ function ProjectKanban({ tasks: _tasksProp, openTask, projectId }: { tasks: Task
     setPrompt(null);
   };
 
+  const activeTask = activeId ? tasks.find(t => t.id === activeId) : null;
+
   return (
     <>
       {prompt && (
@@ -380,6 +397,7 @@ function ProjectKanban({ tasks: _tasksProp, openTask, projectId }: { tasks: Task
           onCancel={() => setPrompt(null)}
         />
       )}
+      <DndContext sensors={sensors} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
       <div className="kanban">
         {STATUS_ORDER.map(s => {
           const list = tasks.filter(t => t.status === s);
@@ -401,30 +419,20 @@ function ProjectKanban({ tasks: _tasksProp, openTask, projectId }: { tasks: Task
                 </button>
               </div>
 
-              <div
-                className={`kan-col-body ${over === s ? 'dragover' : ''}`}
-                style={{ minHeight: 100 }}
-                onDragOver={e => onDragOver(e, s)}
-                onDrop={e => onDrop(e, s as TaskStatus)}
-                onDragLeave={onDragLeave}
-              >
+              <KanDroppable id={s} isOver={overCol === s}>
                 {list.map(t => {
-                  const m          = getMember(t.assignee);
-                  const isDragging = drag === t.id;
-                  const isSaving   = saving === t.id;
-                  const isDone     = t.status === 'done';
-                  const blockNote  = getBlockNote(t);
-                  const reviewer   = t.status === 'rev' && t.helper
+                  const m        = getMember(t.assignee);
+                  const isSaving = saving === t.id;
+                  const isDone   = t.status === 'done';
+                  const blockNote = getBlockNote(t);
+                  const reviewer  = t.status === 'rev' && t.helper
                     ? (members.find(x => x.id === t.helper) ?? getMember(t.helper))
                     : null;
 
                   return (
+                    <KanDraggable key={t.id} id={t.id}>
                     <div
-                      key={t.id}
-                      className={`kan-card ${isDragging ? 'dragging' : ''}`}
-                      draggable
-                      onDragStart={e => onDragStart(e, t.id)}
-                      onDragEnd={onDragEnd}
+                      className="kan-card"
                       onClick={() => openTask(t.id)}
                       style={{ opacity: isSaving ? 0.6 : 1, borderLeft: `4px solid ${col}` }}
                     >
@@ -489,8 +497,9 @@ function ProjectKanban({ tasks: _tasksProp, openTask, projectId }: { tasks: Task
                       )}
 
                       {/* Bottom meta */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
                         {m && <Avatar name={m.name} size={22} title={m.name} />}
+                        {t.helper && (() => { const h = getMember(t.helper); return h ? <Avatar name={h.name} size={18} style={{ opacity: 0.6 }} title={`Auxiliar: ${h.name}`} /> : null; })()}
                         <span style={{ flex: 1, fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: dueColor(t.due) }}>{fmtDate(t.due)}</span>
                         {t.comments > 0 && (
                           <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--text-3)' }}>
@@ -499,19 +508,29 @@ function ProjectKanban({ tasks: _tasksProp, openTask, projectId }: { tasks: Task
                         )}
                       </div>
                     </div>
+                    </KanDraggable>
                   );
                 })}
 
-                {list.length === 0 && over !== s && (
+                {list.length === 0 && (
                   <div style={{ padding: '20px 12px', color: 'var(--text-3)', fontSize: 12, textAlign: 'center', borderRadius: 6, border: '1px dashed var(--border)', margin: '0 2px' }}>
                     Sin tareas
                   </div>
                 )}
-              </div>
+              </KanDroppable>
             </div>
           );
         })}
       </div>
+      {/* Drag overlay — shows a ghost while dragging */}
+      <DragOverlay>
+        {activeTask ? (
+          <div className="kan-card" style={{ borderLeft: `4px solid ${KAN_STATUS_COLORS[activeTask.status]}`, opacity: 0.9, boxShadow: '0 8px 24px rgba(0,0,0,.5)' }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-1)' }}>{activeTask.title}</div>
+          </div>
+        ) : null}
+      </DragOverlay>
+      </DndContext>
     </>
   );
 }
