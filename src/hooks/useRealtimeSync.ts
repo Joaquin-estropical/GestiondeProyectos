@@ -7,14 +7,14 @@ import type { Task, Area, Project } from '@/types'
 // Only active when user is logged in.
 // NOTE: Supabase realtime may send partial rows on UPDATE — we always merge
 // into the existing record rather than replacing it, to avoid undefined fields.
-export function useRealtimeSync(enabled: boolean) {
+export function useRealtimeSync(enabled: boolean, userId?: string) {
   const { patchTask, addTask, removeTask, addArea, removeArea, addProject, removeProject } = useAppStore()
 
   useEffect(() => {
     if (!enabled) return
 
     const channel = supabase
-      .channel('realtime-sync')
+      .channel(`realtime-sync-${userId ?? 'anon'}`)
 
       // ── TASKS ──────────────────────────────────────────────
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tasks' }, ({ new: row }) => {
@@ -65,5 +65,5 @@ export function useRealtimeSync(enabled: boolean) {
       supabase.removeChannel(channel)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled])
+  }, [enabled, userId])
 }

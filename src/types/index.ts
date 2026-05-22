@@ -88,12 +88,17 @@ export interface TaskDependency {
 }
 
 // ── Gantt CPM types ───────────────────────────────────────
+export interface GanttDep {
+  id:   string             // predecessor task id
+  type: DependencyType
+}
+
 export interface GanttTask {
   id:          string
   name:        string
   start:       number   // days from project start (day 0)
   duration:    number   // days
-  deps:        string[] // predecessor ids
+  deps:        GanttDep[] // predecessors with their relation type
   // computed by CPM:
   es:          number
   ef:          number

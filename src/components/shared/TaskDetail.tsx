@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Link2, X, Plus, Check, ChevronRight, GitMerge, AlertCircle, User, AlertTriangle, Trash2 } from 'lucide-react';
+import { Link2, X, Plus, Check, ChevronRight, GitMerge, AlertCircle, User, AlertTriangle, Trash2, MessageSquare, Send } from 'lucide-react';
 import { useAppStore } from '@/stores/app';
 import { getProject, fmtDate, STATUS_LABELS, STATUS_ORDER, PRIORITY_LABELS } from '@/lib/mock-data';
-import { updateTask, createTaskDependency, deleteTaskDependency, fetchTaskDependencies, createTaskEvent, deleteTask } from '@/lib/db';
+import { updateTask, createTaskDependency, deleteTaskDependency, fetchTaskDependencies, createTaskEvent, deleteTask, fetchTaskEvents } from '@/lib/db';
 import { useMembers } from '@/hooks/useSupabase';
 import { Avatar } from '@/components/shared/Avatar';
-import { sortedMembers } from '@/lib/auth';
-import type { TaskDependency } from '@/types';
+import { sortedMembers, getLocalUsers } from '@/lib/auth';
+import type { TaskDependency, TaskEvent } from '@/types';
 
 interface TaskDetailProps {
   taskId: string;
@@ -145,6 +145,11 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
   const [overdueNote, setOverdueNote] = useState('');
   const [overdueNoteSaved, setOverdueNoteSaved] = useState(false);
 
+  // Comments / timeline
+  const [events, setEvents] = useState<TaskEvent[]>([]);
+  const [newComment, setNewComment] = useState('');
+  const [postingComment, setPostingComment] = useState(false);
+
   // Delete confirmation
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -166,6 +171,11 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
     if (!t) return;
     fetchTaskDependencies(t.project).then(setDeps).catch(() => {});
   }, [taskId, t?.project]);
+
+  useEffect(() => {
+    if (!t) return;
+    fetchTaskEvents(t.id).then(setEvents).catch(() => {});
+  }, [taskId, t?.id]);
 
   const flashSaved = useCallback(() => {
     setSavedFlash(true);
@@ -249,6 +259,29 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
     await deleteTaskDependency(dep.predecessor_id, dep.successor_id).catch(() => {});
     const updated = await fetchTaskDependencies(t.project);
     setDeps(updated);
+  };
+
+  const handleAddComment = async () => {
+    if (!newComment.trim() || !t) return;
+    setPostingComment(true);
+    await createTaskEvent({
+      task_id: t.id, user_id: currentUser.id,
+      event_type: 'comment',
+      old_value: undefined, new_value: undefined,
+      reason: newComment.trim(),
+    }).catch(() => {});
+    const fresh = await fetchTaskEvents(t.id).catch(() => [] as TaskEvent[]);
+    setEvents(fresh);
+    setNewComment('');
+    setPostingComment(false);
+  };
+
+  // Resolve user_id (UUID) → display name. Tries auth.LOCAL_USERS first,
+  // then falls back to "Usuario" if unknown.
+  const localUsers = getLocalUsers();
+  const resolveUserName = (uid: string): string => {
+    const u = localUsers.find(x => x.id === uid);
+    return u?.name ?? 'Usuario';
   };
 
   const handleDelete = async () => {
@@ -583,6 +616,100 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* COMENTARIOS / TIMELINE */}
+          <div style={{ padding: '24px 20px 0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <MessageSquare size={13} color="var(--text-3)" />
+              <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)' }}>Comentarios</span>
+              {events.length > 0 && (
+                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>· {events.length}</span>
+              )}
+            </div>
+
+            {/* Lista de eventos / comentarios */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+              {events.length === 0 && (
+                <p style={{ margin: '0 0 4px 4px', fontSize: 12, color: 'var(--text-3)' }}>
+                  Sin comentarios todavía. Sé el primero en comentar.
+                </p>
+              )}
+              {events.map(ev => {
+                const userName = resolveUserName(ev.user_id);
+                const isComment = ev.event_type === 'comment';
+                const typeLabel: Record<string, string> = {
+                  date_changed: '📅 Cambió la fecha',
+                  status_changed: '🔄 Cambió el estado',
+                  overdue_flagged: '⚠ Marcada como atrasada',
+                  reschedule: '📅 Reprogramada',
+                };
+                const headerText = isComment ? userName : (typeLabel[ev.event_type] ?? ev.event_type);
+                return (
+                  <div key={ev.id} style={{
+                    display: 'flex', gap: 10,
+                    padding: '10px 12px',
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 8,
+                  }}>
+                    <Avatar name={userName} size={26} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 4 }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-1)' }}>{headerText}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                          {fmtDate(ev.created_at.slice(0, 10))}
+                        </span>
+                      </div>
+                      {ev.reason && (
+                        <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                          {ev.reason}
+                        </div>
+                      )}
+                      {!isComment && !ev.reason && (
+                        <div style={{ fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic' }}>
+                          (sin nota)
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Form para nuevo comentario */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <textarea
+                value={newComment}
+                onChange={e => setNewComment(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    handleAddComment();
+                  }
+                }}
+                placeholder="Escribí un comentario... (⌘+Enter para enviar)"
+                style={{
+                  width: '100%', boxSizing: 'border-box', minHeight: 60,
+                  background: 'var(--surface-2)', border: '1px solid var(--border)',
+                  borderRadius: 6, padding: '8px 12px', color: 'var(--text-1)',
+                  fontSize: 13, resize: 'vertical', outline: 'none', lineHeight: 1.5,
+                  fontFamily: 'inherit',
+                }}
+                onFocus={e => (e.currentTarget.style.borderColor = 'var(--teal)')}
+                onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={handleAddComment}
+                  disabled={!newComment.trim() || postingComment}
+                  style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 5 }}
+                >
+                  <Send size={11} /> {postingComment ? 'Enviando…' : 'Comentar'}
+                </button>
+              </div>
             </div>
           </div>
 

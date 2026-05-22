@@ -11,9 +11,12 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
     this.state = { error: null };
   }
   static getDerivedStateFromError(error: Error) { return { error }; }
-  componentDidCatch(_error: Error, _info: ErrorInfo) {
-    // Clear potentially corrupt localStorage on crash
-    localStorage.removeItem('ot_current_user');
+  componentDidCatch(error: Error, _info: ErrorInfo) {
+    // Log for diagnostics (helps debug intermittent crashes like realtime DELETE mid-render)
+    console.error('[ErrorBoundary]', error);
+    // Note: do NOT clear the session key here — many crashes are transient and
+    // dropping the session would force a re-login. The "Reiniciar app" button
+    // below already calls localStorage.clear() if the user opts in.
   }
   render() {
     if (this.state.error) {
@@ -26,12 +29,20 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
           <div style={{ width: 48, height: 48, borderRadius: 12, background: '#14B8A6', display: 'grid', placeItems: 'center', fontSize: 18, fontWeight: 700, color: '#00302A' }}>OT</div>
           <p style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Algo salió mal</p>
           <p style={{ fontSize: 13, color: '#5A5A60', margin: 0 }}>{this.state.error.message}</p>
-          <button
-            onClick={() => { localStorage.clear(); window.location.reload(); }}
-            style={{ marginTop: 8, padding: '8px 20px', borderRadius: 6, background: '#14B8A6', border: 'none', color: '#00302A', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}
-          >
-            Reiniciar app
-          </button>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <button
+              onClick={() => window.location.reload()}
+              style={{ padding: '8px 20px', borderRadius: 6, background: '#14B8A6', border: 'none', color: '#00302A', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}
+            >
+              Reintentar
+            </button>
+            <button
+              onClick={() => { localStorage.removeItem('ot_session_user_id'); window.location.reload(); }}
+              style={{ padding: '8px 20px', borderRadius: 6, background: 'transparent', border: '1px solid #2A2A35', color: '#C8C8D0', cursor: 'pointer', fontSize: 13 }}
+            >
+              Cerrar sesión
+            </button>
+          </div>
         </div>
       );
     }

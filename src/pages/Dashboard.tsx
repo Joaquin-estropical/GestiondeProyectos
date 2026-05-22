@@ -111,12 +111,23 @@ export default function Dashboard() {
   const { data: members  = [] } = useMembers();
 
   const today = new Date().toISOString().slice(0, 10);
-  const overdue  = tasks.filter(t => t.status !== 'done' && t.due < today);
-  const atRisk   = tasks.filter(t => t.status !== 'done' && daysFromToday(t.due) <= 2 && daysFromToday(t.due) >= 0);
-  const doneCount = tasks.filter(t => t.status === 'done').length;
+
+  // ── Personal (this user) ────────────────────────────────
+  const myAll      = tasks.filter(t => t.assignee === currentUser.memberId);
+  const myOverdue  = myAll.filter(t => t.status !== 'done' && t.due < today);
+  const myTodayCnt = myAll.filter(t => t.status !== 'done' && daysFromToday(t.due) === 0).length;
+  const myCurso    = myAll.filter(t => t.status === 'curso').length;
+  const myDoneCnt  = myAll.filter(t => t.status === 'done').length;
+  const myPending  = myAll
+    .filter(t => t.status !== 'done')
+    .sort((a, b) => (a.due ?? '').localeCompare(b.due ?? ''));
+
+  // ── Team-wide (for secondary view) ──────────────────────
+  const overdue    = tasks.filter(t => t.status !== 'done' && t.due < today);
+  const atRisk     = tasks.filter(t => t.status !== 'done' && daysFromToday(t.due) <= 2 && daysFromToday(t.due) >= 0);
+  const doneCount  = tasks.filter(t => t.status === 'done').length;
   const todayCount = tasks.filter(t => t.status !== 'done' && daysFromToday(t.due) === 0).length;
 
-  const myTasks  = tasks.filter(t => t.assignee === currentUser.memberId && t.status !== 'done').slice(0, 5);
   const firstName = currentUser.name.split(' ')[0];
 
   const filtered  = applyFilters(tasks, filters);
@@ -138,7 +149,7 @@ export default function Dashboard() {
     <>
       <PageHead
         title={`Hola, ${firstName}`}
-        subtitle={`${areas.length} áreas activas · ${tasks.filter(t => t.status !== 'done').length} tareas abiertas`}
+        subtitle={`${myPending.length} pendiente${myPending.length !== 1 ? 's' : ''} · ${myOverdue.length} vencida${myOverdue.length !== 1 ? 's' : ''}`}
         right={
           <div className="row gap-8">
             <button className="btn btn-primary btn-md" onClick={() => openNewTask()}><Plus size={14} /> Nueva tarea</button>
@@ -183,19 +194,19 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* KPIs */}
+        {/* KPIs personales */}
         {!hasFilter && (
           <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
             {[
-              { label: 'Tareas hoy',  val: todayCount,     icon: <ListTodo size={13} />,    cls: '',       filter: 'today',   sub: 'asignadas para hoy' },
-              { label: 'Vencidas',    val: overdue.length, icon: <CircleAlert size={13} />, cls: ' danger', filter: 'overdue', sub: 'requieren atención'  },
-              { label: 'En riesgo',   val: atRisk.length,  icon: <TriangleAlert size={13}/>, cls: ' warn',  filter: 'at_risk', sub: 'vencen en 48h'       },
-              { label: 'Completadas', val: doneCount,      icon: <CircleCheck size={13} />, cls: ' ok',    filter: 'done',    sub: 'total completadas'    },
+              { label: 'Mis para hoy',    val: myTodayCnt,      icon: <ListTodo size={13} />,     cls: '',        filter: 'today',   sub: 'asignadas para hoy'   },
+              { label: 'Mis vencidas',    val: myOverdue.length, icon: <CircleAlert size={13} />,  cls: ' danger', filter: 'overdue', sub: 'requieren atención'    },
+              { label: 'Mis en curso',    val: myCurso,         icon: <TriangleAlert size={13}/>, cls: ' warn',   filter: 'open',    sub: 'trabajando ahora'      },
+              { label: 'Mis completadas', val: myDoneCnt,       icon: <CircleCheck size={13} />,  cls: ' ok',     filter: 'done',    sub: 'total completadas'     },
             ].map(kpi => (
               <div
                 key={kpi.filter}
                 className={`card kpi${kpi.cls}`}
-                onClick={() => navigate(`/tareas?filter=${kpi.filter}`)}
+                onClick={() => navigate(`/tareas?filter=${kpi.filter}&assignee=${currentUser.memberId}`)}
                 style={{ cursor: 'pointer', transition: 'transform .1s, box-shadow .1s' }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,.3)'; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = ''; }}
@@ -220,10 +231,12 @@ export default function Dashboard() {
                 <span className="micro" style={{ marginLeft: 'auto' }}>Datos en tiempo real</span>
               </div>
               <p className="ai-summary" style={{ margin: '14px 0 0', color: 'var(--text-1)', fontSize: 14, lineHeight: 1.6, maxWidth: 780 }}>
-                {overdue.length > 0
-                  ? <>Tenés <span className="fw-6">{overdue.length} tarea{overdue.length > 1 ? 's' : ''} vencida{overdue.length > 1 ? 's' : ''}</span> que requieren atención.</>
-                  : 'Todas las tareas están al día.'}
-                {atRisk.length > 0 && <> Hay <span className="fw-6">{atRisk.length} tarea{atRisk.length > 1 ? 's' : ''}</span> que vence{atRisk.length > 1 ? 'n' : ''} en las próximas 48h.</>}
+                {myOverdue.length > 0
+                  ? <>Tenés <span className="fw-6">{myOverdue.length} tarea{myOverdue.length > 1 ? 's' : ''} vencida{myOverdue.length > 1 ? 's' : ''}</span> asignada{myOverdue.length > 1 ? 's' : ''} a vos.</>
+                  : myPending.length > 0
+                    ? <>Tenés <span className="fw-6">{myPending.length} tarea{myPending.length > 1 ? 's' : ''} pendiente{myPending.length > 1 ? 's' : ''}</span>.</>
+                    : '¡Sin pendientes! Todo al día.'}
+                {myTodayCnt > 0 && <> <span className="fw-6">{myTodayCnt}</span> {myTodayCnt > 1 ? 'vencen' : 'vence'} hoy.</>}
                 {tasks.length === 0 && ' Aún no hay tareas en el sistema — empezá creando la primera.'}
               </p>
             </div>
@@ -235,11 +248,11 @@ export default function Dashboard() {
           <div className="grid dash-two-col" style={{ gridTemplateColumns: '1.4fr 1fr', gap: 16 }}>
             <div className="card">
               <div className="card-head">
-                <span className="title">Mis tareas</span>
-                <span className="micro" style={{ marginLeft: 'auto' }}>{myTasks.length} pendientes</span>
+                <span className="title">Mis tareas pendientes</span>
+                <span className="micro" style={{ marginLeft: 'auto' }}>{myPending.length} pendiente{myPending.length !== 1 ? 's' : ''}</span>
               </div>
-              <div>
-                {myTasks.map(t => {
+              <div style={{ maxHeight: 480, overflowY: 'auto' }}>
+                {myPending.map(t => {
                   const due    = daysFromToday(t.due);
                   const dueLbl = due < 0 ? `Vencida · ${fmtDate(t.due)}` : due === 0 ? 'Hoy' : due === 1 ? 'Mañana' : fmtDate(t.due);
                   return (
@@ -249,16 +262,16 @@ export default function Dashboard() {
                       style={{ padding: '10px 18px', borderBottom: '1px solid var(--border)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}
                     >
                       <span className="check"></span>
-                      <span style={{ flex: 1, fontSize: 13.5 }}>{t.title}</span>
+                      <span style={{ flex: 1, fontSize: 13.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
                       <AreaPill areaId={t.area} mini />
-                      <span className="mono" style={{ fontSize: 12, color: dueColor(t.due), minWidth: 0, textAlign: 'right' }}>{dueLbl}</span>
+                      <span className="mono" style={{ fontSize: 12, color: dueColor(t.due), minWidth: 0, textAlign: 'right', flexShrink: 0 }}>{dueLbl}</span>
                       <StatusPill status={t.status} />
                     </div>
                   );
                 })}
-                {myTasks.length === 0 && (
-                  <div style={{ padding: '24px 18px', color: 'var(--text-3)', fontSize: 13 }}>
-                    {tasks.length === 0 ? 'Aún no hay tareas. ¡Crea la primera!' : 'Sin tareas asignadas a vos.'}
+                {myPending.length === 0 && (
+                  <div style={{ padding: '32px 18px', color: 'var(--text-3)', fontSize: 13, textAlign: 'center' }}>
+                    {tasks.length === 0 ? 'Aún no hay tareas. ¡Crea la primera!' : '¡Sin pendientes! Todo al día.'}
                   </div>
                 )}
               </div>
@@ -319,6 +332,34 @@ export default function Dashboard() {
                     <div style={{ width: a.progress + '%', background: a.color }}></div>
                   </div>
                   <div className="mono mt-8" style={{ fontSize: 11, color: 'var(--text-3)' }}>{a.openTasks} tareas abiertas</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Vista global del equipo (contexto secundario) */}
+        {!hasFilter && tasks.length > 0 && (
+          <div>
+            <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>Vista global del equipo</span>
+              <span className="micro" style={{ color: 'var(--text-3)', fontWeight: 400 }}>· todas las tareas, todos los responsables</span>
+            </div>
+            <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+              {[
+                { label: 'Hoy del equipo', val: todayCount,     color: 'var(--text-2)' },
+                { label: 'Vencidas',        val: overdue.length, color: 'var(--red)'    },
+                { label: 'En riesgo (48h)', val: atRisk.length,  color: 'var(--amber)'  },
+                { label: 'Completadas',     val: doneCount,      color: 'var(--green)'  },
+              ].map((kpi, i) => (
+                <div
+                  key={i}
+                  className="card"
+                  onClick={() => navigate('/tareas?filter=' + ['today', 'overdue', 'at_risk', 'done'][i])}
+                  style={{ padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+                >
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{kpi.label}</span>
+                  <span style={{ fontSize: 20, fontWeight: 700, color: kpi.color, fontFamily: 'JetBrains Mono, monospace' }}>{kpi.val}</span>
                 </div>
               ))}
             </div>

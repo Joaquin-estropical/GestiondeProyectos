@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { Plus, ZoomIn, ZoomOut, Target, Printer, AlertTriangle, ChevronDown, ChevronRight, GripVertical, Eye, EyeOff } from 'lucide-react'
-import type { Task, TaskDependency, GanttTask } from '@/types'
+import type { Task, TaskDependency, GanttTask, GanttDep } from '@/types'
 import { fetchTaskDependencies, updateTaskGantt } from '@/lib/db'
 import { useAppStore } from '@/stores/app'
 import { format, addDays, differenceInCalendarDays, parseISO, isValid } from 'date-fns'
@@ -28,6 +28,10 @@ const C = {
 const PLACEHOLDER_DUE = '2099-12-31'
 
 // ─── CPM ─────────────────────────────────────────────────
+// Respects three dependency types:
+//  • FS (finish_to_start):  successor.es = max(predecessor.ef)
+//  • SS (start_to_start):   successor.es = max(predecessor.es)
+//  • FF (finish_to_finish): successor.ef = max(predecessor.ef); .es = .ef - duration
 function calcCPM(tasks: GanttTask[], allDeps: TaskDependency[]): GanttTask[] {
   if (!tasks.length) return tasks
   const m = new Map(tasks.map(t => [t.id, t]))
@@ -40,7 +44,7 @@ function calcCPM(tasks: GanttTask[], allDeps: TaskDependency[]): GanttTask[] {
   while (q.length) {
     const id = q.shift()!; ord.push(id)
     tasks.forEach(t => {
-      if (t.deps.includes(id)) {
+      if (t.deps.some(d => d.id === id)) {
         deg.set(t.id, (deg.get(t.id) ?? 1) - 1)
         if (!deg.get(t.id)) q.push(t.id)
       }
@@ -50,19 +54,48 @@ function calcCPM(tasks: GanttTask[], allDeps: TaskDependency[]): GanttTask[] {
   // forward pass
   ord.forEach(id => {
     const t = m.get(id)!
-    t.es = t.deps.length ? Math.max(...t.deps.map(d => m.get(d)?.ef ?? 0)) : 0
-    t.ef = t.es + t.duration
+    if (!t.deps.length) {
+      t.es = 0
+      t.ef = t.duration
+      return
+    }
+    let es = 0
+    let efFromFF = -Infinity
+    for (const d of t.deps) {
+      const p = m.get(d.id); if (!p) continue
+      if (d.type === 'finish_to_start')        es = Math.max(es, p.ef)
+      else if (d.type === 'start_to_start')    es = Math.max(es, p.es)
+      else if (d.type === 'finish_to_finish')  efFromFF = Math.max(efFromFF, p.ef)
+    }
+    if (efFromFF > -Infinity) {
+      // FF dominates: align end with predecessor's end (but not earlier than es+duration)
+      t.ef = Math.max(efFromFF, es + t.duration)
+      t.es = t.ef - t.duration
+    } else {
+      t.es = es
+      t.ef = es + t.duration
+    }
   })
   const end = Math.max(...tasks.map(t => t.ef), 0)
 
-  // backward pass
+  // backward pass — respect type of each successor's dep
   tasks.forEach(t => { t.lf = end; t.ls = end - t.duration })
   ;[...ord].reverse().forEach(id => {
     const t = m.get(id)!
     tasks.forEach(s => {
-      if (s.deps.includes(id)) { t.lf = Math.min(t.lf, s.ls); t.ls = t.lf - t.duration }
+      const dep = s.deps.find(d => d.id === id)
+      if (!dep) return
+      if (dep.type === 'finish_to_start') {
+        t.lf = Math.min(t.lf, s.ls)
+      } else if (dep.type === 'start_to_start') {
+        // pred.es ≤ succ.es ⇒ pred.ls ≥ ... ; for slack: pred.ls ≤ succ.ls
+        t.lf = Math.min(t.lf, s.ls + t.duration)
+      } else if (dep.type === 'finish_to_finish') {
+        t.lf = Math.min(t.lf, s.lf)
+      }
+      t.ls = t.lf - t.duration
     })
-    t.float    = t.ls - t.es
+    t.float = t.ls - t.es
   })
 
   // Criticality: only tasks with real scope, not done, and in a dependency chain
@@ -79,7 +112,7 @@ function calcCPM(tasks: GanttTask[], allDeps: TaskDependency[]): GanttTask[] {
 }
 
 
-function toGantt(task: Task, deps: string[], origin: Date): GanttTask {
+function toGantt(task: Task, deps: GanttDep[], origin: Date): GanttTask {
   const hasStart   = !!(task.start_date && isValid(parseISO(task.start_date)))
   const hasEndDate = !!(task.end_date   && isValid(parseISO(task.end_date)))
   const hasRealDue = !!(task.due && task.due !== PLACEHOLDER_DUE && isValid(parseISO(task.due)))
@@ -156,8 +189,23 @@ function Arrows({ tasks, deps, dw, rh }: { tasks: GanttTask[]; deps: TaskDepende
     const pi = idx.get(d.predecessor_id), si = idx.get(d.successor_id)
     if (pi === undefined || si === undefined) return null
     const pred = tasks[pi], succ = tasks[si]
-    const x1 = (pred.es + pred.duration) * dw, y1 = pi * rh + rh / 2
-    const x2 = succ.es * dw,                   y2 = si * rh + rh / 2
+    // Endpoint coords depend on dep type:
+    //   FS: pred.end  → succ.start
+    //   SS: pred.start → succ.start
+    //   FF: pred.end  → succ.end
+    let x1: number, x2: number
+    if (d.type === 'start_to_start') {
+      x1 = pred.es * dw
+      x2 = succ.es * dw
+    } else if (d.type === 'finish_to_finish') {
+      x1 = (pred.es + pred.duration) * dw
+      x2 = (succ.es + succ.duration) * dw
+    } else {
+      x1 = (pred.es + pred.duration) * dw
+      x2 = succ.es * dw
+    }
+    const y1 = pi * rh + rh / 2
+    const y2 = si * rh + rh / 2
     const both = pred.critical && succ.critical
     const color = both ? C.critical : '#484858'
     const dx = Math.abs(x2 - x1)
@@ -279,6 +327,8 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
   const [tip,    setTip]    = useState<{ gt: GanttTask; x: number; y: number } | null>(null)
   const [critCol, setCritCol] = useState(false)
   const [showCompleted, setShowCompleted] = useState(false)
+  const [completedFrom, setCompletedFrom] = useState('')
+  const [completedTo,   setCompletedTo]   = useState('')
   const [drag,   setDrag]   = useState<{ id: string; startX: number; origDur: number; curDur: number } | null>(null)
   const [localDur, setLocalDur] = useState<Record<string, number>>({})
   // Drag-to-reorder
@@ -296,19 +346,30 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
 
   // Filter tasks before plotting:
   //  • require start_date (no temporal anchor → skip)
-  //  • hide done tasks unless they are "bridges" (have ≥1 pred AND ≥1 succ in deps)
-  //    or showCompleted toggle is on
+  //  • done tasks:
+  //      - if completedFrom/To range is set, only show those within it
+  //      - else if showCompleted toggle off, only show "bridges" (≥1 pred AND ≥1 succ)
+  const hasCompletedRange = !!(completedFrom || completedTo)
   const visibleTasks = useMemo(() => {
     return tasks.filter(t => {
       if (!t.start_date) return false
-      if (t.status === 'done' && !showCompleted) {
-        const hasPred = deps.some(d => d.successor_id === t.id)
-        const hasSucc = deps.some(d => d.predecessor_id === t.id)
-        if (!(hasPred && hasSucc)) return false
+      if (t.status === 'done') {
+        if (hasCompletedRange) {
+          const refDate = t.end_date ?? t.due
+          if (!refDate) return false
+          if (completedFrom && refDate < completedFrom) return false
+          if (completedTo   && refDate > completedTo)   return false
+          return true
+        }
+        if (!showCompleted) {
+          const hasPred = deps.some(d => d.successor_id === t.id)
+          const hasSucc = deps.some(d => d.predecessor_id === t.id)
+          if (!(hasPred && hasSucc)) return false
+        }
       }
       return true
     })
-  }, [tasks, deps, showCompleted])
+  }, [tasks, deps, showCompleted, hasCompletedRange, completedFrom, completedTo])
 
   const origin = useMemo(() => {
     const sd = visibleTasks.filter(t => t.start_date).map(t => parseISO(t.start_date!)).filter(isValid)
@@ -317,8 +378,13 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
   }, [visibleTasks])
 
   const ganttTasks = useMemo(() => {
-    const dm = new Map<string, string[]>()
-    deps.forEach(d => { dm.set(d.successor_id, [...(dm.get(d.successor_id) ?? []), d.predecessor_id]) })
+    const dm = new Map<string, GanttDep[]>()
+    deps.forEach(d => {
+      dm.set(d.successor_id, [
+        ...(dm.get(d.successor_id) ?? []),
+        { id: d.predecessor_id, type: d.type },
+      ])
+    })
     const taskMap = new Map(visibleTasks.map(t => [t.id, t]))
     let sorted: Task[]
     if (sortOverride) {
@@ -485,14 +551,54 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
           onClick={() => { if (rightRef.current) rightRef.current.scrollLeft = Math.max(0, todayX - 280) }}>
           <Target size={13} /> Hoy
         </button>
-        <button
-          className="btn btn-secondary btn-sm"
-          title={showCompleted ? 'Ocultar tareas completadas' : 'Mostrar tareas completadas'}
-          onClick={() => setShowCompleted(v => !v)}
-        >
-          {showCompleted ? <EyeOff size={13} /> : <Eye size={13} />}
-          {showCompleted ? 'Ocultar completadas' : 'Mostrar completadas'}
-        </button>
+        {!hasCompletedRange && (
+          <button
+            className="btn btn-secondary btn-sm"
+            title={showCompleted ? 'Ocultar tareas completadas' : 'Mostrar tareas completadas'}
+            onClick={() => setShowCompleted(v => !v)}
+          >
+            {showCompleted ? <EyeOff size={13} /> : <Eye size={13} />}
+            {showCompleted ? 'Ocultar completadas' : 'Mostrar completadas'}
+          </button>
+        )}
+
+        {/* Rango de completadas */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#6B6B7A' }}>
+          <span style={{ marginRight: 2 }}>Completadas:</span>
+          <input
+            type="date"
+            value={completedFrom}
+            onChange={e => setCompletedFrom(e.target.value)}
+            title="Desde"
+            style={{
+              background: 'var(--surface-2)', border: '1px solid var(--border)',
+              borderRadius: 4, padding: '3px 6px', fontSize: 11, color: 'var(--text-1)',
+              outline: 'none', cursor: 'pointer', height: 26,
+            }}
+          />
+          <span style={{ color: '#3A3A4A' }}>→</span>
+          <input
+            type="date"
+            value={completedTo}
+            onChange={e => setCompletedTo(e.target.value)}
+            title="Hasta"
+            style={{
+              background: 'var(--surface-2)', border: '1px solid var(--border)',
+              borderRadius: 4, padding: '3px 6px', fontSize: 11, color: 'var(--text-1)',
+              outline: 'none', cursor: 'pointer', height: 26,
+            }}
+          />
+          {hasCompletedRange && (
+            <button
+              onClick={() => { setCompletedFrom(''); setCompletedTo(''); }}
+              title="Limpiar rango"
+              style={{
+                background: 'transparent', border: 'none', color: 'var(--text-3)',
+                cursor: 'pointer', padding: '0 4px', fontSize: 14, lineHeight: 1,
+              }}
+            >×</button>
+          )}
+        </div>
 
         {/* Leyenda */}
         <div style={{ display: 'flex', gap: 10, marginLeft: 6 }}>

@@ -1,6 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Component } from 'react'
+import type { ReactNode } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import './index.css'
+
+// Local boundary that only swallows crashes in overlays (TaskDetail, CmdK).
+// Without this, a single overlay crash (e.g. stale ref after realtime DELETE)
+// tumbles the whole app via the root ErrorBoundary in main.tsx.
+class OverlayBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false }
+  static getDerivedStateFromError() { return { hasError: true } }
+  componentDidCatch(err: Error) { console.error('[OverlayBoundary]', err) }
+  render() { return this.state.hasError ? null : this.props.children }
+}
 
 import { AppShell }        from '@/components/layout/AppShell'
 import { TaskDetail }      from '@/components/shared/TaskDetail'
@@ -46,8 +57,9 @@ function AppRoutes() {
   const [user,         setUser]         = useState<AppUser | null>(null)
   const [authChecking, setAuthChecking] = useState(true)
 
-  // Enable realtime sync when logged in
-  useRealtimeSync(!!user)
+  // Enable realtime sync when logged in. Channel name is per-user to avoid
+  // collisions when multiple devices/users are connected simultaneously.
+  useRealtimeSync(!!user, user?.id)
 
   // Load area access permissions for non-admin users
   const loadAccess = async (u: AppUser) => {
@@ -153,14 +165,18 @@ function AppRoutes() {
         <Route path="/planillas/:checklistId/imprimir" element={<PrintPage />} />
       </Routes>
 
-      {/* Overlays globales */}
-      {taskDetailId && <TaskDetail taskId={taskDetailId} onClose={closeTask} />}
-      {cmdkOpen     && <CmdK onClose={() => setCmdK(false)} />}
-      <NewAreaModal />
-      <NewSubAreaModal />
-      <NewProjectModal />
-      <EditProjectModal />
-      <NewTaskModal />
+      {/* Overlays globales — wrapped in OverlayBoundary so a transient crash
+          (e.g. stale ref after a realtime DELETE) doesn't tumble the whole app.
+          The `key` on TaskDetail forces a clean remount when navigating between tasks. */}
+      <OverlayBoundary>
+        {taskDetailId && <TaskDetail key={taskDetailId} taskId={taskDetailId} onClose={closeTask} />}
+        {cmdkOpen     && <CmdK onClose={() => setCmdK(false)} />}
+        <NewAreaModal />
+        <NewSubAreaModal />
+        <NewProjectModal />
+        <EditProjectModal />
+        <NewTaskModal />
+      </OverlayBoundary>
     </>
   )
 }
