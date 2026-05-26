@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Plus, ArrowRight, CircleAlert, TriangleAlert, CircleCheck, ListTodo, Sparkles, ChevronDown, X, Search } from 'lucide-react';
+import { Plus, CircleAlert, TriangleAlert, CircleCheck, ListTodo, Sparkles, ChevronDown, X, Search, ShieldAlert } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAreas, useProjects, useTasks, useMembers } from '@/hooks/useSupabase';
-import { getMember, daysFromToday, fmtDate, dueColor, ACTIVITY } from '@/lib/mock-data';
+import { getMember, daysFromToday, fmtDate, dueColor } from '@/lib/mock-data';
 import { Avatar } from '@/components/shared/Avatar';
 import { StatusPill, AreaPill } from '@/components/shared/Badges';
 import { PageHead } from '@/components/shared/PageHead';
@@ -91,12 +91,88 @@ function applyFilters(tasks: Task[], f: Filters): Task[] {
   });
 }
 
-// ── Activity icon (kept local) ─────────────────────────
-function activityIcon(k: string) {
-  if (k === 'done')   return <CircleCheck size={14} color="var(--green)" />;
-  if (k === 'block')  return <CircleAlert size={14} color="var(--red)" />;
-  if (k === 'create') return <Plus size={14} color="var(--teal)" />;
-  return <ArrowRight size={14} color="var(--text-2)" />;
+
+// ── Bloqueadas y en riesgo (datos reales) ─────────────
+function AtRiskPanel({ tasks, members, onOpen }: {
+  tasks: Task[];
+  members: { id: string; name: string; short?: string }[];
+  onOpen: (id: string) => void;
+}) {
+  const blocked = tasks.filter(t => t.status === 'block');
+  const atRisk  = tasks.filter(t =>
+    t.status !== 'done' && t.status !== 'block' &&
+    daysFromToday(t.due) >= 0 && daysFromToday(t.due) <= 2
+  );
+  const items = [
+    ...blocked.map(t => ({ t, kind: 'block' as const })),
+    ...atRisk.map(t  => ({ t, kind: 'risk'  as const })),
+  ].sort((a, b) => (a.t.due ?? '').localeCompare(b.t.due ?? ''));
+
+  const resolveName = (id: string) => {
+    const m = members.find(x => x.id === id) ?? getMember(id);
+    return m ? (m.short ?? m.name.split(' ')[0]) : null;
+  };
+
+  return (
+    <div className="card">
+      <div className="card-head">
+        <ShieldAlert size={14} color="var(--amber)" />
+        <span className="title">Bloqueadas y en riesgo</span>
+        <span className="micro" style={{ marginLeft: 'auto', color: items.length > 0 ? 'var(--amber)' : 'var(--text-3)' }}>
+          {items.length} {items.length === 1 ? 'tarea' : 'tareas'}
+        </span>
+      </div>
+      <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+        {items.length === 0 ? (
+          <div style={{ padding: '32px 18px', textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>
+            <CircleCheck size={20} color="var(--green)" style={{ display: 'block', margin: '0 auto 8px' }} />
+            Sin tareas bloqueadas ni en riesgo
+          </div>
+        ) : items.map(({ t, kind }, i) => {
+          const days = daysFromToday(t.due);
+          const isBlock = kind === 'block';
+          const dueLbl = days < 0 ? `Venció ${fmtDate(t.due)}` : days === 0 ? 'Vence hoy' : `${days}d restantes`;
+          const assigneeName = resolveName(t.assignee);
+          return (
+            <div
+              key={t.id}
+              onClick={() => onOpen(t.id)}
+              style={{
+                padding: '10px 18px',
+                borderBottom: i < items.length - 1 ? '1px solid var(--border)' : 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                background: isBlock ? 'rgba(239,68,68,.03)' : 'transparent',
+                transition: 'background .1s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+              onMouseLeave={e => (e.currentTarget.style.background = isBlock ? 'rgba(239,68,68,.03)' : 'transparent')}
+            >
+              {isBlock
+                ? <CircleAlert size={14} color="var(--red)" style={{ flexShrink: 0 }} />
+                : <TriangleAlert size={14} color="var(--amber)" style={{ flexShrink: 0 }} />
+              }
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {t.title}
+                </div>
+                {assigneeName && (
+                  <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>
+                    {assigneeName}
+                  </div>
+                )}
+              </div>
+              <span className="mono" style={{ fontSize: 11, color: isBlock ? 'var(--red)' : 'var(--amber)', flexShrink: 0, fontWeight: 600 }}>
+                {isBlock ? 'BLOQUEADA' : dueLbl}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 // ── Main ──────────────────────────────────────────────
@@ -277,32 +353,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="card">
-              <div className="card-head">
-                <span className="title">Actividad reciente</span>
-              </div>
-              <div style={{ padding: '8px 18px 12px' }}>
-                {tasks.length === 0 ? (
-                  <div style={{ padding: '20px 0', color: 'var(--text-3)', fontSize: 13 }}>Sin actividad todavía. Empezá creando tareas.</div>
-                ) : ACTIVITY.map((a, i) => {
-                  const m = getMember(a.who) ?? members.find(x => x.id === a.who);
-                  if (!m) return null;
-                  return (
-                    <div
-                      key={i}
-                      style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 0', borderBottom: i < ACTIVITY.length - 1 ? '1px solid var(--border)' : '' }}
-                    >
-                      <Avatar name={m.name} size={22} />
-                      <div style={{ flex: 1, fontSize: 12.5, lineHeight: 1.5 }}>
-                        <span className="fw-5">{m.short ?? m.name.split(' ')[0]}</span> <span className="text-2">{a.action}</span> <span className="fw-5">{a.target}</span>
-                        <div className="mono" style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{a.when}</div>
-                      </div>
-                      <span style={{ marginTop: 2 }}>{activityIcon(a.kind)}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <AtRiskPanel tasks={tasks} members={members} onOpen={openTask} />
           </div>
         )}
 
