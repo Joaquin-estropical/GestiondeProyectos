@@ -2,11 +2,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link2, X, Plus, Check, ChevronRight, GitMerge, AlertCircle, User, AlertTriangle, Trash2, MessageSquare, Send } from 'lucide-react';
 import { useAppStore } from '@/stores/app';
 import { getProject, fmtDate, STATUS_LABELS, STATUS_ORDER, PRIORITY_LABELS } from '@/lib/mock-data';
-import { updateTask, createTaskDependency, deleteTaskDependency, fetchTaskDependencies, createTaskEvent, deleteTask, fetchTaskEvents } from '@/lib/db';
+import { updateTask, createTaskDependency, deleteTaskDependency, fetchTaskDependencies, createTaskEvent, deleteTask, fetchTaskEvents, fetchComments, createComment } from '@/lib/db';
 import { useMembers } from '@/hooks/useSupabase';
 import { Avatar } from '@/components/shared/Avatar';
 import { sortedMembers, getLocalUsers } from '@/lib/auth';
-import type { TaskDependency, TaskEvent } from '@/types';
+import type { TaskDependency, TaskEvent, Comment } from '@/types';
 
 interface TaskDetailProps {
   taskId: string;
@@ -147,6 +147,7 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
 
   // Comments / timeline
   const [events, setEvents] = useState<TaskEvent[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [postingComment, setPostingComment] = useState(false);
 
@@ -175,6 +176,7 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
   useEffect(() => {
     if (!t) return;
     fetchTaskEvents(t.id).then(setEvents).catch(() => {});
+    fetchComments(t.id).then(setComments).catch(() => {});
   }, [taskId, t?.id]);
 
   const flashSaved = useCallback(() => {
@@ -264,16 +266,16 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
   const handleAddComment = async () => {
     if (!newComment.trim() || !t) return;
     setPostingComment(true);
-    await createTaskEvent({
-      task_id: t.id, user_id: currentUser.id,
-      event_type: 'comment',
-      old_value: undefined, new_value: undefined,
-      reason: newComment.trim(),
-    }).catch(() => {});
-    const fresh = await fetchTaskEvents(t.id).catch(() => [] as TaskEvent[]);
-    setEvents(fresh);
-    setNewComment('');
-    setPostingComment(false);
+    try {
+      await createComment(t.id, currentUser.name || currentUser.short || 'Usuario', newComment.trim());
+      const fresh = await fetchComments(t.id);
+      setComments(fresh);
+      setNewComment('');
+    } catch (err) {
+      console.error('[TaskDetail] Error posting comment:', err);
+    } finally {
+      setPostingComment(false);
+    }
   };
 
   // Resolve user_id (UUID) → display name. Tries auth.LOCAL_USERS first,
@@ -624,53 +626,68 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <MessageSquare size={13} color="var(--text-3)" />
               <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)' }}>Comentarios</span>
-              {events.length > 0 && (
-                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>· {events.length}</span>
+              {(comments.length + events.filter(e => e.event_type === 'comment').length) > 0 && (
+                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>· {comments.length + events.filter(e => e.event_type === 'comment').length}</span>
               )}
             </div>
 
-            {/* Lista de eventos / comentarios */}
+            {/* Lista de comentarios (tabla comments) */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
-              {events.length === 0 && (
+              {comments.length === 0 && events.filter(e => e.event_type === 'comment').length === 0 && (
                 <p style={{ margin: '0 0 4px 4px', fontSize: 12, color: 'var(--text-3)' }}>
                   Sin comentarios todavía. Sé el primero en comentar.
                 </p>
               )}
-              {events.map(ev => {
+              {/* Real comments from `comments` table */}
+              {comments.map(c => (
+                <div key={c.id} style={{
+                  display: 'flex', gap: 10,
+                  padding: '10px 12px',
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 8,
+                }}>
+                  <Avatar name={c.author} size={26} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 4 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-1)' }}>{c.author}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{fmtDate(c.created_at.slice(0, 10))}</span>
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                      {c.body}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {/* Timeline events (date changes, status changes, etc.) */}
+              {events.filter(e => e.event_type !== 'comment').map(ev => {
                 const userName = resolveUserName(ev.user_id);
-                const isComment = ev.event_type === 'comment';
                 const typeLabel: Record<string, string> = {
-                  date_changed: '📅 Cambió la fecha',
-                  status_changed: '🔄 Cambió el estado',
+                  date_changed: '📅 Fecha cambiada',
+                  status_changed: '🔄 Estado cambiado',
                   overdue_flagged: '⚠ Marcada como atrasada',
                   reschedule: '📅 Reprogramada',
                 };
-                const headerText = isComment ? userName : (typeLabel[ev.event_type] ?? ev.event_type);
                 return (
                   <div key={ev.id} style={{
                     display: 'flex', gap: 10,
-                    padding: '10px 12px',
-                    background: 'var(--surface-2)',
+                    padding: '8px 12px',
+                    background: 'var(--surface-1)',
                     border: '1px solid var(--border)',
                     borderRadius: 8,
+                    opacity: 0.85,
                   }}>
-                    <Avatar name={userName} size={26} />
+                    <Avatar name={userName} size={22} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 4 }}>
-                        <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-1)' }}>{headerText}</span>
-                        <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                          {fmtDate(ev.created_at.slice(0, 10))}
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: ev.reason ? 3 : 0 }}>
+                        <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-2)' }}>
+                          {typeLabel[ev.event_type] ?? ev.event_type}
                         </span>
+                        <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{fmtDate(ev.created_at.slice(0, 10))}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-3)' }}>· {userName}</span>
                       </div>
                       {ev.reason && (
-                        <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                          {ev.reason}
-                        </div>
-                      )}
-                      {!isComment && !ev.reason && (
-                        <div style={{ fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic' }}>
-                          (sin nota)
-                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.4, fontStyle: 'italic' }}>{ev.reason}</div>
                       )}
                     </div>
                   </div>
