@@ -36,12 +36,14 @@ export default function TasksListPage() {
   const [params]  = useSearchParams()
   const navigate  = useNavigate()
   const filter    = (params.get('filter') ?? 'all') as FilterKey
+  const assignee  = params.get('assignee') ?? ''
   const { tasks, projects, areas, openTask } = useAppStore()
   const { data: members = [] } = useMembers()
-  const resolveName = (id: string) => members.find(m => m.id === id)?.name ?? id
+  const resolveName = (id: string) => members.find(m => m.id === id)?.name ?? 'Sin asignar'
 
-  const filtered = applyFilter(tasks, filter)
-  const label    = FILTER_LABELS[filter] ?? 'Tareas'
+  const byFilter   = applyFilter(tasks, filter)
+  const filtered   = assignee ? byFilter.filter(t => t.assignee === assignee) : byFilter
+  const label      = FILTER_LABELS[filter] ?? 'Tareas'
 
   return (
     <>

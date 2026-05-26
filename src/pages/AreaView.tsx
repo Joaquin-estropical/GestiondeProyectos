@@ -197,7 +197,7 @@ export default function AreaView() {
   const done     = filteredTasks.filter(t => t.status === 'done').length;
   const pct      = Math.round(done / Math.max(filteredTasks.length, 1) * 100);
   const critical = filteredTasks
-    .filter(t => t.priority === 'urg' || (t.status !== 'done' && new Date(t.due) <= new Date('2026-03-11')))
+    .filter(t => t.status !== 'done' && (t.priority === 'urg' || t.priority === 'alta'))
     .slice(0, 5);
 
   // ─── Mode: NON-EDIFICIO AREA (list of projects directly) ──
@@ -375,7 +375,7 @@ export default function AreaView() {
           </div>
           <div className="card kpi">
             <div className="lbl"><Users size={13} /> Miembros</div>
-            <div className="val">5</div>
+            <div className="val">{new Set(filteredTasks.map(t => t.assignee).filter(Boolean)).size}</div>
           </div>
         </div>
 

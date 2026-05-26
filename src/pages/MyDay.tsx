@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Play, Pause, Plus, CalendarDays, List, AlertCircle, ExternalLink } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { useTasks, useProjects, useAreas } from '@/hooks/useSupabase';
 import { fmtDate, dueColor, DAYS_ES, MONTHS_SHORT } from '@/lib/mock-data';
 import { AreaPill, PriorityPill, StatusPill } from '@/components/shared/Badges';
@@ -207,7 +206,6 @@ function ScheduleView({ tasks, todayIso, onOpenTask, onNewTask, areas }: {
 
 // ── Main ──────────────────────────────────────────────────
 export default function MyDay() {
-  const navigate = useNavigate();
   const { openNewTask, openTask, currentUser } = useAppStore();
   const today    = new Date().toISOString().slice(0, 10);
   const [tab, setTab] = useState<MyDayView>('list');
@@ -222,10 +220,7 @@ export default function MyDay() {
   const upcoming     = allTasks.filter(t => t.status !== 'done' && t.due > today);
   const review       = allTasks.filter(t => t.status === 'rev');
 
-  // Navigate to project page with task open in side panel
-  const goToTask = (t: Task) => {
-    navigate(`/proyecto/${t.project}?task=${t.id}`)
-  };
+  const goToTask = (t: Task) => openTask(t.id);
 
   function TaskRow({ t }: { t: Task }) {
     const isTiming = timing === t.id;
@@ -268,7 +263,7 @@ export default function MyDay() {
         <button
           className="btn btn-ghost btn-sm btn-icon"
           onClick={e => { e.stopPropagation(); goToTask(t); }}
-          title="Ir al proyecto"
+          title="Abrir detalle"
           style={{ width: 24, height: 24, flexShrink: 0 }}
         >
           <ExternalLink size={11} color="var(--text-3)" />
