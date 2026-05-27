@@ -155,7 +155,7 @@ function ExpandedPanel({ template, onClose, onSaveAsNew, onDeleted }: ExpandedPa
           onClick={() => { setSaveAsName(template.name + ' — copia'); setSavingAs(true) }}
           style={{ fontSize: 12, gap: 5 }}
         >
-          <Save size={12} /> Guardar como nueva plantilla
+          <Save size={12} /> Guardar como nuevo formulario
         </button>
         <button className="btn btn-ghost btn-sm btn-icon" onClick={onClose} title="Cerrar">
           <X size={13} />
@@ -169,12 +169,12 @@ function ExpandedPanel({ template, onClose, onSaveAsNew, onDeleted }: ExpandedPa
           border: '1px solid var(--teal)', borderRadius: 8,
           background: 'var(--surface)', display: 'flex', flexDirection: 'column', gap: 8,
         }}>
-          <div style={{ fontSize: 13, fontWeight: 600 }}>Guardar como nueva plantilla</div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Guardar como nuevo formulario</div>
           <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
-            La plantilla original no se modifica. Se crea una copia con el nombre que elijas.
+            El formulario original no se modifica. Se crea una copia con el nombre que elijas.
           </div>
           <input
-            autoFocus className="input" placeholder="Nombre de la nueva plantilla…"
+            autoFocus className="input" placeholder="Nombre del nuevo formulario…"
             value={saveAsName} onChange={e => setSaveAsName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleSaveAsNew(); if (e.key === 'Escape') setSavingAs(false) }}
             style={{ fontSize: 13 }}
@@ -329,7 +329,7 @@ function ExpandedPanel({ template, onClose, onSaveAsNew, onDeleted }: ExpandedPa
           style={{ color: 'var(--red)', fontSize: 12 }}
           onClick={onDeleted}
         >
-          <Trash2 size={11} /> Eliminar esta plantilla
+          <Trash2 size={11} /> Eliminar este formulario
         </button>
       </div>
     </div>
@@ -392,13 +392,13 @@ export default function TemplatesPage() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Plantillas de planillas</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Formularios maestros</h1>
           <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '4px 0 0' }}>
-            Hacé clic en una plantilla para expandirla y editar sus ítems directamente.
+            Hacé clic en un formulario para expandirlo y editar sus ítems directamente.
           </p>
         </div>
         <button className="btn btn-primary btn-sm" onClick={() => { setCreating(true); setExpandedId(null) }}>
-          <Plus size={14} /> Nueva plantilla
+          <Plus size={14} /> Nuevo formulario
         </button>
       </div>
 
@@ -410,7 +410,7 @@ export default function TemplatesPage() {
           borderRadius: 8, padding: '14px 16px',
         }}>
           <input
-            autoFocus className="input" placeholder="Nombre de la plantilla…"
+            autoFocus className="input" placeholder="Nombre del formulario…"
             value={newName} onChange={e => setNewName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setCreating(false) }}
           />
@@ -438,9 +438,9 @@ export default function TemplatesPage() {
       ) : templates.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '64px 24px', border: '1px dashed var(--border)', borderRadius: 12 }}>
           <Layers size={36} style={{ color: 'var(--text-3)', marginBottom: 12 }} />
-          <p style={{ fontSize: 14, color: 'var(--text-2)', margin: 0 }}>No hay plantillas todavía.</p>
+          <p style={{ fontSize: 14, color: 'var(--text-2)', margin: 0 }}>No hay formularios todavía.</p>
           <button className="btn btn-primary btn-sm" style={{ marginTop: 16 }} onClick={() => setCreating(true)}>
-            <Plus size={13} /> Crear primera plantilla
+            <Plus size={13} /> Crear primer formulario
           </button>
         </div>
       ) : (

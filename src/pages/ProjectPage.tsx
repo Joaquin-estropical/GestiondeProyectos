@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { DndContext, type DragEndEvent, type DragOverEvent, type DragStartEvent, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay, useDroppable, useDraggable } from '@dnd-kit/core';
-import { List, Kanban, GanttChart as GanttIcon, Calendar, Table, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, ChevronLeft, ChevronRight, X, Pen, Trash2, User, AlertTriangle } from 'lucide-react';
+import { List, Kanban, GanttChart as GanttIcon, Calendar, Table, ClipboardList, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, ChevronLeft, ChevronRight, X, Pen, Trash2, User, AlertTriangle } from 'lucide-react';
 import { useProjects, useTasks, useMembers } from '@/hooks/useSupabase';
 import { getMember, STATUS_ORDER, STATUS_LABELS, fmtDate, dueColor } from '@/lib/mock-data';
 import { useAppStore } from '@/stores/app';
@@ -9,6 +9,7 @@ import { updateTask } from '@/lib/db';
 import { Avatar } from '@/components/shared/Avatar';
 import { StatusPill, PriorityPill, AreaPill } from '@/components/shared/Badges';
 import { GanttChart } from '@/components/shared/GanttChart';
+import { ProjectFormsView } from '@/pages/project/ProjectFormsView';
 import type { Task, TaskStatus } from '@/types';
 
 // ─── Project actions dropdown ───
@@ -125,11 +126,12 @@ function ProjectHeader({ project, tasks, onNewTask }: { project: NonNullable<Ret
 
 // ─── View tabs bar (always visible, outside resize zone) ───
 const VIEW_TABS = [
-  { id: 'list',   label: 'Lista',      Icon: List },
-  { id: 'kanban', label: 'Kanban',     Icon: Kanban },
-  { id: 'gantt',  label: 'Gantt',      Icon: GanttIcon },
-  { id: 'cal',    label: 'Calendario', Icon: Calendar },
-  { id: 'table',  label: 'Tabla',      Icon: Table },
+  { id: 'list',   label: 'Lista',       Icon: List },
+  { id: 'kanban', label: 'Kanban',      Icon: Kanban },
+  { id: 'gantt',  label: 'Gantt',       Icon: GanttIcon },
+  { id: 'cal',    label: 'Calendario',  Icon: Calendar },
+  { id: 'table',  label: 'Tabla',       Icon: Table },
+  { id: 'forms',  label: 'Formularios', Icon: ClipboardList },
 ];
 function ViewTabsBar({ view, setView }: { view: string; setView: (v: string) => void }) {
   return (
@@ -678,7 +680,7 @@ const HEADER_DEFAULT = 210;
 export default function ProjectPage() {
   const { projectId }       = useParams<{ projectId: string }>();
   const [searchParams]      = useSearchParams();
-  const { openTask, openNewTask } = useAppStore();
+  const { openTask, openNewTask, currentUser } = useAppStore();
   const [view, setView]     = useState('list');
   const [headerH, setHeaderH] = useState(HEADER_DEFAULT);
   const id                  = projectId ?? '';
@@ -716,7 +718,7 @@ export default function ProjectPage() {
   if (loading) return <div className="page-body" style={{ color: 'var(--text-3)', fontSize: 13 }}>Cargando proyecto...</div>;
   if (!project) return <div className="page-body">Proyecto no encontrado.</div>;
 
-  const isFullHeight = view === 'gantt' || view === 'kanban' || view === 'cal';
+  const isFullHeight = view === 'gantt' || view === 'kanban' || view === 'cal' || view === 'forms';
 
   return (
     <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', userSelect: 'none' }}>
@@ -766,6 +768,15 @@ export default function ProjectPage() {
         )}
         {view === 'table'  && <ProjectList   tasks={tasks} openTask={openTask} projectId={id} />}
         {view === 'cal'    && <ProjectCalendar tasks={tasks} openTask={openTask} />}
+        {view === 'forms'  && (
+          <ProjectFormsView
+            projectId={id}
+            projectArea={project.area}
+            currentUserId={currentUser.id}
+            currentUserName={currentUser.name}
+            onOpenTask={openTask}
+          />
+        )}
       </div>
     </div>
   );

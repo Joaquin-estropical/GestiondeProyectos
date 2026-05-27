@@ -13,8 +13,8 @@ function useBreadcrumb(): string[] {
   if (pathname === '/configuracion') return ['Configuración']
   if (pathname === '/empty-states') return ['Empty states']
   if (pathname === '/planillas') return ['Planillas']
-  if (pathname === '/planillas/plantillas') return ['Planillas', 'Plantillas']
-  if (pathname.startsWith('/planillas/plantillas/')) return ['Planillas', 'Plantillas', 'Detalle']
+  if (pathname === '/planillas/plantillas') return ['Planillas', 'Formularios']
+  if (pathname.startsWith('/planillas/plantillas/')) return ['Planillas', 'Formularios', 'Detalle']
   if (pathname.endsWith('/imprimir')) return ['Planillas', 'Imprimir']
   if (pathname.startsWith('/planillas/')) return ['Planillas', 'Acta']
   if (pathname.startsWith('/area/')) {

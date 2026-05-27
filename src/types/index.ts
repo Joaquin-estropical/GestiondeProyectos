@@ -250,3 +250,31 @@ export interface ChecklistItem {
   sort_order:    number
   created_at:    string
 }
+
+// ── Project Forms (checklists OK/X dentro de un proyecto) ──
+
+export type ProjectFormStatus     = 'in_progress' | 'completed'
+export type ProjectFormItemStatus = 'pending' | 'ok' | 'fail'
+
+export interface ProjectForm {
+  id:           string
+  project_id:   string
+  template_id:  string | null
+  title:        string
+  status:       ProjectFormStatus
+  created_by:   string | null
+  created_at:   string
+  completed_at: string | null
+}
+
+export interface ProjectFormItem {
+  id:          string
+  form_id:     string
+  title:       string
+  category:    string | null
+  status:      ProjectFormItemStatus
+  observation: string | null
+  task_id:     string | null
+  sort_order:  number
+  created_at:  string
+}

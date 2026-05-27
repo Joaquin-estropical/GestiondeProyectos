@@ -380,7 +380,7 @@ function TemplateCard({ tpl, onDelete, onEdit }: {
   );
 }
 
-// ── Tab: Plantillas ──────────────────────────────────────
+// ── Tab: Formularios ─────────────────────────────────────
 function TemplatesTab() {
   const { data: templates, reload } = useTemplates();
   const [newName,   setNewName]   = useState('');
@@ -418,19 +418,19 @@ function TemplatesTab() {
 
       <div className="row between items-center mb-20">
         <div>
-          <div className="fw-6">Plantillas de procesos</div>
+          <div className="fw-6">Formularios de proceso</div>
           <div className="f-xs text-2 mt-4">
             Modelá tus procesos con fases, hitos y tareas con duración. Se aplican al crear un proyecto nuevo.
           </div>
         </div>
         <button className="btn btn-primary btn-sm" onClick={() => setShowForm(v => !v)}>
-          <Plus size={14} /> Nueva plantilla
+          <Plus size={14} /> Nuevo formulario
         </button>
       </div>
 
       {showForm && (
         <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-hover)', borderRadius: 8, padding: '18px 20px', marginBottom: 24 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Nueva plantilla</div>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Nuevo formulario</div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
             <div style={{ flex: 2 }}>
               <input
@@ -487,10 +487,10 @@ function TemplatesTab() {
       {templates.length === 0 && !showForm && (
         <div className="empty" style={{ marginTop: 40 }}>
           <div className="ill"><Layers size={22} /></div>
-          <p className="t">Sin plantillas de procesos</p>
+          <p className="t">Sin formularios de proceso</p>
           <p className="d">Modelá tus procesos empresariales con fases, tareas y duraciones para automatizar la creación de proyectos.</p>
           <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
-            <Plus size={13} /> Crear primera plantilla
+            <Plus size={13} /> Crear primer formulario
           </button>
         </div>
       )}
@@ -839,8 +839,8 @@ export default function SettingsPage() {
   }
 
   const TABS = [
-    { id: 'areas',     label: 'Áreas'      },
-    { id: 'templates', label: 'Plantillas' },
+    { id: 'areas',     label: 'Áreas'       },
+    { id: 'templates', label: 'Formularios' },
     { id: 'members',   label: 'Miembros'   },
     ...(currentUser.is_admin ? [{ id: 'users', label: 'Usuarios' }] : []),
     { id: 'billing',   label: 'Facturación'},
@@ -850,7 +850,7 @@ export default function SettingsPage() {
     <>
       <PageHead
         title="Configuración"
-        subtitle="Áreas, plantillas y miembros del workspace"
+        subtitle="Áreas, formularios y miembros del workspace"
         right={
           <button
             className="btn btn-ghost btn-sm"

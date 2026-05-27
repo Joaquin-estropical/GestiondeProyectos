@@ -123,13 +123,13 @@ export default function TemplateDetailPage() {
   }
 
   if (loading) return <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: '64px 0', fontSize: 14 }}>Cargando…</div>
-  if (!template) return <div style={{ textAlign: 'center', color: 'var(--red)', padding: '64px 0', fontSize: 14 }}>Plantilla no encontrada.</div>
+  if (!template) return <div style={{ textAlign: 'center', color: 'var(--red)', padding: '64px 0', fontSize: 14 }}>Formulario no encontrado.</div>
 
   return (
     <div style={{ maxWidth: 740, margin: '0 auto', padding: '28px 24px' }}>
       {/* Back */}
       <button className="btn btn-ghost btn-sm" onClick={() => navigate('/planillas/plantillas')} style={{ marginBottom: 20, color: 'var(--text-3)' }}>
-        <ArrowLeft size={14} /> Plantillas
+        <ArrowLeft size={14} /> Formularios
       </button>
 
       {/* Template name */}
@@ -154,7 +154,7 @@ export default function TemplateDetailPage() {
           </div>
         )}
         <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '6px 0 0' }}>
-          {items.length} ítem{items.length !== 1 ? 's' : ''} · Editá la lista base de esta plantilla en línea
+          {items.length} ítem{items.length !== 1 ? 's' : ''} · Editá la lista base de este formulario en línea
         </p>
       </div>
 
