@@ -307,7 +307,7 @@ function ItemsEditor({
         {grouped.map(({ cat, items: catItems }) => (
           <div key={cat || '__nocat__'} style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: 'var(--surface-1)' }}>
             {/* Cabecera de categoría editable */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
               <input
                 value={cat}
                 onChange={e => renameCategory(cat, e.target.value)}
@@ -321,35 +321,41 @@ function ItemsEditor({
               <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>{catItems.length}</span>
             </div>
 
-            {/* Ítems del grupo */}
-            {catItems.map(item => (
-              <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
-                <input
-                  value={item.title}
-                  onChange={e => updateItem(item.id, 'title', e.target.value)}
-                  placeholder="Nombre del ítem"
-                  style={{ ...inputBase, flex: 1 }}
-                  onFocus={e => (e.currentTarget.style.borderColor = 'var(--teal)')}
-                  onBlur={e  => (e.currentTarget.style.borderColor = 'var(--border)')}
-                />
-                {canRemove && (
-                  <button
-                    className="btn btn-ghost btn-sm btn-icon"
-                    onClick={() => removeItem(item.id)}
-                    style={{ width: 28, height: 28, color: 'var(--text-3)', flexShrink: 0 }}
-                    title="Quitar ítem"
-                  >
-                    <X size={13} />
-                  </button>
-                )}
-              </div>
-            ))}
+            {/* Ítems del grupo — grilla responsiva */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+              gap: 8, padding: 12,
+            }}>
+              {catItems.map(item => (
+                <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input
+                    value={item.title}
+                    onChange={e => updateItem(item.id, 'title', e.target.value)}
+                    placeholder="Nombre del ítem"
+                    style={{ ...inputBase, flex: 1, minWidth: 0 }}
+                    onFocus={e => (e.currentTarget.style.borderColor = 'var(--teal)')}
+                    onBlur={e  => (e.currentTarget.style.borderColor = 'var(--border)')}
+                  />
+                  {canRemove && (
+                    <button
+                      className="btn btn-ghost btn-sm btn-icon"
+                      onClick={() => removeItem(item.id)}
+                      style={{ width: 28, height: 28, color: 'var(--text-3)', flexShrink: 0 }}
+                      title="Quitar ítem"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
 
             {/* Agregar ítem a este grupo */}
             <button
               onClick={() => addItem(cat)}
               className="btn btn-ghost btn-sm"
-              style={{ margin: '6px 8px', fontSize: 12, color: 'var(--text-3)' }}
+              style={{ margin: '0 12px 10px', fontSize: 12, color: 'var(--text-3)' }}
             >
               <Plus size={12} /> Agregar ítem
             </button>
@@ -445,8 +451,6 @@ function CreateFormView({ projectId, currentUserId, onDone, onCancel }: {
   const grouped = categories.map(cat => ({
     cat, items: items.filter(i => (i.category || '') === cat),
   }));
-  // Layout de 2 columnas solo cuando hay categorías reales (varios grupos) o muchos ítems
-  const twoCol = items.length > 6 || categories.filter(Boolean).length > 1;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -456,14 +460,14 @@ function CreateFormView({ projectId, currentUserId, onDone, onCancel }: {
         <span style={{ fontSize: 16, fontWeight: 600 }}>Nuevo formulario</span>
       </div>
 
-      {/* Body scrollable — layout de 2 columnas cuando hay varias categorías / muchos ítems */}
+      {/* Body scrollable — apilado vertical a ancho casi completo */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: twoCol ? '380px 1fr' : '1fr', gap: 32, maxWidth: twoCol ? 1100 : 640, alignItems: 'start' }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto' }}>
 
-          {/* Columna izquierda: controles */}
-          <div>
+          {/* Fila de controles: título + origen */}
+          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: 24 }}>
             {/* Título */}
-            <div style={{ marginBottom: 22 }}>
+            <div style={{ flex: '1 1 360px', minWidth: 0 }}>
               <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)', display: 'block', marginBottom: 7 }}>
                 Título del formulario
               </label>
@@ -484,7 +488,7 @@ function CreateFormView({ projectId, currentUserId, onDone, onCancel }: {
             </div>
 
             {/* Origen */}
-            <div style={{ marginBottom: 22 }}>
+            <div style={{ flex: '0 1 340px', minWidth: 280 }}>
               <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)', display: 'block', marginBottom: 8 }}>
                 Empezar desde
               </label>
@@ -520,40 +524,25 @@ function CreateFormView({ projectId, currentUserId, onDone, onCancel }: {
                 </select>
               )}
             </div>
-
-            {/* Ítems editables en una sola columna (modo en blanco / pocos ítems) */}
-            {!twoCol && (
-              <ItemsEditor
-                grouped={grouped}
-                updateItem={updateItem}
-                removeItem={removeItem}
-                addItem={addItem}
-                renameCategory={renameCategory}
-                addCategory={addCategory}
-                canRemove={items.length > 1}
-              />
-            )}
-
-            {error && (
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '8px 12px', borderRadius: 6, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)', marginBottom: 16, fontSize: 13, color: 'var(--red)' }}>
-                <AlertCircle size={13} /> {error}
-              </div>
-            )}
           </div>
 
-          {/* Columna derecha: ítems editables agrupados por categoría (template / muchos ítems) */}
-          {twoCol && (
-            <ItemsEditor
-              grouped={grouped}
-              updateItem={updateItem}
-              removeItem={removeItem}
-              addItem={addItem}
-              renameCategory={renameCategory}
-              addCategory={addCategory}
-              canRemove={items.length > 1}
-              count={items.length}
-            />
+          {error && (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '8px 12px', borderRadius: 6, background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.25)', marginBottom: 16, fontSize: 13, color: 'var(--red)' }}>
+              <AlertCircle size={13} /> {error}
+            </div>
           )}
+
+          {/* Ítems editables a ancho completo */}
+          <ItemsEditor
+            grouped={grouped}
+            updateItem={updateItem}
+            removeItem={removeItem}
+            addItem={addItem}
+            renameCategory={renameCategory}
+            addCategory={addCategory}
+            canRemove={items.length > 1}
+            count={items.length}
+          />
 
         </div>
       </div>
