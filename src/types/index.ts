@@ -255,6 +255,17 @@ export interface ChecklistItem {
 
 export type ProjectFormStatus     = 'in_progress' | 'completed'
 export type ProjectFormItemStatus = 'pending' | 'ok' | 'fail'
+export type RelevamientoCondition = 'optimo' | 'regular' | 'mantenimiento' | 'na'
+
+export const RELEVAMIENTO_CONDITION_LABELS: Record<RelevamientoCondition, string> = {
+  optimo:        'Óptimo',
+  regular:       'Regular',
+  mantenimiento: 'Requiere mantenimiento',
+  na:            'No aplica',
+}
+
+// Template maestro sembrado por la migración 013 (checklist de sucursales).
+export const RELEVAMIENTO_TEMPLATE_ID = 'bbbbbbbb-0000-0000-0000-000000000001'
 
 export interface ProjectForm {
   id:           string
@@ -273,6 +284,7 @@ export interface ProjectFormItem {
   title:       string
   category:    string | null
   status:      ProjectFormItemStatus
+  condition:   RelevamientoCondition | null
   observation: string | null
   task_id:     string | null
   sort_order:  number

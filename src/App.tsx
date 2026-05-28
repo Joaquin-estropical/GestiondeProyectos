@@ -42,6 +42,7 @@ import TasksListPage       from '@/pages/TasksListPage'
 import PlanillasPage       from '@/pages/planillas/PlanillasPage'
 import ChecklistDetailPage from '@/pages/planillas/ChecklistDetailPage'
 import PrintPage           from '@/pages/planillas/PrintPage'
+import RelevamientoPrintPage from '@/pages/planillas/RelevamientoPrintPage'
 import TemplatesPage       from '@/pages/planillas/TemplatesPage'
 import TemplateDetailPage  from '@/pages/planillas/TemplateDetailPage'
 
@@ -163,6 +164,7 @@ function AppRoutes() {
         </Route>
         {/* Print is outside AppShell (sin navegación) */}
         <Route path="/planillas/:checklistId/imprimir" element={<PrintPage />} />
+        <Route path="/formularios/:formId/imprimir" element={<RelevamientoPrintPage />} />
       </Routes>
 
       {/* Overlays globales — wrapped in OverlayBoundary so a transient crash

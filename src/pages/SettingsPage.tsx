@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Plus, UserPlus, MoreHorizontal, Pencil, Trash2, X, Check, ChevronRight, ChevronDown, Layers, Shield, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, UserPlus, MoreHorizontal, Pencil, Trash2, X, Check, ChevronRight, ChevronDown, Layers, Shield, LogOut, ClipboardList } from 'lucide-react';
 import { useTemplates, useTemplateTasks, useMembers } from '@/hooks/useSupabase';
 import { deleteArea, deleteSubArea, deleteTemplate, createTemplate, createTemplateTask, deleteTemplateTask } from '@/lib/db';
+import { fetchChecklistTemplates } from '@/lib/planillas';
 import { useAppStore } from '@/stores/app';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { signOut } from '@/lib/auth';
 import { Avatar } from '@/components/shared/Avatar';
 import { PageHead } from '@/components/shared/PageHead';
-import type { AreaType, TemplateTask } from '@/types';
+import type { AreaType, TemplateTask, ChecklistTemplate } from '@/types';
 
 const AREA_TYPE_LABELS: Record<AreaType, string> = {
   sucursal: 'Sucursal', outlet: 'Outlet', edificio: 'Edificio', bodega: 'Bodega', general: 'General', otros: 'Otros',
@@ -380,6 +382,50 @@ function TemplateCard({ tpl, onDelete, onEdit }: {
   );
 }
 
+// ── Sección: Formularios de checklist (sucursales) ───────
+function ChecklistTemplatesSection() {
+  const navigate = useNavigate();
+  const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
+
+  useEffect(() => { fetchChecklistTemplates().then(setTemplates).catch(() => {}); }, []);
+
+  if (templates.length === 0) return null;
+
+  return (
+    <div style={{ marginBottom: 36 }}>
+      <div className="row between items-center mb-12">
+        <div>
+          <div className="fw-6">Formularios de checklist (sucursales)</div>
+          <div className="f-xs text-2 mt-4">
+            Modelos de relevamiento por categorías e ítems. Se completan dentro de un proyecto y se imprimen como planilla.
+          </div>
+        </div>
+        <button className="btn btn-secondary btn-sm" onClick={() => navigate('/planillas/plantillas')}>
+          <Pencil size={13} /> Abrir editor
+        </button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 12 }}>
+        {templates.map(t => (
+          <div key={t.id}
+            style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 8, padding: '14px 16px', cursor: 'pointer' }}
+            onClick={() => navigate(`/planillas/plantillas/${t.id}`)}>
+            <ClipboardList size={16} color="var(--teal)" style={{ flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{t.name}</div>
+              {t.description && (
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {t.description}
+                </div>
+              )}
+            </div>
+            <ChevronRight size={14} color="var(--text-3)" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Tab: Formularios ─────────────────────────────────────
 function TemplatesTab() {
   const { data: templates, reload } = useTemplates();
@@ -415,6 +461,8 @@ function TemplatesTab() {
           onClose={() => { setEditingId(null); reload(); }}
         />
       )}
+
+      <ChecklistTemplatesSection />
 
       <div className="row between items-center mb-20">
         <div>
