@@ -414,8 +414,8 @@ function ProjectKanban({ tasks: _tasksProp, openTask, projectId }: { tasks: Task
             <div key={s} className="kan-col">
               <div className="kan-col-head" style={{ borderTop: `3px solid ${col}`, borderRadius: '6px 6px 0 0', background: bg, padding: '12px 14px 12px' }}>
                 <span style={{ width: 8, height: 8, borderRadius: 999, background: col, flexShrink: 0 }}></span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{STATUS_LABELS[s]}</span>
-                <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: col, background: col + '20', padding: '1px 7px', borderRadius: 999 }}>{list.length}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{STATUS_LABELS[s]}</span>
+                <span style={{ fontSize: 12, fontFamily: 'JetBrains Mono, monospace', color: col, background: col + '20', padding: '1px 7px', borderRadius: 999 }}>{list.length}</span>
                 <button
                   className="btn btn-ghost btn-sm btn-icon"
                   style={{ width: 24, height: 24, marginLeft: 'auto' }}
@@ -446,13 +446,13 @@ function ProjectKanban({ tasks: _tasksProp, openTask, projectId }: { tasks: Task
                       {/* Top row */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                         <PriorityPill priority={t.priority} iconOnly />
-                        <span className="mono" style={{ fontSize: 10, color: 'var(--text-3)' }}>{t.code}</span>
+                        <span className="mono" style={{ fontSize: 11.5, color: 'var(--text-2)' }}>{t.code}</span>
                         {isDone && <CheckSquare size={12} color="var(--green)" style={{ marginLeft: 'auto' }} />}
                       </div>
 
                       {/* Title */}
                       <div style={{
-                        fontSize: 14, fontWeight: 500, lineHeight: 1.5,
+                        fontSize: 15, fontWeight: 500, lineHeight: 1.5,
                         color: isDone ? 'var(--text-3)' : 'var(--text-1)',
                         textDecoration: isDone ? 'line-through' : 'none',
                         marginBottom: 10,
@@ -469,7 +469,7 @@ function ProjectKanban({ tasks: _tasksProp, openTask, projectId }: { tasks: Task
                           background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.2)',
                         }}>
                           <User size={11} color="var(--amber)" />
-                          <span style={{ fontSize: 11, color: 'var(--amber)', fontWeight: 500, flex: 1 }}>
+                          <span style={{ fontSize: 12.5, color: 'var(--amber)', fontWeight: 500, flex: 1 }}>
                             Revisor: {reviewer.name.split(' ')[0]} {reviewer.name.split(' ')[1] ?? ''}
                           </span>
                           <Avatar name={reviewer.name} size={16} />
@@ -484,7 +484,7 @@ function ProjectKanban({ tasks: _tasksProp, openTask, projectId }: { tasks: Task
                           background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)',
                         }}>
                           <AlertTriangle size={11} color="var(--red)" style={{ flexShrink: 0, marginTop: 1 }} />
-                          <span style={{ fontSize: 11, color: 'var(--red)', lineHeight: 1.4 }}>
+                          <span style={{ fontSize: 12.5, color: 'var(--red)', lineHeight: 1.4 }}>
                             {blockNote}
                           </span>
                         </div>
@@ -495,7 +495,7 @@ function ProjectKanban({ tasks: _tasksProp, openTask, projectId }: { tasks: Task
                         <div style={{ marginBottom: 10 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                             <CheckSquare size={10} color="var(--text-3)" />
-                            <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'JetBrains Mono, monospace' }}>{t.subtasks.done}/{t.subtasks.total}</span>
+                            <span style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'JetBrains Mono, monospace' }}>{t.subtasks.done}/{t.subtasks.total}</span>
                           </div>
                           <div className="progress">
                             <div style={{ width: (t.subtasks.done / t.subtasks.total * 100) + '%', background: col }}></div>
@@ -507,9 +507,9 @@ function ProjectKanban({ tasks: _tasksProp, openTask, projectId }: { tasks: Task
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
                         {m && <Avatar name={m.name} size={22} title={m.name} />}
                         {t.helper && (() => { const h = members.find(x => x.id === t.helper) ?? getMember(t.helper ?? ''); return h ? <Avatar name={h.name} size={18} style={{ opacity: 0.6 }} title={`Auxiliar: ${h.name}`} /> : null; })()}
-                        <span style={{ flex: 1, fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: dueColor(t.due) }}>{fmtDate(t.due)}</span>
+                        <span style={{ flex: 1, fontSize: 12.5, fontFamily: 'JetBrains Mono, monospace', color: dueColor(t.due) }}>{fmtDate(t.due)}</span>
                         {t.comments > 0 && (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--text-3)' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 12.5, color: 'var(--text-3)' }}>
                             <MessageSquare size={10} />{t.comments}
                           </span>
                         )}

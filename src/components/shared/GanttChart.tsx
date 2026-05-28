@@ -7,7 +7,7 @@ import { format, addDays, differenceInCalendarDays, parseISO, isValid } from 'da
 import { es } from 'date-fns/locale'
 
 // ─── Constants ────────────────────────────────────────────
-const ROW_H      = 40
+const ROW_H      = 46
 const HEADER_H   = 52   // total: 22 (month) + 30 (weeks)
 const MONTH_H    = 22
 const WEEK_H     = 30
@@ -144,7 +144,7 @@ function Tooltip({ gt, preds, x, y }: { gt: GanttTask; preds: GanttTask[]; x: nu
       position: 'fixed', left: Math.min(x + 14, window.innerWidth - 280), top: y - 10,
       background: '#18181F', border: '1px solid #2A2A35',
       borderRadius: 10, padding: '12px 16px', zIndex: 9999,
-      width: 260, fontSize: 12.5, boxShadow: '0 16px 40px rgba(0,0,0,.7)',
+      width: 260, fontSize: 13, boxShadow: '0 16px 40px rgba(0,0,0,.7)',
       pointerEvents: 'none',
     }}>
       <div style={{ fontWeight: 700, fontSize: 13, color: '#E8E8EA', marginBottom: 10, lineHeight: 1.3 }}>
@@ -155,8 +155,8 @@ function Tooltip({ gt, preds, x, y }: { gt: GanttTask; preds: GanttTask[]; x: nu
           <AlertTriangle size={12} /> Sin fecha fin definida — clic para asignar
         </div>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', rowGap: 5, columnGap: 16, color: '#6B6B7A' }}>
-        <span>Inicio</span>     <span style={{ color: '#C8C8D0' }}>{fmt(t.start_date)}</span>
+      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', rowGap: 5, columnGap: 16, color: '#9999A8' }}>
+        <span>Inicio</span>     <span style={{ color: '#E0E0EA' }}>{fmt(t.start_date)}</span>
         <span>Fin</span>
         <span style={{ color: gt.noScope ? '#F59E0B' : '#C8C8D0' }}>
           {gt.noScope ? 'sin definir' : fmt(t.end_date ?? t.due)}
@@ -171,8 +171,8 @@ function Tooltip({ gt, preds, x, y }: { gt: GanttTask; preds: GanttTask[]; x: nu
         </span>
       </div>
       {preds.length > 0 && (
-        <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid #2A2A35', color: '#6B6B7A', fontSize: 12 }}>
-          Depende de: <span style={{ color: '#C8C8D0' }}>{preds.map(p => p.name).join(', ')}</span>
+        <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid #2A2A35', color: '#9999A8', fontSize: 12.5 }}>
+          Depende de: <span style={{ color: '#E0E0EA' }}>{preds.map(p => p.name).join(', ')}</span>
         </div>
       )}
     </div>
@@ -563,7 +563,7 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
         )}
 
         {/* Rango de completadas */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#6B6B7A' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#8B8B92' }}>
           <span style={{ marginRight: 2 }}>Completadas:</span>
           <input
             type="date"
@@ -610,7 +610,7 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
             { c: C.milestone, l: 'Hito',               shape: 'diamond' },
             { c: C.noScope,   l: 'Sin fecha fin',       shape: 'dashed' },
           ].map(l => (
-            <span key={l.l} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#5A5A68' }}>
+            <span key={l.l} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#8B8B92' }}>
               {l.shape === 'diamond'
                 ? <span style={{ width: 9, height: 9, background: l.c, transform: 'rotate(45deg)', display: 'inline-block', borderRadius: 1, flexShrink: 0 }} />
                 : l.shape === 'dashed'
@@ -641,8 +641,8 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
         <div style={{ width: LEFT_W, flexShrink: 0, borderRight: '1px solid #1E1E28', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {/* Left header */}
           <div style={{ height: HEADER_H, flexShrink: 0, display: 'flex', alignItems: 'flex-end', padding: '0 14px 9px', background: '#0E0E13', borderBottom: '1px solid #1E1E28' }}>
-            <span style={{ fontSize: 10.5, color: '#5A5A68', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em' }}>Tarea</span>
-            <span style={{ marginLeft: 'auto', fontSize: 10.5, color: '#5A5A68', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em' }}>Días</span>
+            <span style={{ fontSize: 11.5, color: '#8B8B92', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em' }}>Tarea</span>
+            <span style={{ marginLeft: 'auto', fontSize: 11.5, color: '#8B8B92', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em' }}>Días</span>
           </div>
           {/* Rows */}
           <div ref={leftRef} style={{ flex: 1, overflowY: 'hidden' }}>
@@ -674,12 +674,12 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
                   background: gt.critical ? C.critical : '#2A2A35',
                   boxShadow: gt.critical ? `0 0 5px ${C.critical}90` : 'none',
                 }} />
-                <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: '#D8D8E0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: '#E8E8EA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {gt.originalTask.is_milestone ? '◆ ' : ''}{gt.name}
                 </span>
                 <span
                   title={gt.noScope ? 'Sin fecha fin definida' : undefined}
-                  style={{ fontSize: 11, color: gt.noScope ? '#F59E0B' : '#5A5A68', fontFamily: 'JetBrains Mono, monospace', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3 }}
+                  style={{ fontSize: 12, color: gt.noScope ? '#F59E0B' : '#8B8B92', fontFamily: 'JetBrains Mono, monospace', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3 }}
                 >
                   {gt.originalTask.is_milestone ? '◈' : gt.noScope ? <><AlertTriangle size={10} /> s/f</> : `${gt.duration}d`}
                 </span>
@@ -709,8 +709,8 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
                 {months.map((m, i) => (
                   <div key={i} style={{
                     width: m.span * dw, flexShrink: 0, padding: '0 10px',
-                    fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
-                    color: '#686880', letterSpacing: '.06em',
+                    fontSize: 12, fontWeight: 700, textTransform: 'uppercase',
+                    color: '#9999A8', letterSpacing: '.06em',
                     display: 'flex', alignItems: 'center',
                     borderRight: '1px solid #1A1A22',
                   }}>
@@ -724,8 +724,8 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
                   <div key={i} style={{
                     position: 'absolute', left: wk.start * dw, width: 7 * dw, height: WEEK_H,
                     display: 'flex', alignItems: 'center', paddingLeft: 8,
-                    fontSize: 11.5, fontWeight: 600,
-                    color: (todayOff >= wk.start && todayOff < wk.start + 7) ? 'var(--teal)' : '#5A5A6A',
+                    fontSize: 12, fontWeight: 600,
+                    color: (todayOff >= wk.start && todayOff < wk.start + 7) ? 'var(--teal)' : '#8B8B92',
                     borderRight: '1px solid #1A1A22', boxSizing: 'border-box',
                   }}>
                     {wk.label}
@@ -823,8 +823,8 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
                       {/* Label */}
                       {bw > 32 && (
                         <span style={{
-                          position: 'relative', paddingLeft: 8, paddingRight: 10, fontSize: 12, fontWeight: 600,
-                          color: gt.originalTask.status === 'done' ? '#fff' : '#E0E0EA',
+                          position: 'relative', paddingLeft: 8, paddingRight: 10, fontSize: 13, fontWeight: 600,
+                          color: gt.originalTask.status === 'done' ? '#fff' : '#E8E8EA',
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, pointerEvents: 'none',
                         }}>
                           {gt.name}

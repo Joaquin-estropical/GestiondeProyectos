@@ -52,11 +52,11 @@ function ProgressBar({ items, relevamiento }: { items: ProjectFormItem[]; releva
     const pct      = total === 0 ? 0 : Math.round(reviewed / total * 100);
     return (
       <div style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: 'var(--text-2)', marginBottom: 6 }}>
           <span>{reviewed} de {total} relevados ({pct}%)</span>
           {mant > 0 && <span style={{ color: 'var(--red)' }}>⚠ {mant} requieren mantenimiento</span>}
         </div>
-        <div style={{ height: 6, borderRadius: 3, background: 'var(--surface-2)', overflow: 'hidden' }}>
+        <div style={{ height: 7, borderRadius: 4, background: 'var(--surface-2)', overflow: 'hidden' }}>
           <div style={{ height: '100%', width: `${pct}%`, background: mant > 0 ? 'var(--amber)' : 'var(--teal)', borderRadius: 3, transition: 'width .3s' }} />
         </div>
       </div>
@@ -68,14 +68,14 @@ function ProgressBar({ items, relevamiento }: { items: ProjectFormItem[]; releva
   const pct      = total === 0 ? 0 : Math.round(reviewed / total * 100);
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: 'var(--text-2)', marginBottom: 6 }}>
         <span>{reviewed} de {total} revisados ({pct}%)</span>
         <span style={{ display: 'flex', gap: 12 }}>
           <span style={{ color: 'var(--teal)' }}>✓ {ok} OK</span>
           <span style={{ color: 'var(--red)' }}>✗ {fail} Fallas</span>
         </span>
       </div>
-      <div style={{ height: 6, borderRadius: 3, background: 'var(--surface-2)', overflow: 'hidden' }}>
+      <div style={{ height: 7, borderRadius: 4, background: 'var(--surface-2)', overflow: 'hidden' }}>
         <div style={{ height: '100%', width: `${pct}%`, background: fail > 0 ? 'var(--amber)' : 'var(--teal)', borderRadius: 3, transition: 'width .3s' }} />
       </div>
     </div>
@@ -240,8 +240,8 @@ function FormCard({ form, onOpen, onDelete }: { form: ProjectForm; onOpen: () =>
     >
       <ClipboardList size={15} color={isCompleted ? 'var(--teal)' : 'var(--amber)'} style={{ flexShrink: 0 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{form.title}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{dateLabel}</div>
+        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{form.title}</div>
+        <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{dateLabel}</div>
       </div>
       <span style={{
         fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 999,
@@ -295,7 +295,7 @@ function ItemsEditor({
 }) {
   const inputBase: CSSProperties = {
     background: 'var(--surface-2)', border: '1px solid var(--border)',
-    borderRadius: 6, padding: '7px 10px', fontSize: 13, color: 'var(--text-1)', outline: 'none',
+    borderRadius: 6, padding: '9px 12px', fontSize: 14, color: 'var(--text-1)', outline: 'none',
   };
   return (
     <div style={{ marginBottom: 22 }}>
@@ -314,7 +314,7 @@ function ItemsEditor({
                 placeholder="Categoría (opcional)"
                 style={{
                   flex: 1, background: 'transparent', border: 'none', outline: 'none',
-                  fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em',
+                  fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em',
                   color: 'var(--text-2)',
                 }}
               />
@@ -712,8 +712,8 @@ function RunFormView({ form, projectId, projectArea, currentUserName, members, o
                       background: cond ? `${REL_COLOR[cond]}0d` : 'var(--surface-1)', overflow: 'hidden',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', flexWrap: 'wrap' }}>
-                      <span style={{ flex: '1 1 180px', fontSize: 13.5, color: 'var(--text-1)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', flexWrap: 'wrap' }}>
+                      <span style={{ flex: '1 1 180px', fontSize: 14.5, color: 'var(--text-1)' }}>
                         {item.title}
                       </span>
                       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
@@ -725,7 +725,7 @@ function RunFormView({ form, projectId, projectArea, currentUserName, members, o
                               onClick={() => setCondition(item, c)}
                               disabled={isSaving}
                               style={{
-                                padding: '5px 10px', borderRadius: 6, fontSize: 11.5, fontWeight: 600, cursor: 'pointer',
+                                padding: '6px 12px', borderRadius: 6, fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
                                 border: `1px solid ${on ? REL_COLOR[c] : 'var(--border)'}`,
                                 background: on ? `${REL_COLOR[c]}26` : 'var(--surface-2)',
                                 color: on ? REL_COLOR[c] : 'var(--text-2)',
@@ -748,7 +748,7 @@ function RunFormView({ form, projectId, projectArea, currentUserName, members, o
                           style={{
                             width: '100%', boxSizing: 'border-box', resize: 'vertical',
                             background: 'var(--surface-2)', border: '1px solid var(--border)',
-                            borderRadius: 6, padding: '7px 10px', fontSize: 12.5,
+                            borderRadius: 6, padding: '8px 11px', fontSize: 13,
                             color: 'var(--text-1)', outline: 'none', lineHeight: 1.5, fontFamily: 'inherit',
                           }}
                           onFocus={e => (e.currentTarget.style.borderColor = 'var(--teal)')}
@@ -771,9 +771,9 @@ function RunFormView({ form, projectId, projectArea, currentUserName, members, o
                     overflow: 'hidden',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px' }}>
                     {statusIcon(item.status)}
-                    <span style={{ flex: 1, fontSize: 13.5, color: 'var(--text-1)', textDecoration: item.status === 'ok' ? 'line-through' : 'none' }}>
+                    <span style={{ flex: 1, fontSize: 14.5, color: 'var(--text-1)', textDecoration: item.status === 'ok' ? 'line-through' : 'none' }}>
                       {item.title}
                     </span>
                     {/* OK button */}
@@ -781,7 +781,7 @@ function RunFormView({ form, projectId, projectArea, currentUserName, members, o
                       onClick={() => markItem(item, 'ok')}
                       disabled={isSaving}
                       style={{
-                        padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                        padding: '6px 13px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
                         border: `1px solid ${item.status === 'ok' ? 'var(--teal)' : 'var(--border)'}`,
                         background: item.status === 'ok' ? 'rgba(20,184,166,.15)' : 'var(--surface-2)',
                         color: item.status === 'ok' ? 'var(--teal)' : 'var(--text-2)',
@@ -795,7 +795,7 @@ function RunFormView({ form, projectId, projectArea, currentUserName, members, o
                       onClick={() => markItem(item, 'fail')}
                       disabled={isSaving}
                       style={{
-                        padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                        padding: '6px 13px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
                         border: `1px solid ${item.status === 'fail' ? 'var(--red)' : 'var(--border)'}`,
                         background: item.status === 'fail' ? 'rgba(239,68,68,.15)' : 'var(--surface-2)',
                         color: item.status === 'fail' ? 'var(--red)' : 'var(--text-2)',
@@ -830,7 +830,7 @@ function RunFormView({ form, projectId, projectArea, currentUserName, members, o
                         style={{
                           width: '100%', boxSizing: 'border-box', resize: 'vertical',
                           background: 'var(--surface-2)', border: '1px solid var(--border)',
-                          borderRadius: 6, padding: '7px 10px', fontSize: 12.5,
+                          borderRadius: 6, padding: '8px 11px', fontSize: 13,
                           color: 'var(--text-1)', outline: 'none', lineHeight: 1.5, fontFamily: 'inherit',
                         }}
                         onFocus={e => (e.currentTarget.style.borderColor = 'var(--red)')}
@@ -937,7 +937,7 @@ function TaskGenerationPanel({ form, actionItems, mode = 'fail', projectId, proj
         <div style={{ fontWeight: 600, fontSize: 15 }}>
           {isMant ? 'Generar tareas de mantenimiento' : 'Generar tareas a partir de las fallas'}
         </div>
-        <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 3 }}>
+        <div style={{ fontSize: 12.5, color: 'var(--text-2)', marginTop: 3 }}>
           {actionItems.length} ítem{actionItems.length !== 1 ? 's' : ''} {isMant ? 'requieren mantenimiento' : 'con falla'} — seleccioná los que convertir en tareas
         </div>
       </div>
@@ -966,7 +966,7 @@ function TaskGenerationPanel({ form, actionItems, mode = 'fail', projectId, proj
                 onChange={e => update(idx, { title: e.target.value })}
                 style={{
                   flex: 1, background: 'var(--surface-2)', border: '1px solid var(--border)',
-                  borderRadius: 6, padding: '6px 10px', fontSize: 13, color: 'var(--text-1)', outline: 'none',
+                  borderRadius: 6, padding: '8px 11px', fontSize: 13.5, color: 'var(--text-1)', outline: 'none',
                   opacity: d.selected ? 1 : 0.5,
                 }}
                 disabled={!d.selected}
@@ -984,7 +984,7 @@ function TaskGenerationPanel({ form, actionItems, mode = 'fail', projectId, proj
                   style={{
                     width: '100%', boxSizing: 'border-box', resize: 'vertical', marginBottom: 8,
                     background: 'var(--surface-2)', border: '1px solid var(--border)',
-                    borderRadius: 6, padding: '6px 10px', fontSize: 12.5, color: 'var(--text-1)',
+                    borderRadius: 6, padding: '8px 11px', fontSize: 13, color: 'var(--text-1)',
                     outline: 'none', lineHeight: 1.5, fontFamily: 'inherit',
                   }}
                 />
@@ -995,7 +995,7 @@ function TaskGenerationPanel({ form, actionItems, mode = 'fail', projectId, proj
                     onChange={e => update(idx, { assignee: e.target.value })}
                     style={{
                       flex: 1, background: 'var(--surface-2)', border: '1px solid var(--border)',
-                      borderRadius: 6, padding: '6px 8px', fontSize: 12.5, color: 'var(--text-1)', outline: 'none',
+                      borderRadius: 6, padding: '8px 10px', fontSize: 13, color: 'var(--text-1)', outline: 'none',
                     }}
                   >
                     <option value="">Sin asignar</option>
@@ -1010,7 +1010,7 @@ function TaskGenerationPanel({ form, actionItems, mode = 'fail', projectId, proj
                     onChange={e => update(idx, { priority: e.target.value as TaskDraft['priority'] })}
                     style={{
                       width: 130, background: 'var(--surface-2)', border: '1px solid var(--border)',
-                      borderRadius: 6, padding: '6px 8px', fontSize: 12.5, color: 'var(--text-1)', outline: 'none',
+                      borderRadius: 6, padding: '8px 10px', fontSize: 13, color: 'var(--text-1)', outline: 'none',
                     }}
                   >
                     <option value="urg">Urgente</option>
