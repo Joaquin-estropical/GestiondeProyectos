@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import type { CSSProperties } from 'react';
 import {
   ClipboardList, Plus, Check, X, ChevronLeft, AlertCircle,
   CheckCircle2, XCircle, Clock, ChevronDown, ChevronRight,
@@ -277,8 +278,101 @@ function FormCard({ form, onOpen, onDelete }: { form: ProjectForm; onOpen: () =>
   );
 }
 
+// ── ItemsEditor ───────────────────────────────────────────
+// Lista de ítems editable, agrupada por categoría. Cada grupo permite renombrar
+// la categoría (aplica a todos sus ítems) y agregar/quitar ítems individualmente.
+function ItemsEditor({
+  grouped, updateItem, removeItem, addItem, renameCategory, addCategory, canRemove, count,
+}: {
+  grouped:        { cat: string; items: DraftItem[] }[];
+  updateItem:     (id: string, field: 'title' | 'category', val: string) => void;
+  removeItem:     (id: string) => void;
+  addItem:        (category?: string) => void;
+  renameCategory: (oldCat: string, newCat: string) => void;
+  addCategory:    () => void;
+  canRemove:      boolean;
+  count?:         number;
+}) {
+  const inputBase: CSSProperties = {
+    background: 'var(--surface-2)', border: '1px solid var(--border)',
+    borderRadius: 6, padding: '7px 10px', fontSize: 13, color: 'var(--text-1)', outline: 'none',
+  };
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)', display: 'block', marginBottom: 10 }}>
+        Ítems del formulario{count != null ? ` · ${count}` : ''}
+      </label>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {grouped.map(({ cat, items: catItems }) => (
+          <div key={cat || '__nocat__'} style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: 'var(--surface-1)' }}>
+            {/* Cabecera de categoría editable */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
+              <input
+                value={cat}
+                onChange={e => renameCategory(cat, e.target.value)}
+                placeholder="Categoría (opcional)"
+                style={{
+                  flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                  fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em',
+                  color: 'var(--text-2)',
+                }}
+              />
+              <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>{catItems.length}</span>
+            </div>
+
+            {/* Ítems del grupo */}
+            {catItems.map(item => (
+              <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
+                <input
+                  value={item.title}
+                  onChange={e => updateItem(item.id, 'title', e.target.value)}
+                  placeholder="Nombre del ítem"
+                  style={{ ...inputBase, flex: 1 }}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'var(--teal)')}
+                  onBlur={e  => (e.currentTarget.style.borderColor = 'var(--border)')}
+                />
+                {canRemove && (
+                  <button
+                    className="btn btn-ghost btn-sm btn-icon"
+                    onClick={() => removeItem(item.id)}
+                    style={{ width: 28, height: 28, color: 'var(--text-3)', flexShrink: 0 }}
+                    title="Quitar ítem"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+            ))}
+
+            {/* Agregar ítem a este grupo */}
+            <button
+              onClick={() => addItem(cat)}
+              className="btn btn-ghost btn-sm"
+              style={{ margin: '6px 8px', fontSize: 12, color: 'var(--text-3)' }}
+            >
+              <Plus size={12} /> Agregar ítem
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <button
+        onClick={addCategory}
+        className="btn btn-ghost btn-sm"
+        style={{ marginTop: 12, fontSize: 12, color: 'var(--text-3)' }}
+      >
+        <Plus size={12} /> Agregar categoría
+      </button>
+    </div>
+  );
+}
+
 // ── CreateFormView ────────────────────────────────────────
-interface DraftItem { title: string; category: string }
+interface DraftItem { id: string; title: string; category: string }
+
+let draftSeq = 0;
+const newDraft = (title = '', category = ''): DraftItem => ({ id: `d${++draftSeq}`, title, category });
 
 function CreateFormView({ projectId, currentUserId, onDone, onCancel }: {
   projectId:     string;
@@ -290,7 +384,7 @@ function CreateFormView({ projectId, currentUserId, onDone, onCancel }: {
   const [source,       setSource]      = useState<'blank' | 'template'>('blank');
   const [templates,    setTemplates]   = useState<ChecklistTemplate[]>([]);
   const [templateId,   setTemplateId]  = useState('');
-  const [items,        setItems]       = useState<DraftItem[]>([{ title: '', category: '' }]);
+  const [items,        setItems]       = useState<DraftItem[]>([newDraft()]);
   const [saving,       setSaving]      = useState(false);
   const [error,        setError]       = useState('');
   const titleRef = useRef<HTMLInputElement>(null);
@@ -302,17 +396,23 @@ function CreateFormView({ projectId, currentUserId, onDone, onCancel }: {
 
   const loadTemplate = async (tid: string) => {
     setTemplateId(tid);
-    if (!tid) { setItems([{ title: '', category: '' }]); return; }
+    if (!tid) { setItems([newDraft()]); return; }
     try {
       const tItems = await fetchTemplateItems(tid);
-      setItems(tItems.map(i => ({ title: i.name, category: i.category })));
-    } catch { setItems([{ title: '', category: '' }]); }
+      setItems(tItems.map(i => newDraft(i.name, i.category ?? '')));
+    } catch { setItems([newDraft()]); }
   };
 
-  const addItem = () => setItems(prev => [...prev, { title: '', category: '' }]);
-  const removeItem = (i: number) => setItems(prev => prev.filter((_, idx) => idx !== i));
-  const updateItem = (i: number, field: keyof DraftItem, val: string) =>
-    setItems(prev => prev.map((it, idx) => idx === i ? { ...it, [field]: val } : it));
+  const addItem = (category = '') => setItems(prev => [...prev, newDraft('', category)]);
+  const removeItem = (id: string) => setItems(prev => prev.filter(it => it.id !== id));
+  const updateItem = (id: string, field: 'title' | 'category', val: string) =>
+    setItems(prev => prev.map(it => it.id === id ? { ...it, [field]: val } : it));
+
+  // Renombrar una categoría completa (aplica a todos sus ítems)
+  const renameCategory = (oldCat: string, newCat: string) =>
+    setItems(prev => prev.map(it => (it.category || '') === oldCat ? { ...it, category: newCat } : it));
+
+  const addCategory = () => setItems(prev => [...prev, newDraft('', 'Nueva categoría')]);
 
   const handleSave = async () => {
     if (!title.trim())                              return setError('El formulario necesita un título.');
@@ -340,11 +440,13 @@ function CreateFormView({ projectId, currentUserId, onDone, onCancel }: {
     }
   };
 
-  // Group items by category for preview
-  const previewCategories = [...new Set(items.map(i => i.category || ''))];
-  const previewGrouped = previewCategories.map(cat => ({
+  // Agrupar por categoría (manteniendo el orden de aparición)
+  const categories = [...new Set(items.map(i => i.category || ''))];
+  const grouped = categories.map(cat => ({
     cat, items: items.filter(i => (i.category || '') === cat),
   }));
+  // Layout de 2 columnas solo cuando hay categorías reales (varios grupos) o muchos ítems
+  const twoCol = items.length > 6 || categories.filter(Boolean).length > 1;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -354,9 +456,9 @@ function CreateFormView({ projectId, currentUserId, onDone, onCancel }: {
         <span style={{ fontSize: 16, fontWeight: 600 }}>Nuevo formulario</span>
       </div>
 
-      {/* Body scrollable — layout de 2 columnas cuando hay ítems del template */}
+      {/* Body scrollable — layout de 2 columnas cuando hay varias categorías / muchos ítems */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: items.length > 3 ? '1fr 1fr' : '1fr', gap: 32, maxWidth: 1100 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: twoCol ? '380px 1fr' : '1fr', gap: 32, maxWidth: twoCol ? 1100 : 640, alignItems: 'start' }}>
 
           {/* Columna izquierda: controles */}
           <div>
@@ -419,60 +521,17 @@ function CreateFormView({ projectId, currentUserId, onDone, onCancel }: {
               )}
             </div>
 
-            {/* Ítems — solo si hay pocos o no hay template cargado */}
-            {items.length <= 3 && (
-              <div style={{ marginBottom: 22 }}>
-                <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)', display: 'block', marginBottom: 8 }}>
-                  Ítems del formulario
-                </label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                  {items.map((item, idx) => (
-                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 5, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-1)' }}>
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <input
-                          value={item.title}
-                          onChange={e => updateItem(idx, 'title', e.target.value)}
-                          placeholder={`Ítem ${idx + 1}`}
-                          style={{
-                            flex: 1, background: 'var(--surface-2)', border: '1px solid var(--border)',
-                            borderRadius: 6, padding: '7px 10px', fontSize: 13, color: 'var(--text-1)', outline: 'none',
-                          }}
-                          onFocus={e => (e.currentTarget.style.borderColor = 'var(--teal)')}
-                          onBlur={e  => (e.currentTarget.style.borderColor = 'var(--border)')}
-                        />
-                        {items.length > 1 && (
-                          <button
-                            className="btn btn-ghost btn-sm btn-icon"
-                            onClick={() => removeItem(idx)}
-                            style={{ width: 28, height: 28, color: 'var(--text-3)', flexShrink: 0 }}
-                          >
-                            <X size={13} />
-                          </button>
-                        )}
-                      </div>
-                      <input
-                        value={item.category}
-                        onChange={e => updateItem(idx, 'category', e.target.value)}
-                        placeholder="Categoría (opcional)"
-                        style={{
-                          width: '100%', boxSizing: 'border-box',
-                          background: 'var(--surface-2)', border: '1px solid var(--border)',
-                          borderRadius: 6, padding: '6px 10px', fontSize: 12, color: 'var(--text-2)', outline: 'none',
-                        }}
-                        onFocus={e => (e.currentTarget.style.borderColor = 'var(--teal)')}
-                        onBlur={e  => (e.currentTarget.style.borderColor = 'var(--border)')}
-                      />
-                    </div>
-                  ))}
-                </div>
-                <button
-                  onClick={addItem}
-                  className="btn btn-ghost btn-sm"
-                  style={{ marginTop: 8, fontSize: 12, color: 'var(--text-3)' }}
-                >
-                  <Plus size={12} /> Agregar ítem
-                </button>
-              </div>
+            {/* Ítems editables en una sola columna (modo en blanco / pocos ítems) */}
+            {!twoCol && (
+              <ItemsEditor
+                grouped={grouped}
+                updateItem={updateItem}
+                removeItem={removeItem}
+                addItem={addItem}
+                renameCategory={renameCategory}
+                addCategory={addCategory}
+                canRemove={items.length > 1}
+              />
             )}
 
             {error && (
@@ -482,46 +541,18 @@ function CreateFormView({ projectId, currentUserId, onDone, onCancel }: {
             )}
           </div>
 
-          {/* Columna derecha: preview de ítems del template (solo cuando hay muchos) */}
-          {items.length > 3 && (
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)', marginBottom: 12 }}>
-                Ítems del formulario · {items.length}
-              </div>
-              <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: 'var(--surface-1)' }}>
-                {previewGrouped.map(({ cat, items: catItems }, gi) => (
-                  <div key={cat} style={{ borderBottom: gi < previewGrouped.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                    {cat && (
-                      <div style={{
-                        padding: '8px 14px', fontSize: 10.5, fontWeight: 700,
-                        textTransform: 'uppercase', letterSpacing: '.06em',
-                        color: 'var(--text-3)', background: 'var(--surface-2)',
-                        borderBottom: '1px solid var(--border)',
-                      }}>
-                        {cat} · {catItems.length}
-                      </div>
-                    )}
-                    {catItems.map((item, ii) => (
-                      <div
-                        key={ii}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 10,
-                          padding: '9px 14px',
-                          borderBottom: ii < catItems.length - 1 ? '1px solid var(--border)' : 'none',
-                          fontSize: 13, color: 'var(--text-1)',
-                        }}
-                      >
-                        <span style={{
-                          display: 'inline-block', width: 20, height: 20, borderRadius: 4,
-                          border: '1.5px solid var(--border)', flexShrink: 0,
-                        }} />
-                        {item.title}
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </div>
+          {/* Columna derecha: ítems editables agrupados por categoría (template / muchos ítems) */}
+          {twoCol && (
+            <ItemsEditor
+              grouped={grouped}
+              updateItem={updateItem}
+              removeItem={removeItem}
+              addItem={addItem}
+              renameCategory={renameCategory}
+              addCategory={addCategory}
+              canRemove={items.length > 1}
+              count={items.length}
+            />
           )}
 
         </div>
@@ -600,13 +631,16 @@ function RunFormView({ form, projectId, projectArea, currentUserName, members, o
     setItems(prev => prev.map(i => i.id === item.id ? { ...i, observation: obs || null } : i));
   };
 
+  // Ítems que disparan creación de tareas al finalizar:
+  // relevamiento → "Requiere mantenimiento"; genérico → "Falla".
+  const actionItems = relevamiento
+    ? items.filter(i => i.condition === 'mantenimiento')
+    : items.filter(i => i.status === 'fail');
+
   const handleFinalize = () => {
-    if (!relevamiento) {
-      const fails = items.filter(i => i.status === 'fail');
-      if (fails.length > 0) {
-        setShowTaskPanel(true);
-        return;
-      }
+    if (actionItems.length > 0) {
+      setShowTaskPanel(true);
+      return;
     }
     setCompleting(true);
     completeForm(form.id).then(onDone).catch(console.error).finally(() => setCompleting(false));
@@ -629,7 +663,8 @@ function RunFormView({ form, projectId, projectArea, currentUserName, members, o
     return (
       <TaskGenerationPanel
         form={form}
-        failItems={items.filter(i => i.status === 'fail')}
+        actionItems={actionItems}
+        mode={relevamiento ? 'mantenimiento' : 'fail'}
         projectId={projectId}
         projectArea={projectArea}
         members={members}
@@ -847,19 +882,22 @@ interface TaskDraft {
   selected: boolean;
 }
 
-function TaskGenerationPanel({ form, failItems, projectId, projectArea, members, onDone }: {
-  form:      ProjectForm;
-  failItems: ProjectFormItem[];
-  projectId: string;
+function TaskGenerationPanel({ form, actionItems, mode = 'fail', projectId, projectArea, members, onDone }: {
+  form:        ProjectForm;
+  actionItems: ProjectFormItem[];
+  mode?:       'fail' | 'mantenimiento';
+  projectId:   string;
   projectArea: string;
-  members:   { id: string; name: string; role: string }[];
-  onDone:    () => void;
+  members:     { id: string; name: string; role: string }[];
+  onDone:      () => void;
 }) {
+  const isMant  = mode === 'mantenimiento';
+  const accent  = isMant ? REL_COLOR.mantenimiento : '#ef4444';
   const today7 = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
   const [drafts,   setDrafts]   = useState<TaskDraft[]>(
-    failItems.map(i => ({
+    actionItems.map(i => ({
       itemId:   i.id,
-      title:    i.title,
+      title:    isMant ? `Mantenimiento: ${i.title}` : i.title,
       notes:    i.observation ?? '',
       assignee: '',
       priority: 'alta' as const,
@@ -907,9 +945,11 @@ function TaskGenerationPanel({ form, failItems, projectId, projectArea, members,
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div style={{ padding: '16px 32px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: 15 }}>Generar tareas a partir de las fallas</div>
+        <div style={{ fontWeight: 600, fontSize: 15 }}>
+          {isMant ? 'Generar tareas de mantenimiento' : 'Generar tareas a partir de las fallas'}
+        </div>
         <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 3 }}>
-          {failItems.length} ítem{failItems.length !== 1 ? 's' : ''} con falla — seleccioná los que convertir en tareas
+          {actionItems.length} ítem{actionItems.length !== 1 ? 's' : ''} {isMant ? 'requieren mantenimiento' : 'con falla'} — seleccioná los que convertir en tareas
         </div>
       </div>
 
@@ -919,8 +959,8 @@ function TaskGenerationPanel({ form, failItems, projectId, projectArea, members,
             key={d.itemId}
             style={{
               padding: '14px 16px', borderRadius: 8,
-              border: `1px solid ${d.selected ? 'rgba(239,68,68,.3)' : 'var(--border)'}`,
-              background: d.selected ? 'rgba(239,68,68,.04)' : 'var(--surface-1)',
+              border: `1px solid ${d.selected ? `${accent}4d` : 'var(--border)'}`,
+              background: d.selected ? `${accent}0a` : 'var(--surface-1)',
               marginBottom: 10,
             }}
           >
