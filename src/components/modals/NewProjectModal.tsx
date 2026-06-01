@@ -57,7 +57,7 @@ export function NewProjectModal() {
   const selectedArea = areas.find(a => a.id === areaId)
   const areaTemplates = templates.filter(t => !selectedArea || t.area_type === selectedArea.type)
 
-  const needsSubArea = areaId === 'edificio'
+  const needsSubArea = selectedArea?.type === 'edificio'
 
   const handleSave = async () => {
     if (!name.trim()) { setError('El nombre es obligatorio'); return }
@@ -66,7 +66,7 @@ export function NewProjectModal() {
     setSaving(true); setError('')
     try {
       const project = await createProject({
-        name: name.trim(), area: areaId, subarea: needsSubArea ? subareaId : null, due,
+        name: name.trim(), area: areaId, areaType: selectedArea?.type, subarea: needsSubArea ? subareaId : null, due,
         templateId: templateId || undefined,
       })
       addProject(project)

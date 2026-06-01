@@ -67,6 +67,9 @@ export function NewTaskModal() {
     }
   }
 
+  const isEdificioArea = (aid: string) =>
+    areas.find(a => a.id === aid)?.type === 'edificio'
+
   // Get "Generales" project for a given area
   const getGeneralesProject = (aid: string) =>
     projects.find(p => p.area === aid && p.name === 'Generales')
@@ -102,7 +105,7 @@ export function NewTaskModal() {
 
     // Sub-area: only relevant for edificio. If the preselected project has a
     // subarea, use it; otherwise leave blank so the user picks one.
-    if (aid === 'edificio') {
+    if (_areas.find(a => a.id === aid)?.type === 'edificio') {
       setSubareaId(proj?.subarea ?? '')
     } else {
       setSubareaId('')
@@ -121,7 +124,7 @@ export function NewTaskModal() {
   const handleAreaChange = (aid: string) => {
     setAreaId(aid)
     // Reset subarea when area changes. If edificio with a single subarea, autoselect.
-    if (aid === 'edificio') {
+    if (isEdificioArea(aid)) {
       const subs = subareas.filter(sa => sa.area === aid)
       setSubareaId(subs.length === 1 ? subs[0].id : '')
     } else {
@@ -148,13 +151,13 @@ export function NewTaskModal() {
     const proj = projects.find(p => p.id === pid)
     if (proj) {
       setAreaId(proj.area)
-      if (proj.area === 'edificio') setSubareaId(proj.subarea ?? '')
+      if (isEdificioArea(proj.area)) setSubareaId(proj.subarea ?? '')
     }
   }
 
   const handleSave = async () => {
     if (!title.trim()) { setError('El título es obligatorio'); return }
-    if (areaId === 'edificio' && !subareaId && subareas.filter(sa => sa.area === 'edificio').length > 0) {
+    if (isEdificioArea(areaId) && !subareaId && subareas.filter(sa => sa.area === areaId).length > 0) {
       setError('Seleccioná una sub-área'); return
     }
     const finalProjectId = resolveProject(areaId, projectId)
@@ -189,7 +192,7 @@ export function NewTaskModal() {
   const handleBulkSave = async () => {
     const lines = bulkText.split('\n').map(l => l.trim()).filter(Boolean)
     if (lines.length === 0) { setError('Escribí al menos una tarea'); return }
-    if (areaId === 'edificio' && !subareaId && subareas.filter(sa => sa.area === 'edificio').length > 0) {
+    if (isEdificioArea(areaId) && !subareaId && subareas.filter(sa => sa.area === areaId).length > 0) {
       setError('Seleccioná una sub-área'); return
     }
     const finalProjectId = resolveProject(areaId, projectId)
@@ -218,7 +221,7 @@ export function NewTaskModal() {
 
   if (!newTaskOpen) return null
 
-  const needsSubArea = areaId === 'edificio'
+  const needsSubArea = isEdificioArea(areaId)
   const areaSubAreas = subareas.filter(sa => sa.area === areaId)
   // Edificio: filter projects by subarea (Generales always shown as fallback).
   // Other areas: show all projects for the area.
@@ -296,65 +299,104 @@ export function NewTaskModal() {
           </div>
           )}
 
-          {/* Área + Proyecto */}
-          <div className="row gap-12 mt-16">
-            <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Área</label>
-              <div className="input" style={{ padding: 0 }}>
+          {/* Jerarquía: Área → Sub-área → Proyecto */}
+          <div className="form-group mt-16" style={{
+            background: 'var(--surface-2)',
+            border: '1px solid var(--border)',
+            borderRadius: 10,
+            padding: '14px 16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 0,
+          }}>
+            {/* Área */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingBottom: 10 }}>
+              <div style={{ width: 6, height: 6, borderRadius: 999, background: areas.find(a => a.id === areaId)?.color ?? 'var(--text-3)', flexShrink: 0 }} />
+              <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)', width: 72, flexShrink: 0 }}>Área</label>
+              <div style={{ flex: 1, background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
                 <select
                   value={areaId}
                   onChange={e => handleAreaChange(e.target.value)}
-                  style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 12px', height: 36, color: 'var(--text-1)', fontSize: 13, cursor: 'pointer' }}
+                  style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 10px', height: 32, color: 'var(--text-1)', fontSize: 13, cursor: 'pointer' }}
                 >
-                  <option value="">Todas</option>
+                  <option value="">Seleccionar área...</option>
                   {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                 </select>
               </div>
             </div>
+
+            {/* Conector visual */}
+            <div style={{ display: 'flex', alignItems: 'stretch', gap: 10, paddingLeft: 3 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 6, flexShrink: 0 }}>
+                <div style={{ width: 1, flex: 1, background: 'var(--border)' }} />
+              </div>
+              <div style={{ flex: 1 }} />
+            </div>
+
+            {/* Sub-área (solo edificio) */}
             {needsSubArea && (
-              <div className="form-group" style={{ flex: 1 }}>
-                <label className="form-label">
-                  Sub-área <span style={{ color: 'var(--red)' }}>*</span>
-                </label>
-                <div className="input" style={{ padding: 0 }}>
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingBottom: 10, paddingTop: 0 }}>
+                  <div style={{ width: 6, height: 6, borderRadius: 2, background: areaSubAreas.find(sa => sa.id === subareaId)?.color ?? 'var(--border)', flexShrink: 0 }} />
+                  <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)', width: 72, flexShrink: 0 }}>
+                    Sub-área <span style={{ color: 'var(--red)' }}>*</span>
+                  </label>
+                  <div style={{ flex: 1, background: 'var(--surface-1)', border: `1px solid ${!subareaId && areaSubAreas.length > 0 ? 'var(--amber)' : 'var(--border)'}`, borderRadius: 6, overflow: 'hidden' }}>
+                    {areaSubAreas.length === 0 ? (
+                      <div style={{ padding: '0 10px', height: 32, display: 'flex', alignItems: 'center', fontSize: 12, color: 'var(--amber)' }}>
+                        Sin sub-áreas — creá una primero
+                      </div>
+                    ) : (
+                      <select
+                        value={subareaId}
+                        onChange={e => handleSubareaChange(e.target.value)}
+                        style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 10px', height: 32, color: subareaId ? 'var(--text-1)' : 'var(--text-3)', fontSize: 13, cursor: 'pointer' }}
+                      >
+                        <option value="">Seleccionar sub-área...</option>
+                        {areaSubAreas.map(sa => (
+                          <option key={sa.id} value={sa.id}>{sa.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'stretch', gap: 10, paddingLeft: 3 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 6, flexShrink: 0 }}>
+                    <div style={{ width: 1, flex: 1, background: 'var(--border)' }} />
+                  </div>
+                  <div style={{ flex: 1 }} />
+                </div>
+              </>
+            )}
+
+            {/* Proyecto */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 0 }}>
+              <div style={{ width: 6, height: 6, borderRadius: 2, background: 'var(--teal)', flexShrink: 0, opacity: projectId ? 1 : 0.3 }} />
+              <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)', width: 72, flexShrink: 0 }}>
+                Proyecto <span style={{ color: 'var(--red)' }}>*</span>
+              </label>
+              <div style={{ flex: 1, background: 'var(--surface-1)', border: `1px solid ${areaId && areaProjects.length === 0 ? 'var(--amber)' : 'var(--border)'}`, borderRadius: 6, overflow: 'hidden' }}>
+                {areaId && areaProjects.length === 0 ? (
+                  <div style={{ padding: '0 10px', height: 32, display: 'flex', alignItems: 'center', fontSize: 12, color: 'var(--amber)' }}>
+                    Sin proyectos — creá uno primero
+                  </div>
+                ) : (
                   <select
-                    value={subareaId}
-                    onChange={e => handleSubareaChange(e.target.value)}
-                    style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 12px', height: 36, color: 'var(--text-1)', fontSize: 13, cursor: 'pointer' }}
+                    value={projectId}
+                    onChange={e => handleProjectChange(e.target.value)}
+                    style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 10px', height: 32, color: projectId ? 'var(--text-1)' : 'var(--text-3)', fontSize: 13, cursor: 'pointer' }}
                   >
-                    <option value="">Seleccionar...</option>
-                    {areaSubAreas.map(sa => (
-                      <option key={sa.id} value={sa.id}>{sa.name}</option>
+                    <option value="">Seleccionar proyecto...</option>
+                    {areaProjects.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.name === 'Generales' ? '📋 ' : ''}{p.name}
+                      </option>
                     ))}
                   </select>
-                </div>
-              </div>
-            )}
-            <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">
-                Proyecto <span style={{ color: 'var(--red)' }}>*</span>
-                {hasGenerales && !projectId && (
-                  <span className="micro" style={{ marginLeft: 6, color: 'var(--teal)' }}>→ Generales</span>
                 )}
-              </label>
-              <div className="input" style={{ padding: 0 }}>
-                <select
-                  value={projectId}
-                  onChange={e => handleProjectChange(e.target.value)}
-                  style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 12px', height: 36, color: 'var(--text-1)', fontSize: 13, cursor: 'pointer' }}
-                >
-                  <option value="">Seleccionar...</option>
-                  {areaProjects.map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.name === 'Generales' ? '📋 ' : ''}{p.name}
-                    </option>
-                  ))}
-                </select>
               </div>
-              {areaId && areaProjects.length === 0 && (
-                <div style={{ fontSize: 11, color: 'var(--amber)', marginTop: 4 }}>
-                  Sin proyectos en esta área. Crea uno primero.
-                </div>
+              {hasGenerales && !projectId && areaProjects.length > 0 && (
+                <span style={{ fontSize: 11, color: 'var(--teal)', whiteSpace: 'nowrap' }}>→ Generales</span>
               )}
             </div>
           </div>

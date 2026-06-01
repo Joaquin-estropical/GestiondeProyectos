@@ -49,7 +49,7 @@ function AreasTab() {
       </div>
       <div className="card">
         {areas.map((a, i) => {
-          const isEdificio = a.id === 'edificio';
+          const isEdificio = a.type === 'edificio';
           const aSubAreas = subareas.filter(sa => sa.area === a.id);
           const aProjects = projects.filter(p => p.area === a.id);
           const aTasks    = tasks.filter(t => t.area === a.id);

@@ -170,7 +170,7 @@ export default function AreaView() {
   const id = areaId ?? '';
 
   const { data: areas    = [], loading } = useAreas();
-  const { data: subareas = [] }          = useSubAreas(id === 'edificio' ? id : undefined);
+  const { data: subareas = [] }          = useSubAreas(id);
   const { data: allProjects = [] }       = useProjects(id);
   const { data: tasks    = [] }          = useTasks({ areaId: id });
   const { data: members  = [] }          = useMembers();
@@ -191,7 +191,7 @@ export default function AreaView() {
   if (!a) return <div className="page-body">Área no encontrada.</div>;
   if (subareaId && !sa) return <div className="page-body">Sub-área no encontrada.</div>;
 
-  const isEdificio = a.id === 'edificio';
+  const isEdificio = a.type === 'edificio';
 
   const open     = filteredTasks.filter(t => t.status !== 'done').length;
   const done     = filteredTasks.filter(t => t.status === 'done').length;

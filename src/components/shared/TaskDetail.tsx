@@ -483,6 +483,32 @@ export function TaskDetail({ taskId, onClose }: TaskDetailProps) {
               <DateField value={t.due} onChange={handleDueSave} />
 
             </div>
+
+            {/* Descripción / Observaciones */}
+            <div style={{ marginTop: 18 }}>
+              <div style={{ fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)', marginBottom: 8 }}>
+                Descripción / Observaciones
+              </div>
+              <textarea
+                value={t.description ?? ''}
+                onChange={e => save({ description: e.target.value })}
+                placeholder="Contexto, instrucciones, notas importantes..."
+                style={{
+                  width: '100%', boxSizing: 'border-box', minHeight: 90,
+                  background: 'var(--surface-2)', border: '1px solid var(--border)',
+                  borderRadius: 6, padding: '10px 12px', color: 'var(--text-1)',
+                  fontSize: 13, resize: 'vertical', outline: 'none', lineHeight: 1.6,
+                  fontFamily: 'inherit', transition: 'border-color .12s',
+                }}
+                onFocus={e => (e.currentTarget.style.borderColor = 'var(--teal)')}
+                onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+              />
+              {t.description && (
+                <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>
+                  Clic en el texto para editar · se guarda automáticamente
+                </div>
+              )}
+            </div>
           </div>
 
           {/* DEPENDENCIAS */}

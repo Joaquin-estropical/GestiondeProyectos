@@ -127,7 +127,7 @@ export function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         {!c && <div className="sb-section">Áreas</div>}
 
         {areas.filter(a => currentUser.is_admin || !accessibleAreaIds || accessibleAreaIds.has(a.id)).map((a) => {
-          const isEdificio   = a.id === 'edificio'
+          const isEdificio   = a.type === 'edificio'
           const areaSubAreas = isEdificio ? subareas.filter(sa => sa.area === a.id) : []
           const areaProjects = projects.filter((p) => p.area === a.id)
           const isOpen       = expanded[a.id] ?? false
