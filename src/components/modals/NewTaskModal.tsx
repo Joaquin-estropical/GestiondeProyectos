@@ -317,10 +317,10 @@ export function NewTaskModal() {
                 <select
                   value={areaId}
                   onChange={e => handleAreaChange(e.target.value)}
-                  style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 10px', height: 32, color: 'var(--text-1)', fontSize: 13, cursor: 'pointer' }}
+                  style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 10px', height: 32, color: 'var(--text-1)', fontSize: 13, cursor: 'pointer', colorScheme: 'dark' }}
                 >
-                  <option value="">Seleccionar área...</option>
-                  {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  <option value="" style={{ background: '#1e1e2e', color: '#cdd6f4' }}>Seleccionar área...</option>
+                  {areas.map(a => <option key={a.id} value={a.id} style={{ background: '#1e1e2e', color: '#cdd6f4' }}>{a.name}</option>)}
                 </select>
               </div>
             </div>
@@ -350,11 +350,11 @@ export function NewTaskModal() {
                       <select
                         value={subareaId}
                         onChange={e => handleSubareaChange(e.target.value)}
-                        style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 10px', height: 32, color: subareaId ? 'var(--text-1)' : 'var(--text-3)', fontSize: 13, cursor: 'pointer' }}
+                        style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 10px', height: 32, color: subareaId ? 'var(--text-1)' : 'var(--text-3)', fontSize: 13, cursor: 'pointer', colorScheme: 'dark' }}
                       >
-                        <option value="">Seleccionar sub-área...</option>
+                        <option value="" style={{ background: '#1e1e2e', color: '#cdd6f4' }}>Seleccionar sub-área...</option>
                         {areaSubAreas.map(sa => (
-                          <option key={sa.id} value={sa.id}>{sa.name}</option>
+                          <option key={sa.id} value={sa.id} style={{ background: '#1e1e2e', color: '#cdd6f4' }}>{sa.name}</option>
                         ))}
                       </select>
                     )}
@@ -384,11 +384,11 @@ export function NewTaskModal() {
                   <select
                     value={projectId}
                     onChange={e => handleProjectChange(e.target.value)}
-                    style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 10px', height: 32, color: projectId ? 'var(--text-1)' : 'var(--text-3)', fontSize: 13, cursor: 'pointer' }}
+                    style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 10px', height: 32, color: projectId ? 'var(--text-1)' : 'var(--text-3)', fontSize: 13, cursor: 'pointer', colorScheme: 'dark' }}
                   >
-                    <option value="">Seleccionar proyecto...</option>
+                    <option value="" style={{ background: '#1e1e2e', color: '#cdd6f4' }}>Seleccionar proyecto...</option>
                     {areaProjects.map(p => (
-                      <option key={p.id} value={p.id}>
+                      <option key={p.id} value={p.id} style={{ background: '#1e1e2e', color: '#cdd6f4' }}>
                         {p.name === 'Generales' ? '📋 ' : ''}{p.name}
                       </option>
                     ))}
@@ -409,10 +409,10 @@ export function NewTaskModal() {
                 <select
                   value={assignee}
                   onChange={e => setAssignee(e.target.value)}
-                  style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 12px', height: 36, color: 'var(--text-1)', fontSize: 13, cursor: 'pointer' }}
+                  style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 12px', height: 36, color: 'var(--text-1)', fontSize: 13, cursor: 'pointer', colorScheme: 'dark' }}
                 >
                   {memberList.map(m => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
+                    <option key={m.id} value={m.id} style={{ background: '#1e1e2e', color: '#cdd6f4' }}>{m.name}</option>
                   ))}
                 </select>
               </div>
@@ -423,11 +423,11 @@ export function NewTaskModal() {
                 <select
                   value={helper}
                   onChange={e => setHelper(e.target.value)}
-                  style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 12px', height: 36, color: helper ? 'var(--text-1)' : 'var(--text-3)', fontSize: 13, cursor: 'pointer' }}
+                  style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '0 12px', height: 36, color: helper ? 'var(--text-1)' : 'var(--text-3)', fontSize: 13, cursor: 'pointer', colorScheme: 'dark' }}
                 >
-                  <option value="">Sin auxiliar</option>
+                  <option value="" style={{ background: '#1e1e2e', color: '#cdd6f4' }}>Sin auxiliar</option>
                   {memberList.filter(m => m.id !== assignee).map(m => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
+                    <option key={m.id} value={m.id} style={{ background: '#1e1e2e', color: '#cdd6f4' }}>{m.name}</option>
                   ))}
                 </select>
               </div>
