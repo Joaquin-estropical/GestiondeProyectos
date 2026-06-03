@@ -14,6 +14,7 @@ export const TEAM: Member[] = [
   { id: 'joa', name: 'Joaquin Abastoflor', role: 'Jefe de Proyectos',          short: 'Joaquin A.' },
   { id: 'fab', name: 'Fabio Jimenez',      role: 'Coordinador Administrativo', short: 'Fabio J.'   },
   { id: 'mar', name: 'Marcelo Jaldin',     role: 'Director de Finanzas',        short: 'Marcelo J.' },
+  { id: 'raq', name: 'Raquel Cabrera',     role: 'Auditora',                    short: 'Raquel C.'  },
 ]
 
 export const PROJECTS: Project[] = [

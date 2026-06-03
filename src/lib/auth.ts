@@ -45,6 +45,16 @@ const LOCAL_USERS: (AppUser & { password: string })[] = [
     is_admin:  false,
     password:  'Tropical2024!',
   },
+  {
+    id:        'c7e2a1b3-d4f5-4a6b-8c9d-0e1f2a3b4c5d',
+    memberId:  'raq',
+    name:      'Raquel Cabrera',
+    role:      'Auditora',
+    short:     'Raquel C.',
+    email:     'rcabrera@estropical.com',
+    is_admin:  false,
+    password:  'Tropical2024!',
+  },
 ]
 
 const SESSION_KEY = 'ot_session_user_id'
@@ -94,7 +104,7 @@ export const APP_USER_IDS = new Set<string>(LOCAL_USERS.map(u => u.id))
 export const APP_USERS: AppUser[] = LOCAL_USERS.map(({ password: _pw, ...u }) => u)
 export function setCurrentUser(_id: string) {}
 export function clearCurrentUser() {}
-const PRIORITY_IDS = ['joa', 'fab', 'mar']
+const PRIORITY_IDS = ['joa', 'fab', 'mar', 'raq']
 
 export function sortedMembers<T extends { id: string; name: string }>(members: T[]): T[] {
   return [...members].sort((a, b) => {
