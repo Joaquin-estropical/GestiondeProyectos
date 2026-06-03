@@ -45,6 +45,7 @@ import PrintPage           from '@/pages/planillas/PrintPage'
 import RelevamientoPrintPage from '@/pages/planillas/RelevamientoPrintPage'
 import TemplatesPage       from '@/pages/planillas/TemplatesPage'
 import TemplateDetailPage  from '@/pages/planillas/TemplateDetailPage'
+import FormulariosPage     from '@/pages/formularios/FormulariosPage'
 
 function AppRoutes() {
   const {
@@ -161,6 +162,7 @@ function AppRoutes() {
           <Route path="/planillas/plantillas"              element={<TemplatesPage />}       />
           <Route path="/planillas/plantillas/:templateId"  element={<TemplateDetailPage />}  />
           <Route path="/planillas/:checklistId"            element={<ChecklistDetailPage />} />
+          <Route path="/formularios"                        element={<FormulariosPage />}     />
         </Route>
         {/* Print is outside AppShell (sin navegación) */}
         <Route path="/planillas/:checklistId/imprimir" element={<PrintPage />} />

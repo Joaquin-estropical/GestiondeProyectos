@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
-import { Plus, ZoomIn, ZoomOut, Target, Printer, AlertTriangle, ChevronDown, ChevronRight, GripVertical, Eye, EyeOff } from 'lucide-react'
+import { Plus, ZoomIn, ZoomOut, Target, Printer, AlertTriangle, ChevronDown, ChevronRight, GripVertical, Eye } from 'lucide-react'
 import type { Task, TaskDependency, GanttTask, GanttDep } from '@/types'
 import { fetchTaskDependencies, updateTaskGantt } from '@/lib/db'
 import { useAppStore } from '@/stores/app'
@@ -8,9 +8,9 @@ import { es } from 'date-fns/locale'
 
 // ─── Constants ────────────────────────────────────────────
 const ROW_H      = 46
-const HEADER_H   = 52   // total: 22 (month) + 30 (weeks)
 const MONTH_H    = 22
-const WEEK_H     = 30
+const DAY_H      = 34   // two lines: day number + weekday initial
+const HEADER_H   = MONTH_H + DAY_H
 const LEFT_W     = 320
 
 const ZOOM_LEVELS = [18, 28, 44] as const
@@ -325,7 +325,7 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
   const [deps,   setDeps]   = useState<TaskDependency[]>([])
   const [selId,  setSelId]  = useState<string | null>(null)
   const [tip,    setTip]    = useState<{ gt: GanttTask; x: number; y: number } | null>(null)
-  const [critCol, setCritCol] = useState(false)
+  const [critCol, setCritCol] = useState(true)
   const [showCompleted, setShowCompleted] = useState(false)
   const [completedFrom, setCompletedFrom] = useState('')
   const [completedTo,   setCompletedTo]   = useState('')
@@ -336,6 +336,11 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
   const dragRowRef = useRef<string | null>(null)
   const dragOverRef = useRef<string | null>(null)
 
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [legendOpen,  setLegendOpen]  = useState(false)
+  const filtersRef = useRef<HTMLDivElement>(null)
+  const legendRef  = useRef<HTMLDivElement>(null)
+
   const rightRef = useRef<HTMLDivElement>(null)
   const leftRef  = useRef<HTMLDivElement>(null)
 
@@ -343,6 +348,16 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
     if (!projectId) return
     fetchTaskDependencies(projectId).then(setDeps).catch(console.error)
   }, [projectId])
+
+  // Click-outside to close popovers
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (filtersRef.current && !filtersRef.current.contains(e.target as Node)) setFiltersOpen(false)
+      if (legendRef.current  && !legendRef.current.contains(e.target as Node))  setLegendOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   // Filter tasks before plotting:
   //  • require start_date (no temporal anchor → skip)
@@ -420,10 +435,14 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
     return res
   }, [totalDays, origin])
 
-  // Week labels (every 7 days)
-  const weeks = useMemo(() => {
-    const res: { label: string; start: number }[] = []
-    for (let i = 0; i < totalDays; i += 7) res.push({ label: format(addDays(origin, i), 'd MMM', { locale: es }), start: i })
+  // Per-day cells (number + weekday initial)
+  const days = useMemo(() => {
+    const res: { i: number; date: Date; weekend: boolean; monday: boolean }[] = []
+    for (let i = 0; i < totalDays; i++) {
+      const date = addDays(origin, i)
+      const dow = date.getDay()
+      res.push({ i, date, weekend: dow === 0 || dow === 6, monday: dow === 1 })
+    }
     return res
   }, [totalDays, origin])
 
@@ -537,8 +556,14 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
 
       {/* ── Toolbar ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderBottom: '1px solid #1E1E28', flexShrink: 0, background: '#0E0E13' }}>
-        <span style={{ fontSize: 13, color: '#8888A0', fontWeight: 600, marginRight: 2 }}>{projectName}</span>
-        <div style={{ width: 1, height: 16, background: '#2A2A35' }} />
+        {projectName && (
+          <>
+            <span style={{ fontSize: 13, color: '#8888A0', fontWeight: 600, marginRight: 2 }}>{projectName}</span>
+            <div style={{ width: 1, height: 16, background: '#2A2A35' }} />
+          </>
+        )}
+
+        {/* Zoom */}
         <button className="btn btn-secondary btn-sm btn-icon" title="Zoom −"
           onClick={() => setDw(w => { const i = ZOOM_LEVELS.indexOf(w); return i > 0 ? ZOOM_LEVELS[i - 1] : w })}>
           <ZoomOut size={13} />
@@ -547,80 +572,134 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
           onClick={() => setDw(w => { const i = ZOOM_LEVELS.indexOf(w); return i < ZOOM_LEVELS.length - 1 ? ZOOM_LEVELS[i + 1] : w })}>
           <ZoomIn size={13} />
         </button>
+
+        {/* Hoy */}
         <button className="btn btn-secondary btn-sm"
           onClick={() => { if (rightRef.current) rightRef.current.scrollLeft = Math.max(0, todayX - 280) }}>
           <Target size={13} /> Hoy
         </button>
-        {!hasCompletedRange && (
+
+        <div style={{ width: 1, height: 16, background: '#2A2A35' }} />
+
+        {/* Filtros popover */}
+        <div ref={filtersRef} style={{ position: 'relative' }}>
           <button
             className="btn btn-secondary btn-sm"
-            title={showCompleted ? 'Ocultar tareas completadas' : 'Mostrar tareas completadas'}
-            onClick={() => setShowCompleted(v => !v)}
+            onClick={() => { setFiltersOpen(v => !v); setLegendOpen(false) }}
+            style={{ display: 'flex', alignItems: 'center', gap: 5 }}
           >
-            {showCompleted ? <EyeOff size={13} /> : <Eye size={13} />}
-            {showCompleted ? 'Ocultar completadas' : 'Mostrar completadas'}
+            <Eye size={13} />
+            Filtros
+            {(showCompleted || hasCompletedRange) && (
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--teal)', flexShrink: 0 }} />
+            )}
           </button>
-        )}
+          {filtersOpen && (
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 200,
+              background: '#18181F', border: '1px solid #2A2A35', borderRadius: 10,
+              padding: '14px 16px', width: 260, boxShadow: '0 12px 32px rgba(0,0,0,.7)',
+              display: 'flex', flexDirection: 'column', gap: 12,
+            }}>
+              <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: '#5A5A68' }}>Filtros de tareas</span>
 
-        {/* Rango de completadas */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#8B8B92' }}>
-          <span style={{ marginRight: 2 }}>Completadas:</span>
-          <input
-            type="date"
-            value={completedFrom}
-            onChange={e => setCompletedFrom(e.target.value)}
-            title="Desde"
-            style={{
-              background: 'var(--surface-2)', border: '1px solid var(--border)',
-              borderRadius: 4, padding: '3px 6px', fontSize: 11, color: 'var(--text-1)',
-              outline: 'none', cursor: 'pointer', height: 26,
-            }}
-          />
-          <span style={{ color: '#3A3A4A' }}>→</span>
-          <input
-            type="date"
-            value={completedTo}
-            onChange={e => setCompletedTo(e.target.value)}
-            title="Hasta"
-            style={{
-              background: 'var(--surface-2)', border: '1px solid var(--border)',
-              borderRadius: 4, padding: '3px 6px', fontSize: 11, color: 'var(--text-1)',
-              outline: 'none', cursor: 'pointer', height: 26,
-            }}
-          />
-          {hasCompletedRange && (
-            <button
-              onClick={() => { setCompletedFrom(''); setCompletedTo(''); }}
-              title="Limpiar rango"
-              style={{
-                background: 'transparent', border: 'none', color: 'var(--text-3)',
-                cursor: 'pointer', padding: '0 4px', fontSize: 14, lineHeight: 1,
-              }}
-            >×</button>
+              {/* Toggle completadas */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <div
+                  onClick={() => setShowCompleted(v => !v)}
+                  style={{
+                    width: 32, height: 18, borderRadius: 9, position: 'relative', cursor: 'pointer', flexShrink: 0,
+                    background: showCompleted ? 'var(--teal)' : '#2A2A35',
+                    transition: 'background .2s',
+                  }}
+                >
+                  <div style={{
+                    position: 'absolute', top: 3, left: showCompleted ? 17 : 3,
+                    width: 12, height: 12, borderRadius: '50%', background: '#fff',
+                    transition: 'left .2s',
+                  }} />
+                </div>
+                <span style={{ fontSize: 13, color: 'var(--text-1)' }}>Mostrar completadas</span>
+              </label>
+
+              {/* Rango de fechas */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: 11.5, color: '#8B8B92' }}>Rango de completadas</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input
+                    type="date"
+                    value={completedFrom}
+                    onChange={e => setCompletedFrom(e.target.value)}
+                    title="Desde"
+                    style={{
+                      flex: 1, background: 'var(--surface-2)', border: '1px solid var(--border)',
+                      borderRadius: 5, padding: '5px 8px', fontSize: 12, color: 'var(--text-1)',
+                      outline: 'none', cursor: 'pointer',
+                    }}
+                  />
+                  <span style={{ color: '#3A3A4A', fontSize: 12 }}>→</span>
+                  <input
+                    type="date"
+                    value={completedTo}
+                    onChange={e => setCompletedTo(e.target.value)}
+                    title="Hasta"
+                    style={{
+                      flex: 1, background: 'var(--surface-2)', border: '1px solid var(--border)',
+                      borderRadius: 5, padding: '5px 8px', fontSize: 12, color: 'var(--text-1)',
+                      outline: 'none', cursor: 'pointer',
+                    }}
+                  />
+                  {hasCompletedRange && (
+                    <button
+                      onClick={() => { setCompletedFrom(''); setCompletedTo('') }}
+                      title="Limpiar rango"
+                      style={{ background: 'transparent', border: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '0 2px', fontSize: 16, lineHeight: 1 }}
+                    >×</button>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Leyenda */}
-        <div style={{ display: 'flex', gap: 10, marginLeft: 6 }}>
-          {[
-            { c: C.critical,  l: 'Ruta crítica',      shape: 'rect' },
-            { c: C.normal,    l: 'Normal',             shape: 'rect' },
-            { c: C.done,      l: 'Completada',         shape: 'rect' },
-            { c: C.float,     l: 'Holgura',            shape: 'rect' },
-            { c: C.milestone, l: 'Hito',               shape: 'diamond' },
-            { c: C.noScope,   l: 'Sin fecha fin',       shape: 'dashed' },
-          ].map(l => (
-            <span key={l.l} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#8B8B92' }}>
-              {l.shape === 'diamond'
-                ? <span style={{ width: 9, height: 9, background: l.c, transform: 'rotate(45deg)', display: 'inline-block', borderRadius: 1, flexShrink: 0 }} />
-                : l.shape === 'dashed'
-                ? <span style={{ width: 10, height: 8, borderRadius: 2, border: `1.5px dashed ${l.c}`, background: 'transparent', flexShrink: 0 }} />
-                : <span style={{ width: 10, height: 8, borderRadius: 2, background: l.c, flexShrink: 0 }} />}
-              {l.l}
-            </span>
-          ))}
+        {/* Leyenda popover */}
+        <div ref={legendRef} style={{ position: 'relative' }}>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => { setLegendOpen(v => !v); setFiltersOpen(false) }}
+          >
+            Leyenda
+          </button>
+          {legendOpen && (
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 200,
+              background: '#18181F', border: '1px solid #2A2A35', borderRadius: 10,
+              padding: '14px 16px', width: 180, boxShadow: '0 12px 32px rgba(0,0,0,.7)',
+              display: 'flex', flexDirection: 'column', gap: 9,
+            }}>
+              <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: '#5A5A68' }}>Referencias</span>
+              {[
+                { c: C.critical,  l: 'Ruta crítica',   shape: 'rect' },
+                { c: C.normal,    l: 'Normal',          shape: 'rect' },
+                { c: C.done,      l: 'Completada',      shape: 'rect' },
+                { c: C.float,     l: 'Holgura',         shape: 'rect' },
+                { c: C.milestone, l: 'Hito',            shape: 'diamond' },
+                { c: C.noScope,   l: 'Sin fecha fin',   shape: 'dashed' },
+              ].map(l => (
+                <span key={l.l} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#C8C8D0' }}>
+                  {l.shape === 'diamond'
+                    ? <span style={{ width: 10, height: 10, background: l.c, transform: 'rotate(45deg)', display: 'inline-block', borderRadius: 1, flexShrink: 0 }} />
+                    : l.shape === 'dashed'
+                    ? <span style={{ width: 12, height: 9, borderRadius: 2, border: `1.5px dashed ${l.c}`, background: 'transparent', flexShrink: 0 }} />
+                    : <span style={{ width: 12, height: 9, borderRadius: 2, background: l.c, flexShrink: 0 }} />}
+                  {l.l}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
+        {/* Acciones */}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
           <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>
             <Printer size={13} /> Exportar
@@ -718,29 +797,42 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
                   </div>
                 ))}
               </div>
-              {/* Week labels row */}
-              <div style={{ height: WEEK_H, position: 'relative' }}>
-                {weeks.map((wk, i) => (
-                  <div key={i} style={{
-                    position: 'absolute', left: wk.start * dw, width: 7 * dw, height: WEEK_H,
-                    display: 'flex', alignItems: 'center', paddingLeft: 8,
-                    fontSize: 12, fontWeight: 600,
-                    color: (todayOff >= wk.start && todayOff < wk.start + 7) ? 'var(--teal)' : '#8B8B92',
-                    borderRight: '1px solid #1A1A22', boxSizing: 'border-box',
-                  }}>
-                    {wk.label}
-                  </div>
-                ))}
+              {/* Day cells row (number + weekday initial) */}
+              <div style={{ height: DAY_H, position: 'relative' }}>
+                {days.map(d => {
+                  const isToday = d.i === todayOff
+                  const tight = dw < 24
+                  const fg = isToday ? 'var(--teal)' : d.weekend ? '#54545E' : '#8B8B92'
+                  return (
+                    <div key={d.i} style={{
+                      position: 'absolute', left: d.i * dw, width: dw, height: DAY_H,
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                      gap: 1, boxSizing: 'border-box',
+                      borderRight: `1px solid ${d.monday ? '#23232E' : '#16161C'}`,
+                      background: d.weekend ? 'rgba(255,255,255,.012)' : isToday ? 'rgba(20,184,166,.08)' : 'transparent',
+                    }}>
+                      <span style={{
+                        fontSize: tight ? 11 : 12.5, fontWeight: isToday ? 800 : 600,
+                        color: fg, fontFamily: 'JetBrains Mono, monospace', lineHeight: 1,
+                      }}>
+                        {format(d.date, 'd', { locale: es })}
+                      </span>
+                      <span style={{
+                        fontSize: tight ? 8.5 : 9.5, fontWeight: 700, textTransform: 'uppercase',
+                        color: fg, opacity: isToday ? 1 : 0.7, lineHeight: 1, letterSpacing: '.04em',
+                      }}>
+                        {format(d.date, 'EEEEE', { locale: es })}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
             </div>
 
-            {/* Weekend shading */}
-            {Array.from({ length: totalDays }, (_, i) => {
-              const d = addDays(origin, i)
-              return [0, 6].includes(d.getDay()) ? (
-                <div key={i} style={{ position: 'absolute', left: i * dw, top: HEADER_H, width: dw, height: ganttTasks.length * ROW_H, background: 'rgba(255,255,255,.013)', pointerEvents: 'none' }} />
-              ) : null
-            })}
+            {/* Weekend shading + monday lines across body */}
+            {days.map(d => d.weekend ? (
+              <div key={d.i} style={{ position: 'absolute', left: d.i * dw, top: HEADER_H, width: dw, height: ganttTasks.length * ROW_H, background: 'rgba(255,255,255,.013)', pointerEvents: 'none' }} />
+            ) : null)}
 
             {/* Row stripes */}
             {ganttTasks.map((_, i) => (
@@ -751,10 +843,14 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
               }} />
             ))}
 
-            {/* Week vertical lines */}
-            {weeks.map((wk, i) => (
-              <div key={i} style={{ position: 'absolute', left: wk.start * dw, top: HEADER_H, width: 1, height: ganttTasks.length * ROW_H, background: '#1A1A22', pointerEvents: 'none' }} />
+            {/* Monday vertical lines across body */}
+            {days.filter(d => d.monday).map(d => (
+              <div key={d.i} style={{ position: 'absolute', left: d.i * dw, top: HEADER_H, width: 1, height: ganttTasks.length * ROW_H, background: '#23232E', pointerEvents: 'none' }} />
             ))}
+            {/* Per-day faint grid lines */}
+            {days.map(d => !d.monday ? (
+              <div key={d.i} style={{ position: 'absolute', left: d.i * dw, top: HEADER_H, width: 1, height: ganttTasks.length * ROW_H, background: 'rgba(255,255,255,.02)', pointerEvents: 'none' }} />
+            ) : null)}
 
             {/* Today line */}
             {todayOff >= 0 && todayOff < totalDays && (

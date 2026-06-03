@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Home, Sun, Sparkles, Calendar, BarChart3, Settings,
   ChevronDown, ChevronRight, Plus, PanelLeftClose, PanelLeftOpen,
-  LayoutTemplate, LogOut, ChevronUp, ClipboardList,
+  LayoutTemplate, LogOut, ChevronUp, ClipboardList, FileText,
 } from 'lucide-react'
 import { useAppStore } from '@/stores/app'
 import { Avatar } from '@/components/shared/Avatar'
@@ -16,6 +16,7 @@ const WS_ITEMS = [
   { id: 'calendar',  label: 'Calendario global', Icon: Calendar,      path: '/calendario'   },
   { id: 'reports',   label: 'Reportes',          Icon: BarChart3,     path: '/reportes'     },
   { id: 'planillas', label: 'Planillas',          Icon: ClipboardList, path: '/planillas'    },
+  { id: 'formularios', label: 'Formularios',      Icon: FileText,      path: '/formularios'  },
 ]
 
 interface SidebarProps {

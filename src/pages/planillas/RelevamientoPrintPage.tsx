@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import type { ProjectForm, ProjectFormItem, RelevamientoCondition, Project } from '@/types'
-import { RELEVAMIENTO_CONDITION_LABELS } from '@/types'
+import { RELEVAMIENTO_CONDITION_LABELS, RELEVAMIENTO_TEMPLATE_ID } from '@/types'
 import { fetchProjectForm, fetchFormItems } from '@/lib/projectForms'
 import { fetchProjects } from '@/lib/db'
 
@@ -30,6 +30,7 @@ function EstropicalLogo() {
 
 export default function RelevamientoPrintPage() {
   const { formId } = useParams<{ formId: string }>()
+  const [searchParams] = useSearchParams()
 
   const [form, setForm]       = useState<ProjectForm | null>(null)
   const [items, setItems]     = useState<ProjectFormItem[]>([])
@@ -46,6 +47,9 @@ export default function RelevamientoPrintPage() {
   const [tipoVisita,  setTipoVisita]  = useState('☐ Programada   ☐ Correctiva   ☐ Preventiva')
   const [proxima,     setProxima]     = useState('')
   const [editingHeader, setEditingHeader] = useState(false)
+
+  // Modo: ?blank=1 imprime celdas vacías (planilla para llenar a mano).
+  const blank = searchParams.get('blank') === '1'
 
   useEffect(() => {
     if (!formId) return
@@ -89,7 +93,15 @@ export default function RelevamientoPrintPage() {
     </div>
   )
 
+  const relevamiento = form.template_id === RELEVAMIENTO_TEMPLATE_ID
+  const docTitle = relevamiento ? 'Checklist de Relevamiento de Sucursal' : 'Formulario de control'
   const categories = Array.from(new Set(items.map(i => i.category ?? 'Sin categoría')))
+  // Para genéricos: cantidad de columnas de estado (OK / Falla).
+  const GENERIC_STATES: { key: 'ok' | 'fail'; label: string }[] = [
+    { key: 'ok', label: 'OK' }, { key: 'fail', label: 'Falla' },
+  ]
+  const condColCount = relevamiento ? COND_ORDER.length : GENERIC_STATES.length
+  const totalCols = 2 + condColCount + 1 + 1 // N° + ítem + estados + obs + foto
 
   const editInput: React.CSSProperties = {
     border: 'none', borderBottom: '1.5px dashed #94a3b8', outline: 'none',
@@ -223,7 +235,7 @@ export default function RelevamientoPrintPage() {
             <EstropicalLogo />
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontWeight: 800, fontSize: 16, color: '#0f172a', letterSpacing: 1, textTransform: 'uppercase' }}>
-                Checklist de Relevamiento de Sucursal
+                {docTitle}
               </div>
               <div style={{ color: '#64748b', marginTop: 4, fontSize: 12 }}>{form.title}</div>
             </div>
@@ -260,9 +272,14 @@ export default function RelevamientoPrintPage() {
               <tr>
                 <th style={{ width: 26, textAlign: 'center' }}>N°</th>
                 <th>Ítem</th>
-                {COND_ORDER.map(c => (
-                  <th key={c} style={{ width: 70, textAlign: 'center' }}>{RELEVAMIENTO_CONDITION_LABELS[c]}</th>
-                ))}
+                {relevamiento
+                  ? COND_ORDER.map(c => (
+                      <th key={c} style={{ width: 70, textAlign: 'center' }}>{RELEVAMIENTO_CONDITION_LABELS[c]}</th>
+                    ))
+                  : GENERIC_STATES.map(s => (
+                      <th key={s.key} style={{ width: 70, textAlign: 'center' }}>{s.label}</th>
+                    ))
+                }
                 <th style={{ width: 200 }}>Observaciones / hallazgo</th>
                 <th style={{ width: 64, textAlign: 'center' }}>Foto / respaldo</th>
               </tr>
@@ -272,7 +289,7 @@ export default function RelevamientoPrintPage() {
                 const catItems = items.filter(i => (i.category ?? 'Sin categoría') === cat)
                 return [
                   <tr key={`cat-${cat}`} className="cat-row">
-                    <td colSpan={8}>{cat}</td>
+                    <td colSpan={totalCols}>{cat}</td>
                   </tr>,
                   ...catItems.map(item => {
                     rowNum += 1
@@ -280,15 +297,25 @@ export default function RelevamientoPrintPage() {
                       <tr key={item.id}>
                         <td style={{ color: '#94a3b8', textAlign: 'center', fontSize: 10 }}>{rowNum}</td>
                         <td style={{ fontWeight: 500, fontSize: 11 }}>{item.title}</td>
-                        {COND_ORDER.map(c => {
-                          const on = item.condition === c
-                          return (
-                            <td key={c} className={`cond-cell ${on ? 'cond-on' : 'cond-off'}`}>
-                              {on ? '☑' : '☐'}
-                            </td>
-                          )
-                        })}
-                        <td style={{ fontSize: 10, color: '#0f172a' }}>{item.observation ?? ''}</td>
+                        {relevamiento
+                          ? COND_ORDER.map(c => {
+                              const on = !blank && item.condition === c
+                              return (
+                                <td key={c} className={`cond-cell ${on ? 'cond-on' : 'cond-off'}`}>
+                                  {on ? '☑' : '☐'}
+                                </td>
+                              )
+                            })
+                          : GENERIC_STATES.map(s => {
+                              const on = !blank && item.status === s.key
+                              return (
+                                <td key={s.key} className={`cond-cell ${on ? 'cond-on' : 'cond-off'}`}>
+                                  {on ? '☑' : '☐'}
+                                </td>
+                              )
+                            })
+                        }
+                        <td style={{ fontSize: 10, color: '#0f172a' }}>{blank ? '' : (item.observation ?? '')}</td>
                         <td />
                       </tr>
                     )
