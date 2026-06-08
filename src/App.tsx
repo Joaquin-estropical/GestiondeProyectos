@@ -63,12 +63,13 @@ function AppRoutes() {
   useRealtimeSync(!!user, user?.id)
 
   // Load area access permissions for non-admin users (local, localStorage)
-  const loadAccess = (u: AppUser) => {
+  const loadAccess = async (u: AppUser) => {
     if (u.is_admin) {
       setAccessibleAreaIds(null) // null = see everything
       return
     }
-    setAccessibleAreaIds(new Set(getUserAreaAccess(u.id)))
+    const ids = await getUserAreaAccess(u.id)
+    setAccessibleAreaIds(new Set(ids))
   }
 
   // Check existing session on mount

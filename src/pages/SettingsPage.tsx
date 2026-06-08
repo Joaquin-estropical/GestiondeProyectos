@@ -700,20 +700,18 @@ function UsersTab() {
   const [showNew,     setShowNew]     = useState(false)
   const [confirmDel,  setConfirmDel]  = useState<string | null>(null)
 
-  const loadData = () => {
+  const loadData = async () => {
     setLoading(true)
-    // Todo local: usuarios (seeds + creados) y accesos desde localStorage
     setAppUsers(getLocalUsers().map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role, is_admin: u.is_admin })))
-    setUserAccess(getAllAreaAccess())
+    setUserAccess(await getAllAreaAccess())
     setLoading(false)
   }
 
   useEffect(() => { loadData() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const toggleAreaAccess = (userId: string, areaId: string, _hasAccess: boolean) => {
-    const next = toggleUserAreaAccess(userId, areaId)
+  const toggleAreaAccess = async (userId: string, areaId: string, _hasAccess: boolean) => {
+    const next = await toggleUserAreaAccess(userId, areaId)
     setUserAccess(prev => ({ ...prev, [userId]: next }))
-    // Si el usuario afectado es el que está logueado, refrescar su visibilidad en vivo
     if (userId === currentUser.id && !currentUser.is_admin) {
       useAppStore.getState().setAccessibleAreaIds(new Set(next))
     }

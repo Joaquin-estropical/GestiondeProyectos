@@ -134,26 +134,42 @@ export async function resetPasswordWithMasterKey(
   writeJSON(PWD_KEY, overrides)
 }
 
-// ── Acceso a áreas (local) ──────────────────────────────────────────────────
-export function getUserAreaAccess(userId: string): string[] {
+// ── Acceso a áreas (Supabase, con fallback a localStorage) ──────────────────
+export async function getUserAreaAccess(userId: string): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from('user_area_access')
+      .select('area_id')
+      .eq('user_id', userId)
+    if (!error && data) return data.map((r: { area_id: string }) => r.area_id)
+  } catch { /* fallback */ }
+  // Fallback a localStorage si Supabase falla
   const map = readJSON<Record<string, string[]>>(ACCESS_KEY, {})
   return map[userId] ?? []
 }
-export function getAllAreaAccess(): Record<string, string[]> {
+export async function getAllAreaAccess(): Promise<Record<string, string[]>> {
+  try {
+    const { data, error } = await supabase.from('user_area_access').select('user_id, area_id')
+    if (!error && data) {
+      const result: Record<string, string[]> = {}
+      for (const row of data as { user_id: string; area_id: string }[]) {
+        if (!result[row.user_id]) result[row.user_id] = []
+        result[row.user_id].push(row.area_id)
+      }
+      return result
+    }
+  } catch { /* fallback */ }
   return readJSON<Record<string, string[]>>(ACCESS_KEY, {})
 }
-export function setUserAreaAccess(userId: string, areaIds: string[]): void {
-  const map = readJSON<Record<string, string[]>>(ACCESS_KEY, {})
-  map[userId] = areaIds
-  writeJSON(ACCESS_KEY, map)
-}
-export function toggleUserAreaAccess(userId: string, areaId: string): string[] {
-  const current = getUserAreaAccess(userId)
-  const next = current.includes(areaId)
-    ? current.filter(a => a !== areaId)
-    : [...current, areaId]
-  setUserAreaAccess(userId, next)
-  return next
+export async function toggleUserAreaAccess(userId: string, areaId: string): Promise<string[]> {
+  const current = await getUserAreaAccess(userId)
+  const has = current.includes(areaId)
+  if (has) {
+    await supabase.from('user_area_access').delete().eq('user_id', userId).eq('area_id', areaId)
+  } else {
+    await supabase.from('user_area_access').insert({ user_id: userId, area_id: areaId })
+  }
+  return has ? current.filter(a => a !== areaId) : [...current, areaId]
 }
 
 // ── Gestión de usuarios (local) ─────────────────────────────────────────────
