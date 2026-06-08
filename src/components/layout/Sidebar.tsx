@@ -15,7 +15,7 @@ const WS_ITEMS = [
   { id: 'ai',        label: 'Asistente IA',      Icon: Sparkles,      path: '/asistente-ia' },
   { id: 'calendar',  label: 'Calendario global', Icon: Calendar,      path: '/calendario'   },
   { id: 'reports',   label: 'Reportes',          Icon: BarChart3,     path: '/reportes'     },
-  { id: 'planillas', label: 'Planillas',          Icon: ClipboardList, path: '/planillas'    },
+  { id: 'planillas', label: 'Plantillas',          Icon: ClipboardList, path: '/planillas'    },
   { id: 'formularios', label: 'Formularios',      Icon: FileText,      path: '/formularios'  },
 ]
 

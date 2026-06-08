@@ -531,7 +531,7 @@ export default function PlanillasPage() {
 
       {/* ── Header ── */}
       <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Planillas</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Plantillas</h1>
         <p style={{ fontSize: 13, color: 'var(--text-3)', margin: '4px 0 0' }}>
           Creá o editá plantillas, y usálas para generar pares de actas en proyectos y áreas.
         </p>
@@ -650,13 +650,13 @@ export default function PlanillasPage() {
       {/* ── Planillas activas ── */}
       <section>
         <h2 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '.06em', margin: '0 0 16px' }}>
-          Planillas activas
+          Plantillas activas
         </h2>
 
         {!loading && assignedGroups.length === 0 ? (
           <div style={{ padding: '24px 20px', border: '1px dashed var(--border)', borderRadius: 10, textAlign: 'center' }}>
             <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>
-              No hay planillas asignadas. Usá una plantilla de arriba para crear la primera.
+              No hay plantillas asignadas. Usá una plantilla de arriba para crear la primera.
             </p>
           </div>
         ) : (

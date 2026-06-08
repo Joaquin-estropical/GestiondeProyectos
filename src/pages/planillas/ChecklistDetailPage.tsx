@@ -190,7 +190,7 @@ export default function ChecklistDetailPage() {
     <div style={{ maxWidth: 860, margin: '0 auto', padding: '28px 24px' }}>
       {/* Back */}
       <button className="btn btn-ghost btn-sm" onClick={() => navigate('/planillas')} style={{ marginBottom: 20, color: 'var(--text-3)' }}>
-        <ArrowLeft size={14} /> Planillas
+        <ArrowLeft size={14} /> Plantillas
       </button>
 
       {/* Header */}
