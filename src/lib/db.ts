@@ -1,4 +1,5 @@
 import { supabase, supabaseWriter } from './supabase'
+import { getLocalUsers } from './auth'
 import type { Area, SubArea, SubAreaType, Member, Project, Task, Template, TemplateTask, Subtask, Comment, TaskDependency, DependencyType, AreaType, TaskPriority, TaskStatus, TaskEvent, TaskEventType } from '@/types'
 
 // ── helpers ───────────────────────────────────────────────
@@ -114,7 +115,14 @@ export async function deleteSubArea(id: string): Promise<void> {
 export async function fetchMembers(): Promise<Member[]> {
   const { data, error } = await supabase.from('members').select('*').order('name')
   if (error) throw error
-  return data as Member[]
+  const dbMembers = (data as Member[]) ?? []
+  // Merge local users so users added locally (e.g. Raquel) always appear
+  const localUsers = getLocalUsers()
+  const dbIds = new Set(dbMembers.map(m => m.id))
+  const localExtras: Member[] = localUsers
+    .filter(u => !dbIds.has(u.memberId))
+    .map(u => ({ id: u.memberId, name: u.name, role: u.role, short: u.short }))
+  return [...dbMembers, ...localExtras].sort((a, b) => a.name.localeCompare(b.name, 'es'))
 }
 
 // ═══════════════════════════════════════════════════════════
