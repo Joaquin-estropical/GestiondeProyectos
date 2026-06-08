@@ -880,7 +880,7 @@ function MyAccountTab() {
     if (mkNext !== mkConfirm) { setMkMsg({ type: 'err', text: 'Las claves maestras no coinciden.' }); return }
     setMkSaving(true)
     try {
-      setMasterKey(mkNext)
+      await setMasterKey(mkNext)
       setMkMsg({ type: 'ok', text: 'Clave maestra actualizada correctamente.' })
       setMkNext(''); setMkConfirm('')
     } catch (e) {

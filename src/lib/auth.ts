@@ -75,6 +75,29 @@ function writeJSON(key: string, value: unknown) {
   try { localStorage.setItem(key, JSON.stringify(value)) } catch { /* ignore quota */ }
 }
 
+// ── Supabase sync helpers ────────────────────────────────────────────────────
+export async function syncPasswordFromSupabase(userId: string): Promise<void> {
+  try {
+    const { data, error } = await supabase
+      .from('user_settings').select('password').eq('user_id', userId).maybeSingle()
+    if (!error && data?.password) {
+      const overrides = readJSON<Record<string, string>>(PWD_KEY, {})
+      overrides[userId] = data.password
+      writeJSON(PWD_KEY, overrides)
+    }
+  } catch { /* offline — mantener valor localStorage */ }
+}
+
+export async function syncMasterKeyFromSupabase(): Promise<void> {
+  try {
+    const { data, error } = await supabase
+      .from('app_settings').select('value').eq('key', 'master_key').maybeSingle()
+    if (!error && data?.value) {
+      localStorage.setItem(MASTER_KEY_STORAGE, data.value)
+    }
+  } catch { /* offline */ }
+}
+
 // Usuarios creados desde la app (se suman a los seeds LOCAL_USERS)
 function getExtraUsers(): (AppUser & { password: string })[] {
   return readJSON<(AppUser & { password: string })[]>(EXTRA_KEY, [])
@@ -91,10 +114,14 @@ function allUsersWithPw(): (AppUser & { password: string })[] {
 
 // Login local: busca el usuario por email y verifica la contraseña
 export async function signIn(email: string, password: string): Promise<AppUser> {
-  const found = allUsersWithPw().find(u => u.email.toLowerCase() === email.toLowerCase().trim())
+  const emailNorm = email.toLowerCase().trim()
+  const found = allUsersWithPw().find(u => u.email.toLowerCase() === emailNorm)
   if (!found) throw new Error('Usuario no encontrado')
-  if (found.password !== password) throw new Error('Contraseña incorrecta')
-  const { password: _pw, ...user } = found
+  // Traer contraseña actualizada de Supabase (otro dispositivo pudo haberla cambiado)
+  await syncPasswordFromSupabase(found.id)
+  const refreshed = allUsersWithPw().find(u => u.id === found.id)!
+  if (refreshed.password !== password) throw new Error('Contraseña incorrecta')
+  const { password: _pw, ...user } = refreshed
   localStorage.setItem(SESSION_KEY, user.id)
   return user
 }
@@ -108,6 +135,10 @@ export async function changePassword(userId: string, currentPassword: string, ne
   const overrides = readJSON<Record<string, string>>(PWD_KEY, {})
   overrides[userId] = newPassword
   writeJSON(PWD_KEY, overrides)
+  try {
+    await supabase.from('user_settings')
+      .upsert({ user_id: userId, password: newPassword, updated_at: new Date().toISOString() })
+  } catch { /* offline — localStorage ya actualizado */ }
 }
 
 // ── Clave maestra de recuperación (local) ────────────────────────────────────
@@ -116,8 +147,12 @@ export async function changePassword(userId: string, currentPassword: string, ne
 export function getMasterKey(): string | null {
   try { return localStorage.getItem(MASTER_KEY_STORAGE) } catch { return null }
 }
-export function setMasterKey(key: string): void {
+export async function setMasterKey(key: string): Promise<void> {
   try { localStorage.setItem(MASTER_KEY_STORAGE, key) } catch { /* ignore quota */ }
+  try {
+    await supabase.from('app_settings')
+      .upsert({ key: 'master_key', value: key, updated_at: new Date().toISOString() })
+  } catch { /* offline */ }
 }
 export function verifyMasterKey(input: string): boolean {
   return input === (getMasterKey() ?? DEFAULT_MASTER_KEY)
@@ -132,6 +167,10 @@ export async function resetPasswordWithMasterKey(
   const overrides = readJSON<Record<string, string>>(PWD_KEY, {})
   overrides[userId] = newPassword
   writeJSON(PWD_KEY, overrides)
+  try {
+    await supabase.from('user_settings')
+      .upsert({ user_id: userId, password: newPassword, updated_at: new Date().toISOString() })
+  } catch { /* offline */ }
 }
 
 // ── Acceso a áreas (Supabase, con fallback a localStorage) ──────────────────

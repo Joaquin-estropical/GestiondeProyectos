@@ -22,7 +22,8 @@ import { NewProjectModal }  from '@/components/modals/NewProjectModal'
 import { EditProjectModal } from '@/components/modals/EditProjectModal'
 import { NewTaskModal }     from '@/components/modals/NewTaskModal'
 import { useAppStore }     from '@/stores/app'
-import { getSessionUser, onAuthChange, getUserAreaAccess } from '@/lib/auth'
+import { getSessionUser, onAuthChange, getUserAreaAccess,
+         syncPasswordFromSupabase, syncMasterKeyFromSupabase } from '@/lib/auth'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import type { AppUser }    from '@/lib/auth'
 
@@ -72,12 +73,18 @@ function AppRoutes() {
     setAccessibleAreaIds(new Set(ids))
   }
 
-  // Check existing session on mount
+  // Check existing session on mount + sync cross-device settings
   useEffect(() => {
-    getSessionUser().then(u => {
-      if (u) { setCurrentUser(u); setUser(u); loadAccess(u) }
+    const init = async () => {
+      await syncMasterKeyFromSupabase()       // siempre — admin pudo cambiarla en otro dispositivo
+      const u = await getSessionUser()
+      if (u) {
+        await syncPasswordFromSupabase(u.id)  // sesión activa — refrescar contraseña
+        setCurrentUser(u); setUser(u); loadAccess(u)
+      }
       setAuthChecking(false)
-    })
+    }
+    init()
   }, [setCurrentUser])
 
   // Listen to auth state changes (logout from another tab)
