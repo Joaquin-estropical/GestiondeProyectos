@@ -75,6 +75,14 @@ interface AppState {
 
 const DEFAULT_USER: AppUser = { id: '', memberId: '', name: '', role: '', short: '', email: '', is_admin: false }
 
+// ── Visibilidad por área ──────────────────────────────────
+// `access === null` significa admin / sin restricción → todo visible.
+// Si es un Set, solo las áreas en el set son visibles.
+export function areaVisible(areaId: string | null | undefined, access: Set<string> | null): boolean {
+  if (!access) return true
+  return !!areaId && access.has(areaId)
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   currentUser: DEFAULT_USER,
   setCurrentUser: (u) => set({ currentUser: u }),
@@ -182,3 +190,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   openNewTask:     (pid?, date?, aid?) => set({ newTaskOpen: true, newTaskProjectId: pid ?? null, newTaskAreaId: aid ?? null, newTaskDate: date ?? null }),
   closeNewTask:    ()        => set({ newTaskOpen: false,   newTaskProjectId: null, newTaskAreaId: null, newTaskDate: null }),
 }))
+
+// ── Selectores filtrados por acceso ───────────────────────
+// Para consumidores que leen tasks/areas/projects directamente del store.
+// Devuelven solo lo que el usuario actual puede ver (admin ve todo).
+export const useVisibleAreas = (): Area[] => {
+  const areas  = useAppStore(s => s.areas)
+  const access = useAppStore(s => s.accessibleAreaIds)
+  return areas.filter(a => areaVisible(a.id, access))
+}
+export const useVisibleProjects = (): Project[] => {
+  const projects = useAppStore(s => s.projects)
+  const access   = useAppStore(s => s.accessibleAreaIds)
+  return projects.filter(p => areaVisible(p.area, access))
+}
+export const useVisibleTasks = (): Task[] => {
+  const tasks  = useAppStore(s => s.tasks)
+  const access = useAppStore(s => s.accessibleAreaIds)
+  return tasks.filter(t => areaVisible(t.area, access))
+}

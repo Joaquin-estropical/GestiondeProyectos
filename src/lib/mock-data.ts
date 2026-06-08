@@ -83,8 +83,14 @@ export const STATUS_LABELS: Record<string, string> = {
   done:  'Completado',
 }
 export const STATUS_ORDER = ['curso', 'pend', 'rev', 'block', 'done'] as const
+export const STATUS_COLORS: Record<string, string> = {
+  curso: '#3B82F6', pend: '#5A5A60', rev: '#F59E0B', block: '#EF4444', done: '#22C55E',
+}
 export const PRIORITY_LABELS: Record<string, string> = {
   urg: 'Urgente', alta: 'Alta', med: 'Media', baja: 'Baja',
+}
+export const PRIORITY_COLORS: Record<string, string> = {
+  urg: '#EF4444', alta: '#F59E0B', med: '#3B82F6', baja: '#5A5A60',
 }
 
 export function getArea(id: string) { return AREAS.find(a => a.id === id) }

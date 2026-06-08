@@ -4,8 +4,11 @@ import { Plus, UserPlus, MoreHorizontal, Pencil, Trash2, X, Check, ChevronRight,
 import { useTemplates, useTemplateTasks, useMembers } from '@/hooks/useSupabase';
 import { deleteArea, deleteSubArea, deleteTemplate, createTemplate, createTemplateTask, deleteTemplateTask } from '@/lib/db';
 import { useAppStore } from '@/stores/app';
-import { supabase, supabaseAdmin } from '@/lib/supabase';
-import { signOut } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
+import {
+  signOut, getLocalUsers, getAllAreaAccess, toggleUserAreaAccess,
+  createLocalUser, deleteLocalUser, isSeedUser, changePassword,
+} from '@/lib/auth';
 import { Avatar } from '@/components/shared/Avatar';
 import { PageHead } from '@/components/shared/PageHead';
 import type { AreaType, TemplateTask } from '@/types';
@@ -628,19 +631,8 @@ function NewUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
     if (!name.trim() || !email.trim() || !password) { setError('Nombre, correo y contraseña son obligatorios'); return }
     setSaving(true); setError(null)
     try {
-      // 1. Create auth user
-      const { data, error: authErr } = await supabase.auth.signUp({ email: email.trim(), password })
-      if (authErr) throw new Error(authErr.message)
-      const uid = data.user?.id
-      if (!uid) throw new Error('No se pudo crear el usuario en Auth')
-      // 2. Create profile in app_users
-      const { error: profErr } = await supabaseAdmin.from('app_users').insert({
-        id: uid, name: name.trim(), email: email.trim(),
-        role: role.trim() || 'Miembro',
-        short: name.trim().split(' ').slice(0, 2).map(w => w[0]).join('') + '.',
-        is_admin: isAdmin,
-      })
-      if (profErr) throw new Error(profErr.message)
+      // Crear usuario local (sin Supabase Auth — todo local)
+      createLocalUser({ name: name.trim(), email: email.trim(), role: role.trim() || 'Miembro', password, is_admin: isAdmin })
       onCreated()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al crear el usuario')
@@ -709,37 +701,25 @@ function UsersTab() {
 
   const loadData = () => {
     setLoading(true)
-    Promise.all([
-      supabase.from('app_users').select('id,name,email,role,is_admin').order('name'),
-      supabase.from('user_area_access').select('user_id,area_id'),
-    ]).then(([{ data: users }, { data: access }]) => {
-      if (users) setAppUsers(users as AppUserRow[])
-      if (access) {
-        const map: Record<string, string[]> = {}
-        access.forEach((r: { user_id: string; area_id: string }) => {
-          if (!map[r.user_id]) map[r.user_id] = []
-          map[r.user_id].push(r.area_id)
-        })
-        setUserAccess(map)
-      }
-      setLoading(false)
-    })
+    // Todo local: usuarios (seeds + creados) y accesos desde localStorage
+    setAppUsers(getLocalUsers().map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role, is_admin: u.is_admin })))
+    setUserAccess(getAllAreaAccess())
+    setLoading(false)
   }
 
   useEffect(() => { loadData() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const toggleAreaAccess = async (userId: string, areaId: string, hasAccess: boolean) => {
-    if (hasAccess) {
-      await supabaseAdmin.from('user_area_access').delete().eq('user_id', userId).eq('area_id', areaId)
-      setUserAccess(prev => ({ ...prev, [userId]: (prev[userId] ?? []).filter(a => a !== areaId) }))
-    } else {
-      await supabaseAdmin.from('user_area_access').insert({ user_id: userId, area_id: areaId })
-      setUserAccess(prev => ({ ...prev, [userId]: [...(prev[userId] ?? []), areaId] }))
+  const toggleAreaAccess = (userId: string, areaId: string, _hasAccess: boolean) => {
+    const next = toggleUserAreaAccess(userId, areaId)
+    setUserAccess(prev => ({ ...prev, [userId]: next }))
+    // Si el usuario afectado es el que está logueado, refrescar su visibilidad en vivo
+    if (userId === currentUser.id && !currentUser.is_admin) {
+      useAppStore.getState().setAccessibleAreaIds(new Set(next))
     }
   }
 
-  const deleteUser = async (userId: string) => {
-    await supabaseAdmin.from('app_users').delete().eq('id', userId)
+  const deleteUser = (userId: string) => {
+    deleteLocalUser(userId)
     setAppUsers(prev => prev.filter(u => u.id !== userId))
     setConfirmDel(null)
   }
@@ -793,7 +773,7 @@ function UsersTab() {
                       <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDel(null)}>Cancelar</button>
                     </div>
                   ) : (
-                    u.id !== currentUser.id && (
+                    u.id !== currentUser.id && !isSeedUser(u.id) && (
                       <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setConfirmDel(u.id)} title="Eliminar usuario">
                         <Trash2 size={13} color="var(--red)" />
                       </button>
@@ -852,6 +832,89 @@ function UsersTab() {
   )
 }
 
+// ── Tab: Mi cuenta (cambio de contraseña local) ──────────
+function MyAccountTab() {
+  const { currentUser } = useAppStore()
+  const [current, setCurrent] = useState('')
+  const [next,    setNext]    = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [saving,  setSaving]  = useState(false)
+  const [msg,     setMsg]     = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+
+  const inp: React.CSSProperties = {
+    width: '100%', boxSizing: 'border-box', background: 'var(--surface-2)',
+    border: '1px solid var(--border)', borderRadius: 6, padding: '9px 12px',
+    fontSize: 13, color: 'var(--text-1)', outline: 'none',
+  }
+  const lbl: React.CSSProperties = {
+    display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-3)',
+    textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6,
+  }
+
+  const handle = async () => {
+    setMsg(null)
+    if (!current || !next) { setMsg({ type: 'err', text: 'Completá ambos campos.' }); return }
+    if (next !== confirm)  { setMsg({ type: 'err', text: 'La nueva contraseña y su confirmación no coinciden.' }); return }
+    setSaving(true)
+    try {
+      await changePassword(currentUser.id, current, next)
+      setMsg({ type: 'ok', text: 'Contraseña actualizada. Usala en tu próximo ingreso.' })
+      setCurrent(''); setNext(''); setConfirm('')
+    } catch (e) {
+      setMsg({ type: 'err', text: e instanceof Error ? e.message : 'Error al cambiar la contraseña' })
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <div style={{ maxWidth: 460 }}>
+      <div className="row items-center gap-12 mb-16">
+        <Avatar name={currentUser.name} size={44} />
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 600 }}>{currentUser.name}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{currentUser.email} · {currentUser.role}</div>
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: 18 }}>
+        <div className="fw-6" style={{ marginBottom: 4 }}>Cambiar contraseña</div>
+        <div className="f-xs text-2" style={{ marginBottom: 16 }}>
+          Se guarda en este dispositivo para tu próximo ingreso.
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={lbl}>Contraseña actual</label>
+            <input style={inp} type="password" value={current} onChange={e => setCurrent(e.target.value)} placeholder="••••••••" autoComplete="current-password" />
+          </div>
+          <div>
+            <label style={lbl}>Nueva contraseña</label>
+            <input style={inp} type="password" value={next} onChange={e => setNext(e.target.value)} placeholder="Mínimo 4 caracteres" autoComplete="new-password" />
+          </div>
+          <div>
+            <label style={lbl}>Confirmar nueva contraseña</label>
+            <input style={inp} type="password" value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Repetí la nueva contraseña" autoComplete="new-password"
+              onKeyDown={e => { if (e.key === 'Enter') handle() }} />
+          </div>
+          {msg && (
+            <div style={{
+              padding: '8px 12px', borderRadius: 6, fontSize: 12.5,
+              background: msg.type === 'ok' ? 'rgba(20,184,166,.08)' : 'rgba(239,68,68,.08)',
+              border: `1px solid ${msg.type === 'ok' ? 'rgba(20,184,166,.25)' : 'rgba(239,68,68,.25)'}`,
+              color: msg.type === 'ok' ? 'var(--teal)' : 'var(--red)',
+            }}>
+              {msg.text}
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button className="btn btn-primary btn-md" onClick={handle} disabled={saving || !current || !next}>
+              {saving ? 'Guardando…' : 'Actualizar contraseña'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main ─────────────────────────────────────────────────
 export default function SettingsPage() {
   const [tab, setTab] = useState('areas');
@@ -869,6 +932,7 @@ export default function SettingsPage() {
     { id: 'templates', label: 'Formularios' },
     { id: 'members',   label: 'Miembros'   },
     ...(currentUser.is_admin ? [{ id: 'users', label: 'Usuarios' }] : []),
+    { id: 'account',   label: 'Mi cuenta'  },
     { id: 'billing',   label: 'Facturación'},
   ];
 
@@ -906,6 +970,7 @@ export default function SettingsPage() {
         {tab === 'templates' && <TemplatesTab />}
         {tab === 'members'   && <MembersTab />}
         {tab === 'users'     && <UsersTab />}
+        {tab === 'account'   && <MyAccountTab />}
         {tab === 'billing'   && (
           <div className="empty" style={{ marginTop: 48 }}>
             <div className="ill">💳</div>

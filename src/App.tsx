@@ -22,8 +22,7 @@ import { NewProjectModal }  from '@/components/modals/NewProjectModal'
 import { EditProjectModal } from '@/components/modals/EditProjectModal'
 import { NewTaskModal }     from '@/components/modals/NewTaskModal'
 import { useAppStore }     from '@/stores/app'
-import { getSessionUser, onAuthChange } from '@/lib/auth'
-import { supabase } from '@/lib/supabase'
+import { getSessionUser, onAuthChange, getUserAreaAccess } from '@/lib/auth'
 import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 import type { AppUser }    from '@/lib/auth'
 
@@ -63,21 +62,13 @@ function AppRoutes() {
   // collisions when multiple devices/users are connected simultaneously.
   useRealtimeSync(!!user, user?.id)
 
-  // Load area access permissions for non-admin users
-  const loadAccess = async (u: AppUser) => {
+  // Load area access permissions for non-admin users (local, localStorage)
+  const loadAccess = (u: AppUser) => {
     if (u.is_admin) {
       setAccessibleAreaIds(null) // null = see everything
       return
     }
-    const { data } = await supabase
-      .from('user_area_access')
-      .select('area_id')
-      .eq('user_id', u.id)
-    if (data) {
-      setAccessibleAreaIds(new Set(data.map((r: { area_id: string }) => r.area_id)))
-    } else {
-      setAccessibleAreaIds(new Set()) // no access to any area
-    }
+    setAccessibleAreaIds(new Set(getUserAreaAccess(u.id)))
   }
 
   // Check existing session on mount

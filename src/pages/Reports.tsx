@@ -3,17 +3,12 @@ import { Download, BarChart3, Users, CheckSquare, AlertTriangle } from 'lucide-r
 import { useAreas, useTasks, useMembers, useProjects } from '@/hooks/useSupabase';
 import { Donut } from '@/components/shared/Charts';
 import { PageHead } from '@/components/shared/PageHead';
+import { STATUS_LABELS, STATUS_COLORS } from '@/lib/mock-data';
 import type { Task } from '@/types';
 
 // ── helpers ──────────────────────────────────────────────────
 function isoOf(d: Date) { return d.toISOString().slice(0, 10); }
 
-const STATUS_LABELS: Record<string, string> = {
-  curso: 'En curso', pend: 'Pendiente', rev: 'En revisión', block: 'Bloqueado', done: 'Completado',
-};
-const STATUS_COLORS: Record<string, string> = {
-  curso: '#3B82F6', pend: '#5A5A60', rev: '#F59E0B', block: '#EF4444', done: '#22C55E',
-};
 const STATUS_ORDER = ['pend', 'curso', 'rev', 'block', 'done'];
 
 type Period = '7d' | '30d' | '90d' | 'all';

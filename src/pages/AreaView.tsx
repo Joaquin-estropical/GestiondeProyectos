@@ -1,4 +1,3 @@
-import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Folder, ListTodo, Percent, Users, UserPlus, Plus, Pencil, MoreHorizontal, Pen, Trash2, Layers } from 'lucide-react';
 import { useAreas, useSubAreas, useProjects, useTasks, useMembers } from '@/hooks/useSupabase';
@@ -6,40 +5,16 @@ import { fmtDate, dueColor } from '@/lib/mock-data';
 import { Avatar } from '@/components/shared/Avatar';
 import { StatusPill, PriorityPill } from '@/components/shared/Badges';
 import { PageHead } from '@/components/shared/PageHead';
-import { useAppStore } from '@/stores/app';
+import { useAppStore, areaVisible } from '@/stores/app';
+import { DropdownMenu } from '@/components/shared/DropdownMenu';
 import { deleteSubArea } from '@/lib/db';
 
 // ── Dropdown menu for project cards ──
 function ProjectMenu({ projectId, projectName, onEdit }: { projectId: string; projectName: string; onEdit: () => void }) {
-  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
   const { removeProject, refreshAll } = useAppStore();
   const navigate = useNavigate();
-  const open = pos !== null;
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
-      const insideBtn  = btnRef.current?.contains(target);
-      const insideMenu = menuRef.current?.contains(target);
-      if (!insideBtn && !insideMenu) setPos(null);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  const toggle = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (open) { setPos(null); return; }
-    const r = btnRef.current?.getBoundingClientRect();
-    if (r) setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
-  };
-
-  const handleDelete = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setPos(null);
+  const handleDelete = async () => {
     if (!confirm(`¿Eliminar el proyecto "${projectName}" y todas sus tareas? Esta acción no se puede deshacer.`)) return;
     try {
       const { deleteProject } = await import('@/lib/db');
@@ -52,71 +27,26 @@ function ProjectMenu({ projectId, projectName, onEdit }: { projectId: string; pr
     }
   };
 
-  const menuItem = (icon: React.ReactNode, label: string, color: string, onClick: (e: React.MouseEvent) => void) => (
-    <button
-      style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 14px', background: 'none', border: 'none', color, fontSize: 13, cursor: 'pointer', textAlign: 'left' }}
-      onClick={e => { e.stopPropagation(); setPos(null); onClick(e); }}
-      onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
-      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-    >
-      {icon} {label}
-    </button>
-  );
-
+  // Envuelto en stopPropagation para no disparar el onClick de la card.
   return (
-    <>
-      <button
-        ref={btnRef}
-        className="btn btn-ghost btn-sm btn-icon"
-        style={{ width: 26, height: 26, opacity: 0.7 }}
-        onClick={toggle}
-      >
-        <MoreHorizontal size={14} />
-      </button>
-      {open && pos && (
-        <div ref={menuRef} style={{
-          position: 'fixed', top: pos.top, right: pos.right, zIndex: 9000,
-          background: 'var(--surface-1)', border: '1px solid var(--border)',
-          borderRadius: 8, padding: '4px 0', minWidth: 180,
-          boxShadow: '0 8px 24px rgba(0,0,0,.5)',
-        }}>
-          {menuItem(<Pen size={13} color="var(--text-2)" />, 'Renombrar / editar', 'var(--text-1)', (_e) => onEdit())}
-          <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-          {menuItem(<Trash2 size={13} color="var(--red)" />, 'Eliminar proyecto', 'var(--red)', handleDelete)}
-        </div>
-      )}
-    </>
+    <span onClick={e => e.stopPropagation()}>
+      <DropdownMenu
+        trigger={<MoreHorizontal size={14} />}
+        minWidth={180}
+        items={[
+          { label: 'Renombrar / editar', icon: <Pen size={13} color="var(--text-2)" />, onClick: onEdit },
+          { label: 'Eliminar proyecto', icon: <Trash2 size={13} color="var(--red)" />, onClick: handleDelete, danger: true, divider: true },
+        ]}
+      />
+    </span>
   );
 }
 
 // ── Dropdown menu for subarea cards ──
 function SubAreaMenu({ subareaId, subareaName }: { subareaId: string; subareaName: string }) {
-  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
   const { openNewSubArea, removeSubArea, refreshAll } = useAppStore();
-  const open = pos !== null;
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (!btnRef.current?.contains(t) && !menuRef.current?.contains(t)) setPos(null);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  const toggle = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (open) { setPos(null); return; }
-    const r = btnRef.current?.getBoundingClientRect();
-    if (r) setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
-  };
-
-  const handleDelete = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setPos(null);
+  const handleDelete = async () => {
     if (!confirm(`¿Eliminar la sub-área "${subareaName}" y sus proyectos y tareas? Esta acción no se puede deshacer.`)) return;
     try {
       await deleteSubArea(subareaId);
@@ -128,37 +58,16 @@ function SubAreaMenu({ subareaId, subareaName }: { subareaId: string; subareaNam
   };
 
   return (
-    <>
-      <button ref={btnRef} className="btn btn-ghost btn-sm btn-icon" style={{ width: 26, height: 26, opacity: 0.7 }} onClick={toggle}>
-        <MoreHorizontal size={14} />
-      </button>
-      {open && pos && (
-        <div ref={menuRef} style={{
-          position: 'fixed', top: pos.top, right: pos.right, zIndex: 9000,
-          background: 'var(--surface-1)', border: '1px solid var(--border)',
-          borderRadius: 8, padding: '4px 0', minWidth: 180,
-          boxShadow: '0 8px 24px rgba(0,0,0,.5)',
-        }}>
-          <button
-            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: 'var(--text-1)', fontSize: 13, cursor: 'pointer', textAlign: 'left' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-            onClick={() => { setPos(null); openNewSubArea(undefined, subareaId); }}
-          >
-            <Pen size={13} color="var(--text-2)" /> Renombrar / editar
-          </button>
-          <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-          <button
-            style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 14px', background: 'none', border: 'none', color: 'var(--red)', fontSize: 13, cursor: 'pointer', textAlign: 'left' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-            onClick={handleDelete}
-          >
-            <Trash2 size={13} color="var(--red)" /> Eliminar sub-área
-          </button>
-        </div>
-      )}
-    </>
+    <span onClick={e => e.stopPropagation()}>
+      <DropdownMenu
+        trigger={<MoreHorizontal size={14} />}
+        minWidth={180}
+        items={[
+          { label: 'Renombrar / editar', icon: <Pen size={13} color="var(--text-2)" />, onClick: () => openNewSubArea(undefined, subareaId) },
+          { label: 'Eliminar sub-área', icon: <Trash2 size={13} color="var(--red)" />, onClick: handleDelete, danger: true, divider: true },
+        ]}
+      />
+    </span>
   );
 }
 
@@ -166,6 +75,7 @@ export default function AreaView() {
   const { areaId, subareaId } = useParams<{ areaId: string; subareaId?: string }>();
   const navigate   = useNavigate();
   const { openTask, openNewProject, openNewSubArea, openNewArea, openEditProject } = useAppStore();
+  const accessibleAreaIds = useAppStore(s => s.accessibleAreaIds);
 
   const id = areaId ?? '';
 
@@ -188,6 +98,15 @@ export default function AreaView() {
     : tasks;
 
   if (loading) return <div className="page-body" style={{ color: 'var(--text-3)', fontSize: 13 }}>Cargando área...</div>;
+  if (!areaVisible(id, accessibleAreaIds)) {
+    return (
+      <div className="empty" style={{ marginTop: 80 }}>
+        <div className="ill">🔒</div>
+        <p className="t">Sin acceso a esta área</p>
+        <p className="d">No tenés permisos para ver esta área. Pedile a un administrador que te habilite el acceso.</p>
+      </div>
+    );
+  }
   if (!a) return <div className="page-body">Área no encontrada.</div>;
   if (subareaId && !sa) return <div className="page-body">Sub-área no encontrada.</div>;
 

@@ -1,6 +1,6 @@
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
-import { useAppStore } from '@/stores/app'
+import { useAppStore, useVisibleTasks, useVisibleProjects, useVisibleAreas } from '@/stores/app'
 import { PageHead } from '@/components/shared/PageHead'
 import { StatusPill, PriorityPill } from '@/components/shared/Badges'
 import { dueColor, fmtDate } from '@/lib/mock-data'
@@ -37,7 +37,10 @@ export default function TasksListPage() {
   const navigate  = useNavigate()
   const filter    = (params.get('filter') ?? 'all') as FilterKey
   const assignee  = params.get('assignee') ?? ''
-  const { tasks, projects, areas, openTask } = useAppStore()
+  const openTask  = useAppStore(s => s.openTask)
+  const tasks     = useVisibleTasks()
+  const projects  = useVisibleProjects()
+  const areas     = useVisibleAreas()
   const { data: members = [] } = useMembers()
   const resolveName = (id: string) => members.find(m => m.id === id)?.name ?? 'Sin asignar'
 

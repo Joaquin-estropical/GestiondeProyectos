@@ -3,6 +3,7 @@ import {
   fetchAreas, fetchSubAreas, fetchMembers, fetchProjects, fetchTasks,
   fetchSubtasks, fetchComments, fetchTemplates, fetchTemplateTasks
 } from '@/lib/db'
+import { useAppStore, areaVisible } from '@/stores/app'
 import type { Area, SubArea, Member, Project, Task, Subtask, Comment, Template, TemplateTask, AreaType } from '@/types'
 
 type State<T> = { data: T; loading: boolean; error: string | null }
@@ -25,12 +26,23 @@ function useQuery<T>(fn: () => Promise<T>, initial: T, deps: unknown[] = []): St
   return { ...state, reload }
 }
 
-export const useAreas    = ()                => useQuery<Area[]>   (fetchAreas,                    [], [])
+export const useAreas    = ()                => {
+  const access = useAppStore(s => s.accessibleAreaIds)
+  const q = useQuery<Area[]>(fetchAreas, [], [])
+  return { ...q, data: q.data.filter(a => areaVisible(a.id, access)) }
+}
 export const useSubAreas = (areaId?: string) => useQuery<SubArea[]>(() => fetchSubAreas(areaId),   [], [areaId])
 export const useMembers  = ()                => useQuery<Member[]> (fetchMembers,                  [], [])
-export const useProjects = (areaId?: string) => useQuery<Project[]>(() => fetchProjects(areaId),   [], [areaId])
-export const useTasks    = (filters?: Parameters<typeof fetchTasks>[0]) =>
-  useQuery<Task[]>(() => fetchTasks(filters), [], [JSON.stringify(filters)])
+export const useProjects = (areaId?: string) => {
+  const access = useAppStore(s => s.accessibleAreaIds)
+  const q = useQuery<Project[]>(() => fetchProjects(areaId), [], [areaId])
+  return { ...q, data: q.data.filter(p => areaVisible(p.area, access)) }
+}
+export const useTasks    = (filters?: Parameters<typeof fetchTasks>[0]) => {
+  const access = useAppStore(s => s.accessibleAreaIds)
+  const q = useQuery<Task[]>(() => fetchTasks(filters), [], [JSON.stringify(filters)])
+  return { ...q, data: q.data.filter(t => areaVisible(t.area, access)) }
+}
 
 export const useSubtasks  = (taskId: string)     => useQuery<Subtask[]> (() => fetchSubtasks(taskId),        [], [taskId])
 export const useComments  = (taskId: string)     => useQuery<Comment[]> (() => fetchComments(taskId),        [], [taskId])

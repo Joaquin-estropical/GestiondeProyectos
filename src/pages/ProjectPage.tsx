@@ -1,47 +1,24 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { DndContext, type DragEndEvent, type DragOverEvent, type DragStartEvent, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay, useDroppable, useDraggable } from '@dnd-kit/core';
-import { List, Kanban, GanttChart as GanttIcon, Calendar, Table, ClipboardList, UserPlus, MoreHorizontal, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, ChevronLeft, ChevronRight, X, Pen, Trash2, User, AlertTriangle } from 'lucide-react';
+import { List, Kanban, GanttChart as GanttIcon, Calendar, Table, ClipboardList, UserPlus, Filter, ArrowDownWideNarrow, Plus, CheckSquare, MessageSquare, ChevronLeft, ChevronRight, X, Pen, Trash2, User, AlertTriangle } from 'lucide-react';
 import { useProjects, useTasks, useMembers } from '@/hooks/useSupabase';
 import { getMember, STATUS_ORDER, STATUS_LABELS, fmtDate, dueColor } from '@/lib/mock-data';
-import { useAppStore } from '@/stores/app';
+import { useAppStore, areaVisible } from '@/stores/app';
 import { updateTask } from '@/lib/db';
 import { Avatar } from '@/components/shared/Avatar';
 import { StatusPill, PriorityPill, AreaPill } from '@/components/shared/Badges';
 import { GanttChart } from '@/components/shared/GanttChart';
+import { DropdownMenu } from '@/components/shared/DropdownMenu';
 import { ProjectFormsView } from '@/pages/project/ProjectFormsView';
 import type { Task, TaskStatus } from '@/types';
 
 // ─── Project actions dropdown ───
 function ProjectActionsMenu({ projectId, projectName }: { projectId: string; projectName: string }) {
-  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
   const { openEditProject, removeProject, refreshAll } = useAppStore();
   const navigate = useNavigate();
 
-  const open = pos !== null;
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
-      const insideBtn  = btnRef.current?.contains(target);
-      const insideMenu = menuRef.current?.contains(target);
-      if (!insideBtn && !insideMenu) setPos(null);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  const toggle = () => {
-    if (open) { setPos(null); return; }
-    const r = btnRef.current?.getBoundingClientRect();
-    if (r) setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
-  };
-
   const handleDelete = async () => {
-    setPos(null);
     if (!confirm(`¿Eliminar el proyecto "${projectName}" y todas sus tareas? Esta acción no se puede deshacer.`)) return;
     try {
       const { deleteProject } = await import('@/lib/db');
@@ -54,35 +31,13 @@ function ProjectActionsMenu({ projectId, projectName }: { projectId: string; pro
     }
   };
 
-  const item = (icon: React.ReactNode, label: string, color: string, onClick: () => void) => (
-    <button
-      style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 14px', background: 'none', border: 'none', color, fontSize: 13, cursor: 'pointer', textAlign: 'left' }}
-      onClick={() => { setPos(null); onClick(); }}
-      onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
-      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-    >
-      {icon} {label}
-    </button>
-  );
-
   return (
-    <>
-      <button ref={btnRef} className="btn btn-secondary btn-sm btn-icon" onClick={toggle}>
-        <MoreHorizontal size={14} />
-      </button>
-      {open && pos && (
-        <div ref={menuRef} style={{
-          position: 'fixed', top: pos.top, right: pos.right, zIndex: 9000,
-          background: 'var(--surface-1)', border: '1px solid var(--border)',
-          borderRadius: 8, padding: '4px 0', minWidth: 200,
-          boxShadow: '0 8px 24px rgba(0,0,0,.5)',
-        }}>
-          {item(<Pen size={13} color="var(--text-2)" />, 'Renombrar / editar', 'var(--text-1)', () => openEditProject(projectId))}
-          <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-          {item(<Trash2 size={13} color="var(--red)" />, 'Eliminar proyecto', 'var(--red)', handleDelete)}
-        </div>
-      )}
-    </>
+    <DropdownMenu
+      items={[
+        { label: 'Renombrar / editar', icon: <Pen size={13} color="var(--text-2)" />, onClick: () => openEditProject(projectId) },
+        { label: 'Eliminar proyecto', icon: <Trash2 size={13} color="var(--red)" />, onClick: handleDelete, danger: true, divider: true },
+      ]}
+    />
   );
 }
 
@@ -697,6 +652,10 @@ export default function ProjectPage() {
   const { data: tasks    = [] }          = useTasks({ projectId: id });
 
   const project = projects.find(p => p.id === id);
+  // Acceso: si el proyecto existe en el store pero no en la lista visible, es por permisos
+  const accessibleAreaIds = useAppStore(s => s.accessibleAreaIds);
+  const rawProject = useAppStore(s => s.projects).find(p => p.id === id);
+  const blockedByAccess = !project && !!rawProject && !areaVisible(rawProject.area, accessibleAreaIds);
 
   // Drag-to-resize divider
   const onDividerMouseDown = useCallback((e: React.MouseEvent) => {
@@ -716,6 +675,15 @@ export default function ProjectPage() {
   }, [headerH]);
 
   if (loading) return <div className="page-body" style={{ color: 'var(--text-3)', fontSize: 13 }}>Cargando proyecto...</div>;
+  if (blockedByAccess) {
+    return (
+      <div className="empty" style={{ marginTop: 80 }}>
+        <div className="ill">🔒</div>
+        <p className="t">Sin acceso a este proyecto</p>
+        <p className="d">Pertenece a un área para la que no tenés permisos. Pedile a un administrador que te habilite el acceso.</p>
+      </div>
+    );
+  }
   if (!project) return <div className="page-body">Proyecto no encontrado.</div>;
 
   const isFullHeight = view === 'gantt' || view === 'kanban' || view === 'cal' || view === 'forms';

@@ -57,16 +57,117 @@ const LOCAL_USERS: (AppUser & { password: string })[] = [
   },
 ]
 
-const SESSION_KEY = 'ot_session_user_id'
+const SESSION_KEY  = 'ot_session_user_id'
+const PWD_KEY      = 'ot_local_passwords'   // { [userId]: password }
+const ACCESS_KEY   = 'ot_local_area_access' // { [userId]: areaId[] }
+const EXTRA_KEY    = 'ot_local_extra_users' // AppUser[] creados desde la app
+
+// ── localStorage helpers (todo local, sin Supabase) ─────────────────────────
+function readJSON<T>(key: string, fallback: T): T {
+  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) as T : fallback }
+  catch { return fallback }
+}
+function writeJSON(key: string, value: unknown) {
+  try { localStorage.setItem(key, JSON.stringify(value)) } catch { /* ignore quota */ }
+}
+
+// Usuarios creados desde la app (se suman a los seeds LOCAL_USERS)
+function getExtraUsers(): (AppUser & { password: string })[] {
+  return readJSON<(AppUser & { password: string })[]>(EXTRA_KEY, [])
+}
+// Todos los usuarios (seeds + extras), con su password efectiva
+function allUsersWithPw(): (AppUser & { password: string })[] {
+  const extras = getExtraUsers()
+  const overrides = readJSON<Record<string, string>>(PWD_KEY, {})
+  return [...LOCAL_USERS, ...extras].map(u => ({
+    ...u,
+    password: overrides[u.id] ?? u.password,
+  }))
+}
 
 // Login local: busca el usuario por email y verifica la contraseña
 export async function signIn(email: string, password: string): Promise<AppUser> {
-  const found = LOCAL_USERS.find(u => u.email.toLowerCase() === email.toLowerCase().trim())
+  const found = allUsersWithPw().find(u => u.email.toLowerCase() === email.toLowerCase().trim())
   if (!found) throw new Error('Usuario no encontrado')
   if (found.password !== password) throw new Error('Contraseña incorrecta')
   const { password: _pw, ...user } = found
   localStorage.setItem(SESSION_KEY, user.id)
   return user
+}
+
+// ── Cambio de contraseña (local) ────────────────────────────────────────────
+export async function changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+  const user = allUsersWithPw().find(u => u.id === userId)
+  if (!user) throw new Error('Usuario no encontrado')
+  if (user.password !== currentPassword) throw new Error('La contraseña actual es incorrecta')
+  if (!newPassword || newPassword.length < 4) throw new Error('La nueva contraseña debe tener al menos 4 caracteres')
+  const overrides = readJSON<Record<string, string>>(PWD_KEY, {})
+  overrides[userId] = newPassword
+  writeJSON(PWD_KEY, overrides)
+}
+
+// ── Acceso a áreas (local) ──────────────────────────────────────────────────
+export function getUserAreaAccess(userId: string): string[] {
+  const map = readJSON<Record<string, string[]>>(ACCESS_KEY, {})
+  return map[userId] ?? []
+}
+export function getAllAreaAccess(): Record<string, string[]> {
+  return readJSON<Record<string, string[]>>(ACCESS_KEY, {})
+}
+export function setUserAreaAccess(userId: string, areaIds: string[]): void {
+  const map = readJSON<Record<string, string[]>>(ACCESS_KEY, {})
+  map[userId] = areaIds
+  writeJSON(ACCESS_KEY, map)
+}
+export function toggleUserAreaAccess(userId: string, areaId: string): string[] {
+  const current = getUserAreaAccess(userId)
+  const next = current.includes(areaId)
+    ? current.filter(a => a !== areaId)
+    : [...current, areaId]
+  setUserAreaAccess(userId, next)
+  return next
+}
+
+// ── Gestión de usuarios (local) ─────────────────────────────────────────────
+export function createLocalUser(input: {
+  name: string; email: string; role: string; password: string; is_admin?: boolean
+}): AppUser {
+  const email = input.email.toLowerCase().trim()
+  if (allUsersWithPw().some(u => u.email.toLowerCase() === email)) {
+    throw new Error('Ya existe un usuario con ese correo')
+  }
+  const short = input.name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase()).join('') + '.'
+  const id = (crypto.randomUUID?.() ?? `u-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`)
+  const user: AppUser & { password: string } = {
+    id,
+    memberId: id.slice(0, 6),
+    name: input.name.trim(),
+    role: input.role.trim() || 'Miembro',
+    short,
+    email,
+    is_admin: input.is_admin ?? false,
+    password: input.password,
+  }
+  const extras = getExtraUsers()
+  extras.push(user)
+  writeJSON(EXTRA_KEY, extras)
+  const { password: _pw, ...pub } = user
+  return pub
+}
+
+export function deleteLocalUser(userId: string): void {
+  // Solo se pueden borrar usuarios creados desde la app (extras), no los seeds.
+  const extras = getExtraUsers().filter(u => u.id !== userId)
+  writeJSON(EXTRA_KEY, extras)
+  // Limpiar accesos y override de password
+  const access = readJSON<Record<string, string[]>>(ACCESS_KEY, {})
+  delete access[userId]; writeJSON(ACCESS_KEY, access)
+  const pwd = readJSON<Record<string, string>>(PWD_KEY, {})
+  delete pwd[userId]; writeJSON(PWD_KEY, pwd)
+}
+
+export function isSeedUser(userId: string): boolean {
+  return LOCAL_USERS.some(u => u.id === userId)
 }
 
 export async function signOut(): Promise<void> {
@@ -76,7 +177,7 @@ export async function signOut(): Promise<void> {
 export async function getSessionUser(): Promise<AppUser | null> {
   const id = localStorage.getItem(SESSION_KEY)
   if (!id) return null
-  const found = LOCAL_USERS.find(u => u.id === id)
+  const found = allUsersWithPw().find(u => u.id === id)
   if (!found) return null
   const { password: _pw, ...user } = found
   return user
@@ -87,13 +188,13 @@ export function onAuthChange(_cb: (user: AppUser | null) => void) {
   return { data: { subscription: { unsubscribe: () => {} } } }
 }
 
-// Lista de usuarios para mostrar en login y selects
+// Lista de usuarios para mostrar en login y selects (seeds + creados en la app)
 export function getLocalUsers(): AppUser[] {
-  return LOCAL_USERS.map(({ password: _pw, ...u }) => u)
+  return allUsersWithPw().map(({ password: _pw, ...u }) => u)
 }
 
 export async function fetchAppUser(uid: string): Promise<AppUser | null> {
-  const found = LOCAL_USERS.find(u => u.id === uid)
+  const found = allUsersWithPw().find(u => u.id === uid)
   if (!found) return null
   const { password: _pw, ...user } = found
   return user
@@ -117,10 +218,10 @@ export function sortedMembers<T extends { id: string; name: string }>(members: T
   })
 }
 
-export async function createAppUser(_input: {
-  email: string; password: string; name: string; role: string; short: string; is_admin?: boolean
+export async function createAppUser(input: {
+  email: string; password: string; name: string; role: string; short?: string; is_admin?: boolean
 }): Promise<void> {
-  throw new Error('Agregar usuarios requiere editar el archivo auth.ts')
+  createLocalUser({ email: input.email, password: input.password, name: input.name, role: input.role, is_admin: input.is_admin })
 }
 
 // Supabase client exportado para otras partes que lo necesiten
