@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { signIn, getLocalUsers, resetPasswordWithMasterKey } from '@/lib/auth'
+import { signIn, getLocalUsers, verifyMasterKey } from '@/lib/auth'
 import type { AppUser } from '@/lib/auth'
-import { Shield, Eye, EyeOff, LogIn, ChevronRight, KeyRound, RotateCcw } from 'lucide-react'
+import { Shield, Eye, EyeOff, LogIn, ChevronRight, KeyRound } from 'lucide-react'
 import { Avatar } from '@/components/shared/Avatar'
 
 interface Props {
@@ -35,13 +35,9 @@ export default function LoginPage({ onLogin }: Props) {
 
   // Forgot-password state
   const [masterKey,   setMasterKey]   = useState('')
-  const [newPwd,      setNewPwd]      = useState('')
-  const [confirmPwd,  setConfirmPwd]  = useState('')
   const [showMaster,  setShowMaster]  = useState(false)
-  const [showNewPwd,  setShowNewPwd]  = useState(false)
   const [resetting,   setResetting]   = useState(false)
   const [resetError,  setResetError]  = useState<string | null>(null)
-  const [resetOk,     setResetOk]     = useState(false)
 
   const handleSelect = (u: AppUser) => {
     setSelected(u)
@@ -52,8 +48,8 @@ export default function LoginPage({ onLogin }: Props) {
   const goToPicker = () => {
     setSelected(null)
     setPassword(''); setError(null)
-    setMasterKey(''); setNewPwd(''); setConfirmPwd('')
-    setResetError(null); setResetOk(false)
+    setMasterKey('')
+    setResetError(null)
     setMode('picker')
   }
 
@@ -73,25 +69,24 @@ export default function LoginPage({ onLogin }: Props) {
 
   const handleForgot = () => {
     setPassword(''); setError(null)
-    setMasterKey(''); setNewPwd(''); setConfirmPwd('')
-    setResetError(null); setResetOk(false)
+    setMasterKey('')
+    setResetError(null)
     setMode('forgot')
   }
 
-  const handleReset = async (e: React.FormEvent) => {
+  const handleMasterLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selected) return
     setResetError(null)
-    if (!masterKey)             { setResetError('Ingresá la clave maestra.'); return }
-    if (newPwd !== confirmPwd)  { setResetError('Las contraseñas no coinciden.'); return }
+    if (!masterKey) { setResetError('Ingresá la clave maestra.'); return }
     setResetting(true)
     try {
-      await resetPasswordWithMasterKey(selected.id, masterKey, newPwd)
-      setResetOk(true)
-      // Volver al selector después de 2 segundos
-      setTimeout(goToPicker, 2200)
+      if (!verifyMasterKey(masterKey)) throw new Error('Clave maestra incorrecta')
+      // Inicia sesión directamente sin verificar contraseña del usuario
+      localStorage.setItem('ot_session_user_id', selected.id)
+      onLogin(selected)
     } catch (err) {
-      setResetError(err instanceof Error ? err.message : 'Error al restablecer la contraseña')
+      setResetError(err instanceof Error ? err.message : 'Clave maestra incorrecta')
     } finally {
       setResetting(false)
     }
@@ -99,7 +94,7 @@ export default function LoginPage({ onLogin }: Props) {
 
   const subtitle =
     mode === 'picker'   ? 'Seleccioná tu perfil para continuar' :
-    mode === 'forgot'   ? `Restablecer contraseña — ${selected?.short}` :
+    mode === 'forgot'   ? `Acceso con clave maestra — ${selected?.short}` :
                           `Ingresando como ${selected?.short}`
 
   return (
@@ -241,7 +236,7 @@ export default function LoginPage({ onLogin }: Props) {
 
         {/* ── FORGOT ── */}
         {mode === 'forgot' && selected && (
-          <form onSubmit={handleReset} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <form onSubmit={handleMasterLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {/* Perfil */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
@@ -260,7 +255,7 @@ export default function LoginPage({ onLogin }: Props) {
               background: 'rgba(20,184,166,.06)', border: '1px solid rgba(20,184,166,.2)', fontSize: 12.5, color: 'var(--text-2)',
             }}>
               <KeyRound size={14} style={{ flexShrink: 0, marginTop: 1, color: 'var(--teal)' }} />
-              Ingresá la clave maestra del administrador para restablecer tu contraseña.
+              Ingresá la clave maestra para ingresar. Luego podés cambiar tu contraseña desde Configuración → Mi cuenta.
             </div>
 
             {/* Clave maestra */}
@@ -273,9 +268,9 @@ export default function LoginPage({ onLogin }: Props) {
                   onChange={e => { setMasterKey(e.target.value); setResetError(null) }}
                   placeholder="Ingresá la clave maestra"
                   autoFocus
-                  style={{ ...inputStyle(!!resetError && !masterKey), paddingRight: 42 }}
+                  style={{ ...inputStyle(!!resetError), paddingRight: 42 }}
                   onFocus={e => (e.currentTarget.style.borderColor = 'var(--teal)')}
-                  onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+                  onBlur={e => (e.currentTarget.style.borderColor = resetError ? 'var(--red)' : 'var(--border)')}
                 />
                 <button type="button" onClick={() => setShowMaster(v => !v)}
                   style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4 }}>
@@ -284,66 +279,25 @@ export default function LoginPage({ onLogin }: Props) {
               </div>
             </div>
 
-            {/* Nueva contraseña */}
-            <div>
-              <label style={labelStyle}>Nueva contraseña</label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showNewPwd ? 'text' : 'password'}
-                  value={newPwd}
-                  onChange={e => { setNewPwd(e.target.value); setResetError(null) }}
-                  placeholder="Mínimo 4 caracteres"
-                  style={{ ...inputStyle(), paddingRight: 42 }}
-                  onFocus={e => (e.currentTarget.style.borderColor = 'var(--teal)')}
-                  onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
-                />
-                <button type="button" onClick={() => setShowNewPwd(v => !v)}
-                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4 }}>
-                  {showNewPwd ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
-              </div>
-            </div>
-
-            {/* Confirmar nueva contraseña */}
-            <div>
-              <label style={labelStyle}>Confirmar nueva contraseña</label>
-              <input
-                type="password"
-                value={confirmPwd}
-                onChange={e => { setConfirmPwd(e.target.value); setResetError(null) }}
-                placeholder="Repetí la nueva contraseña"
-                style={inputStyle(!!resetError && newPwd !== confirmPwd && !!confirmPwd)}
-                onFocus={e => (e.currentTarget.style.borderColor = 'var(--teal)')}
-                onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
-              />
-            </div>
-
             {/* Error */}
-            {resetError && !resetOk && (
+            {resetError && (
               <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', fontSize: 13, color: 'var(--red)' }}>
                 {resetError}
               </div>
             )}
 
-            {/* Éxito */}
-            {resetOk && (
-              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(20,184,166,.08)', border: '1px solid rgba(20,184,166,.2)', fontSize: 13, color: 'var(--teal)', display: 'flex', gap: 8, alignItems: 'center' }}>
-                ✓ Contraseña restablecida. Volviendo al inicio...
-              </div>
-            )}
-
-            <button type="submit" disabled={resetting || resetOk || !masterKey || !newPwd || !confirmPwd} style={{
+            <button type="submit" disabled={resetting || !masterKey} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               width: '100%', padding: '11px 0', borderRadius: 8, border: 'none',
-              background: resetting || resetOk || !masterKey || !newPwd || !confirmPwd ? 'var(--surface-2)' : 'var(--teal)',
-              color: resetting || resetOk || !masterKey || !newPwd || !confirmPwd ? 'var(--text-3)' : '#00302A',
+              background: resetting || !masterKey ? 'var(--surface-2)' : 'var(--teal)',
+              color: resetting || !masterKey ? 'var(--text-3)' : '#00302A',
               fontSize: 14, fontWeight: 600,
-              cursor: resetting || resetOk || !masterKey || !newPwd || !confirmPwd ? 'default' : 'pointer',
+              cursor: resetting || !masterKey ? 'default' : 'pointer',
               transition: 'background .15s',
             }}>
               {resetting
-                ? <><div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid var(--teal)', borderTopColor: 'transparent', animation: 'spin .6s linear infinite' }} /> Restableciendo...</>
-                : <><RotateCcw size={15} /> Restablecer contraseña</>
+                ? <><div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid var(--teal)', borderTopColor: 'transparent', animation: 'spin .6s linear infinite' }} /> Ingresando...</>
+                : <><LogIn size={15} /> Ingresar con clave maestra</>
               }
             </button>
 

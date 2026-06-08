@@ -64,7 +64,7 @@ const EXTRA_KEY    = 'ot_local_extra_users' // AppUser[] creados desde la app
 const MASTER_KEY_STORAGE = 'ot_master_key'  // string — clave maestra de recuperación
 
 // Clave maestra por defecto (se usa si el admin nunca la cambió)
-export const DEFAULT_MASTER_KEY = 'TropicalAdmin2024'
+export const DEFAULT_MASTER_KEY = '7ropical2026!'
 
 // ── localStorage helpers (todo local, sin Supabase) ─────────────────────────
 function readJSON<T>(key: string, fallback: T): T {
