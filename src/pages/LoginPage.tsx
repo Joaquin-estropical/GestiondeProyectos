@@ -1,38 +1,66 @@
 import { useState } from 'react'
-import { signIn, getLocalUsers } from '@/lib/auth'
+import { signIn, getLocalUsers, resetPasswordWithMasterKey } from '@/lib/auth'
 import type { AppUser } from '@/lib/auth'
-import { Shield, Eye, EyeOff, LogIn, ChevronRight } from 'lucide-react'
+import { Shield, Eye, EyeOff, LogIn, ChevronRight, KeyRound, RotateCcw } from 'lucide-react'
 import { Avatar } from '@/components/shared/Avatar'
 
 interface Props {
   onLogin: (user: AppUser) => void
 }
 
+type Mode = 'picker' | 'password' | 'forgot'
+
+const inputStyle = (hasError = false): React.CSSProperties => ({
+  width: '100%', boxSizing: 'border-box',
+  background: 'var(--surface-1)', border: `1px solid ${hasError ? 'var(--red)' : 'var(--border)'}`,
+  borderRadius: 8, padding: '10px 14px', fontSize: 14, color: 'var(--text-1)',
+  outline: 'none', transition: 'border-color .12s',
+})
+
+const labelStyle: React.CSSProperties = {
+  display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-2)',
+  marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.06em',
+}
+
 export default function LoginPage({ onLogin }: Props) {
   const users = getLocalUsers()
+  const [mode,     setMode]     = useState<Mode>('picker')
   const [selected, setSelected] = useState<AppUser | null>(null)
-  const [password, setPassword]  = useState('')
-  const [showPwd,  setShowPwd]   = useState(false)
-  const [loading,  setLoading]   = useState(false)
-  const [error,    setError]     = useState<string | null>(null)
+
+  // Login state
+  const [password, setPassword] = useState('')
+  const [showPwd,  setShowPwd]  = useState(false)
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState<string | null>(null)
+
+  // Forgot-password state
+  const [masterKey,   setMasterKey]   = useState('')
+  const [newPwd,      setNewPwd]      = useState('')
+  const [confirmPwd,  setConfirmPwd]  = useState('')
+  const [showMaster,  setShowMaster]  = useState(false)
+  const [showNewPwd,  setShowNewPwd]  = useState(false)
+  const [resetting,   setResetting]   = useState(false)
+  const [resetError,  setResetError]  = useState<string | null>(null)
+  const [resetOk,     setResetOk]     = useState(false)
 
   const handleSelect = (u: AppUser) => {
     setSelected(u)
-    setPassword('')
-    setError(null)
+    setPassword(''); setError(null)
+    setMode('password')
   }
 
-  const handleBack = () => {
+  const goToPicker = () => {
     setSelected(null)
-    setPassword('')
-    setError(null)
+    setPassword(''); setError(null)
+    setMasterKey(''); setNewPwd(''); setConfirmPwd('')
+    setResetError(null); setResetOk(false)
+    setMode('picker')
   }
 
-  const handle = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selected || !password) return
-    setLoading(true)
-    setError(null)
+    setLoading(true); setError(null)
     try {
       const user = await signIn(selected.email, password)
       onLogin(user)
@@ -43,14 +71,41 @@ export default function LoginPage({ onLogin }: Props) {
     }
   }
 
+  const handleForgot = () => {
+    setPassword(''); setError(null)
+    setMasterKey(''); setNewPwd(''); setConfirmPwd('')
+    setResetError(null); setResetOk(false)
+    setMode('forgot')
+  }
+
+  const handleReset = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selected) return
+    setResetError(null)
+    if (!masterKey)             { setResetError('Ingresá la clave maestra.'); return }
+    if (newPwd !== confirmPwd)  { setResetError('Las contraseñas no coinciden.'); return }
+    setResetting(true)
+    try {
+      await resetPasswordWithMasterKey(selected.id, masterKey, newPwd)
+      setResetOk(true)
+      // Volver al selector después de 2 segundos
+      setTimeout(goToPicker, 2200)
+    } catch (err) {
+      setResetError(err instanceof Error ? err.message : 'Error al restablecer la contraseña')
+    } finally {
+      setResetting(false)
+    }
+  }
+
+  const subtitle =
+    mode === 'picker'   ? 'Seleccioná tu perfil para continuar' :
+    mode === 'forgot'   ? `Restablecer contraseña — ${selected?.short}` :
+                          `Ingresando como ${selected?.short}`
+
   return (
     <div style={{
-      minHeight: '100vh',
-      background: 'var(--bg)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '24px',
+      minHeight: '100vh', background: 'var(--bg)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px',
     }}>
       <div style={{
         position: 'fixed', inset: 0, pointerEvents: 'none',
@@ -70,13 +125,11 @@ export default function LoginPage({ onLogin }: Props) {
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, letterSpacing: '-.03em', color: 'var(--text-1)' }}>
             Operaciones Tropical
           </h1>
-          <p style={{ margin: '8px 0 0', color: 'var(--text-3)', fontSize: 13.5 }}>
-            {selected ? `Ingresando como ${selected.short}` : 'Seleccioná tu perfil para continuar'}
-          </p>
+          <p style={{ margin: '8px 0 0', color: 'var(--text-3)', fontSize: 13.5 }}>{subtitle}</p>
         </div>
 
-        {!selected ? (
-          /* ── Selector de perfil ── */
+        {/* ── PICKER ── */}
+        {mode === 'picker' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {users.map(u => (
               <button
@@ -107,34 +160,30 @@ export default function LoginPage({ onLogin }: Props) {
               </button>
             ))}
           </div>
-        ) : (
-          /* ── Formulario de contraseña ── */
-          <form onSubmit={handle} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        )}
+
+        {/* ── PASSWORD ── */}
+        {mode === 'password' && selected && (
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {/* Perfil seleccionado */}
             <div style={{
-              display: 'flex', alignItems: 'center', gap: 12,
-              padding: '12px 16px', background: 'var(--surface-1)',
-              border: '1px solid var(--border)', borderRadius: 10,
+              display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
+              background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 10,
             }}>
               <Avatar name={selected.name} size={36} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{selected.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{selected.email}</div>
               </div>
-              <button
-                type="button"
-                onClick={handleBack}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: 12, padding: '4px 8px' }}
-              >
+              <button type="button" onClick={goToPicker}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: 12, padding: '4px 8px' }}>
                 Cambiar
               </button>
             </div>
 
             {/* Contraseña */}
             <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-2)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.06em' }}>
-                Contraseña
-              </label>
+              <label style={labelStyle}>Contraseña</label>
               <div style={{ position: 'relative' }}>
                 <input
                   type={showPwd ? 'text' : 'password'}
@@ -144,57 +193,170 @@ export default function LoginPage({ onLogin }: Props) {
                   autoComplete="current-password"
                   autoFocus
                   required
-                  style={{
-                    width: '100%', boxSizing: 'border-box',
-                    background: 'var(--surface-1)', border: `1px solid ${error ? 'var(--red)' : 'var(--border)'}`,
-                    borderRadius: 8, padding: '10px 42px 10px 14px', fontSize: 14, color: 'var(--text-1)',
-                    outline: 'none', transition: 'border-color .12s',
-                  }}
+                  style={{ ...inputStyle(!!error), paddingRight: 42 }}
                   onFocus={e => (e.currentTarget.style.borderColor = 'var(--teal)')}
                   onBlur={e => (e.currentTarget.style.borderColor = error ? 'var(--red)' : 'var(--border)')}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPwd(v => !v)}
-                  style={{
-                    position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                    background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4,
-                  }}
-                >
+                <button type="button" onClick={() => setShowPwd(v => !v)}
+                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4 }}>
                   {showPwd ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
             </div>
 
-            {/* Error */}
             {error && (
-              <div style={{
-                padding: '10px 14px', borderRadius: 8,
-                background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)',
-                fontSize: 13, color: 'var(--red)',
-              }}>
+              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', fontSize: 13, color: 'var(--red)' }}>
                 {error}
               </div>
             )}
 
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={loading || !password}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                width: '100%', padding: '11px 0', borderRadius: 8, border: 'none',
-                background: loading || !password ? 'var(--surface-2)' : 'var(--teal)',
-                color: loading || !password ? 'var(--text-3)' : '#00302A',
-                fontSize: 14, fontWeight: 600, cursor: loading || !password ? 'default' : 'pointer',
-                transition: 'background .15s',
-                marginTop: 4,
-              }}
-            >
+            <button type="submit" disabled={loading || !password} style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              width: '100%', padding: '11px 0', borderRadius: 8, border: 'none',
+              background: loading || !password ? 'var(--surface-2)' : 'var(--teal)',
+              color: loading || !password ? 'var(--text-3)' : '#00302A',
+              fontSize: 14, fontWeight: 600, cursor: loading || !password ? 'default' : 'pointer',
+              transition: 'background .15s', marginTop: 4,
+            }}>
               {loading
                 ? <><div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid var(--teal)', borderTopColor: 'transparent', animation: 'spin .6s linear infinite' }} /> Ingresando...</>
                 : <><LogIn size={15} /> Ingresar</>
               }
+            </button>
+
+            {/* Link recuperación */}
+            <button type="button" onClick={handleForgot} style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'var(--text-3)', fontSize: 12.5, textAlign: 'center',
+              textDecoration: 'underline', padding: '2px 0',
+              transition: 'color .12s',
+            }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--teal)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-3)')}
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
+          </form>
+        )}
+
+        {/* ── FORGOT ── */}
+        {mode === 'forgot' && selected && (
+          <form onSubmit={handleReset} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Perfil */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
+              background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 10,
+            }}>
+              <Avatar name={selected.name} size={36} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{selected.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{selected.email}</div>
+              </div>
+            </div>
+
+            {/* Hint */}
+            <div style={{
+              display: 'flex', gap: 8, padding: '10px 12px', borderRadius: 8,
+              background: 'rgba(20,184,166,.06)', border: '1px solid rgba(20,184,166,.2)', fontSize: 12.5, color: 'var(--text-2)',
+            }}>
+              <KeyRound size={14} style={{ flexShrink: 0, marginTop: 1, color: 'var(--teal)' }} />
+              Ingresá la clave maestra del administrador para restablecer tu contraseña.
+            </div>
+
+            {/* Clave maestra */}
+            <div>
+              <label style={labelStyle}>Clave maestra</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showMaster ? 'text' : 'password'}
+                  value={masterKey}
+                  onChange={e => { setMasterKey(e.target.value); setResetError(null) }}
+                  placeholder="Ingresá la clave maestra"
+                  autoFocus
+                  style={{ ...inputStyle(!!resetError && !masterKey), paddingRight: 42 }}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'var(--teal)')}
+                  onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+                />
+                <button type="button" onClick={() => setShowMaster(v => !v)}
+                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4 }}>
+                  {showMaster ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Nueva contraseña */}
+            <div>
+              <label style={labelStyle}>Nueva contraseña</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showNewPwd ? 'text' : 'password'}
+                  value={newPwd}
+                  onChange={e => { setNewPwd(e.target.value); setResetError(null) }}
+                  placeholder="Mínimo 4 caracteres"
+                  style={{ ...inputStyle(), paddingRight: 42 }}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'var(--teal)')}
+                  onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+                />
+                <button type="button" onClick={() => setShowNewPwd(v => !v)}
+                  style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4 }}>
+                  {showNewPwd ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Confirmar nueva contraseña */}
+            <div>
+              <label style={labelStyle}>Confirmar nueva contraseña</label>
+              <input
+                type="password"
+                value={confirmPwd}
+                onChange={e => { setConfirmPwd(e.target.value); setResetError(null) }}
+                placeholder="Repetí la nueva contraseña"
+                style={inputStyle(!!resetError && newPwd !== confirmPwd && !!confirmPwd)}
+                onFocus={e => (e.currentTarget.style.borderColor = 'var(--teal)')}
+                onBlur={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+              />
+            </div>
+
+            {/* Error */}
+            {resetError && !resetOk && (
+              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', fontSize: 13, color: 'var(--red)' }}>
+                {resetError}
+              </div>
+            )}
+
+            {/* Éxito */}
+            {resetOk && (
+              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(20,184,166,.08)', border: '1px solid rgba(20,184,166,.2)', fontSize: 13, color: 'var(--teal)', display: 'flex', gap: 8, alignItems: 'center' }}>
+                ✓ Contraseña restablecida. Volviendo al inicio...
+              </div>
+            )}
+
+            <button type="submit" disabled={resetting || resetOk || !masterKey || !newPwd || !confirmPwd} style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              width: '100%', padding: '11px 0', borderRadius: 8, border: 'none',
+              background: resetting || resetOk || !masterKey || !newPwd || !confirmPwd ? 'var(--surface-2)' : 'var(--teal)',
+              color: resetting || resetOk || !masterKey || !newPwd || !confirmPwd ? 'var(--text-3)' : '#00302A',
+              fontSize: 14, fontWeight: 600,
+              cursor: resetting || resetOk || !masterKey || !newPwd || !confirmPwd ? 'default' : 'pointer',
+              transition: 'background .15s',
+            }}>
+              {resetting
+                ? <><div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid var(--teal)', borderTopColor: 'transparent', animation: 'spin .6s linear infinite' }} /> Restableciendo...</>
+                : <><RotateCcw size={15} /> Restablecer contraseña</>
+              }
+            </button>
+
+            <button type="button" onClick={goToPicker} style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'var(--text-3)', fontSize: 12.5, textAlign: 'center',
+              textDecoration: 'underline', padding: '2px 0',
+              transition: 'color .12s',
+            }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-2)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-3)')}
+            >
+              ← Volver al inicio de sesión
             </button>
           </form>
         )}

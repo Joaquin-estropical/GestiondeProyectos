@@ -61,6 +61,10 @@ const SESSION_KEY  = 'ot_session_user_id'
 const PWD_KEY      = 'ot_local_passwords'   // { [userId]: password }
 const ACCESS_KEY   = 'ot_local_area_access' // { [userId]: areaId[] }
 const EXTRA_KEY    = 'ot_local_extra_users' // AppUser[] creados desde la app
+const MASTER_KEY_STORAGE = 'ot_master_key'  // string — clave maestra de recuperación
+
+// Clave maestra por defecto (se usa si el admin nunca la cambió)
+export const DEFAULT_MASTER_KEY = 'TropicalAdmin2024'
 
 // ── localStorage helpers (todo local, sin Supabase) ─────────────────────────
 function readJSON<T>(key: string, fallback: T): T {
@@ -100,6 +104,30 @@ export async function changePassword(userId: string, currentPassword: string, ne
   const user = allUsersWithPw().find(u => u.id === userId)
   if (!user) throw new Error('Usuario no encontrado')
   if (user.password !== currentPassword) throw new Error('La contraseña actual es incorrecta')
+  if (!newPassword || newPassword.length < 4) throw new Error('La nueva contraseña debe tener al menos 4 caracteres')
+  const overrides = readJSON<Record<string, string>>(PWD_KEY, {})
+  overrides[userId] = newPassword
+  writeJSON(PWD_KEY, overrides)
+}
+
+// ── Clave maestra de recuperación (local) ────────────────────────────────────
+// El admin puede cambiarla desde Configuración → Mi cuenta.
+// Si nunca fue configurada se usa DEFAULT_MASTER_KEY.
+export function getMasterKey(): string | null {
+  try { return localStorage.getItem(MASTER_KEY_STORAGE) } catch { return null }
+}
+export function setMasterKey(key: string): void {
+  try { localStorage.setItem(MASTER_KEY_STORAGE, key) } catch { /* ignore quota */ }
+}
+export function verifyMasterKey(input: string): boolean {
+  return input === (getMasterKey() ?? DEFAULT_MASTER_KEY)
+}
+export async function resetPasswordWithMasterKey(
+  userId: string,
+  masterKey: string,
+  newPassword: string,
+): Promise<void> {
+  if (!verifyMasterKey(masterKey)) throw new Error('Clave maestra incorrecta')
   if (!newPassword || newPassword.length < 4) throw new Error('La nueva contraseña debe tener al menos 4 caracteres')
   const overrides = readJSON<Record<string, string>>(PWD_KEY, {})
   overrides[userId] = newPassword

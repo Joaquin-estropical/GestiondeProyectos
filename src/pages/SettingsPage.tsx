@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import {
   signOut, getLocalUsers, getAllAreaAccess, toggleUserAreaAccess,
   createLocalUser, deleteLocalUser, isSeedUser, changePassword,
+  getMasterKey, setMasterKey, DEFAULT_MASTER_KEY,
 } from '@/lib/auth';
 import { Avatar } from '@/components/shared/Avatar';
 import { PageHead } from '@/components/shared/PageHead';
@@ -832,14 +833,23 @@ function UsersTab() {
   )
 }
 
-// ── Tab: Mi cuenta (cambio de contraseña local) ──────────
+// ── Tab: Mi cuenta (cambio de contraseña + clave maestra para admin) ─────────
 function MyAccountTab() {
   const { currentUser } = useAppStore()
+
+  // Cambio de contraseña propia
   const [current, setCurrent] = useState('')
   const [next,    setNext]    = useState('')
   const [confirm, setConfirm] = useState('')
   const [saving,  setSaving]  = useState(false)
   const [msg,     setMsg]     = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+
+  // Clave maestra (solo admin)
+  const [mkNext,    setMkNext]    = useState('')
+  const [mkConfirm, setMkConfirm] = useState('')
+  const [mkSaving,  setMkSaving]  = useState(false)
+  const [mkMsg,     setMkMsg]     = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const masterKeySet = !!getMasterKey()
 
   const inp: React.CSSProperties = {
     width: '100%', boxSizing: 'border-box', background: 'var(--surface-2)',
@@ -851,9 +861,9 @@ function MyAccountTab() {
     textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6,
   }
 
-  const handle = async () => {
+  const handlePwd = async () => {
     setMsg(null)
-    if (!current || !next) { setMsg({ type: 'err', text: 'Completá ambos campos.' }); return }
+    if (!current || !next) { setMsg({ type: 'err', text: 'Completá todos los campos.' }); return }
     if (next !== confirm)  { setMsg({ type: 'err', text: 'La nueva contraseña y su confirmación no coinciden.' }); return }
     setSaving(true)
     try {
@@ -863,6 +873,21 @@ function MyAccountTab() {
     } catch (e) {
       setMsg({ type: 'err', text: e instanceof Error ? e.message : 'Error al cambiar la contraseña' })
     } finally { setSaving(false) }
+  }
+
+  const handleMasterKey = async () => {
+    setMkMsg(null)
+    if (!mkNext)               { setMkMsg({ type: 'err', text: 'Ingresá la nueva clave maestra.' }); return }
+    if (mkNext.length < 4)    { setMkMsg({ type: 'err', text: 'La clave maestra debe tener al menos 4 caracteres.' }); return }
+    if (mkNext !== mkConfirm) { setMkMsg({ type: 'err', text: 'Las claves maestras no coinciden.' }); return }
+    setMkSaving(true)
+    try {
+      setMasterKey(mkNext)
+      setMkMsg({ type: 'ok', text: 'Clave maestra actualizada correctamente.' })
+      setMkNext(''); setMkConfirm('')
+    } catch (e) {
+      setMkMsg({ type: 'err', text: e instanceof Error ? e.message : 'Error al guardar' })
+    } finally { setMkSaving(false) }
   }
 
   return (
@@ -875,10 +900,16 @@ function MyAccountTab() {
         </div>
       </div>
 
-      <div className="card" style={{ padding: 18 }}>
+      {/* ── Cambio de contraseña propia ── */}
+      <div className="card" style={{ padding: 18, marginBottom: 20 }}>
         <div className="fw-6" style={{ marginBottom: 4 }}>Cambiar contraseña</div>
         <div className="f-xs text-2" style={{ marginBottom: 16 }}>
           Se guarda en este dispositivo para tu próximo ingreso.
+          {!currentUser.is_admin && (
+            <span style={{ display: 'block', marginTop: 4, color: 'var(--text-3)' }}>
+              Si olvidás tu contraseña, pedile al administrador que la restablezca con la clave maestra.
+            </span>
+          )}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
@@ -892,7 +923,7 @@ function MyAccountTab() {
           <div>
             <label style={lbl}>Confirmar nueva contraseña</label>
             <input style={inp} type="password" value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Repetí la nueva contraseña" autoComplete="new-password"
-              onKeyDown={e => { if (e.key === 'Enter') handle() }} />
+              onKeyDown={e => { if (e.key === 'Enter') handlePwd() }} />
           </div>
           {msg && (
             <div style={{
@@ -905,12 +936,57 @@ function MyAccountTab() {
             </div>
           )}
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button className="btn btn-primary btn-md" onClick={handle} disabled={saving || !current || !next}>
+            <button className="btn btn-primary btn-md" onClick={handlePwd} disabled={saving || !current || !next || !confirm}>
               {saving ? 'Guardando…' : 'Actualizar contraseña'}
             </button>
           </div>
         </div>
       </div>
+
+      {/* ── Clave maestra (solo admin) ── */}
+      {currentUser.is_admin && (
+        <div className="card" style={{ padding: 18 }}>
+          <div className="fw-6" style={{ marginBottom: 4 }}>
+            Clave maestra de recuperación
+          </div>
+          <div className="f-xs text-2" style={{ marginBottom: 16 }}>
+            Esta clave permite a cualquier usuario restablecer su contraseña si la olvida.
+            Compartila solo con los administradores.{' '}
+            {masterKeySet
+              ? <span style={{ color: 'var(--teal)' }}>✓ Configurada</span>
+              : <span style={{ color: 'var(--amber)' }}>
+                  Sin configurar — se usa el valor por defecto (<code style={{ fontSize: 11 }}>{DEFAULT_MASTER_KEY}</code>).
+                </span>
+            }
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={lbl}>Nueva clave maestra</label>
+              <input style={inp} type="password" value={mkNext} onChange={e => { setMkNext(e.target.value); setMkMsg(null) }} placeholder="Mínimo 4 caracteres" autoComplete="new-password" />
+            </div>
+            <div>
+              <label style={lbl}>Confirmar clave maestra</label>
+              <input style={inp} type="password" value={mkConfirm} onChange={e => { setMkConfirm(e.target.value); setMkMsg(null) }} placeholder="Repetí la nueva clave maestra" autoComplete="new-password"
+                onKeyDown={e => { if (e.key === 'Enter') handleMasterKey() }} />
+            </div>
+            {mkMsg && (
+              <div style={{
+                padding: '8px 12px', borderRadius: 6, fontSize: 12.5,
+                background: mkMsg.type === 'ok' ? 'rgba(20,184,166,.08)' : 'rgba(239,68,68,.08)',
+                border: `1px solid ${mkMsg.type === 'ok' ? 'rgba(20,184,166,.25)' : 'rgba(239,68,68,.25)'}`,
+                color: mkMsg.type === 'ok' ? 'var(--teal)' : 'var(--red)',
+              }}>
+                {mkMsg.text}
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button className="btn btn-primary btn-md" onClick={handleMasterKey} disabled={mkSaving || !mkNext || !mkConfirm}>
+                {mkSaving ? 'Guardando…' : 'Actualizar clave maestra'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
