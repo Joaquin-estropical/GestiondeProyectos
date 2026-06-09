@@ -3,6 +3,7 @@ import { Play, Pause, Plus, CalendarDays, List, AlertCircle, ExternalLink } from
 import { useTasks, useProjects, useAreas } from '@/hooks/useSupabase';
 import { fmtDate, dueColor, DAYS_ES, MONTHS_SHORT } from '@/lib/mock-data';
 import { AreaPill, PriorityPill, StatusPill } from '@/components/shared/Badges';
+import { priorityBar } from '@/lib/visual';
 import { PageHead } from '@/components/shared/PageHead';
 import { useAppStore } from '@/stores/app';
 import type { Task } from '@/types';
@@ -226,10 +227,12 @@ export default function MyDay() {
     const isTiming = timing === t.id;
     const isOverdue = t.due < today && t.status !== 'done';
     const project = projects.find(p => p.id === t.project);
+    const isHigh = t.priority === 'urg' || t.priority === 'alta';
+    const bar = isOverdue ? 'var(--red)' : priorityBar(t.priority);
     return (
       <div
         style={{
-          padding: '11px 0', borderBottom: '1px solid var(--border)',
+          padding: '11px 0 11px 11px', borderLeft: `3px solid ${bar}`, borderBottom: '1px solid var(--border)',
           display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
           background: isOverdue ? 'rgba(239,68,68,.03)' : 'transparent',
         }}
@@ -237,7 +240,7 @@ export default function MyDay() {
       >
         <span className="check" style={{ flexShrink: 0 }}></span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13.5, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.title}</div>
+          <div style={{ fontSize: 13.5, fontWeight: isHigh ? 600 : 400, color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.title}</div>
           {project && (
             <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
               <AreaPill areaId={t.area} mini />
@@ -310,6 +313,23 @@ export default function MyDay() {
       ) : (
         /* ── Lista ── */
         <div className="page-body" style={{ maxWidth: '100%' }}>
+          {/* Mini-resumen del día */}
+          {allTasks.length > 0 && (
+            <div className="card card-pad mb-16" style={{ display: 'flex', gap: 28, alignItems: 'center', flexWrap: 'wrap' }}>
+              {[
+                { lbl: 'Para hoy',     val: todayTasks.length,   color: 'var(--text-1)' },
+                { lbl: 'Vencidas',     val: overdueTasks.length, color: overdueTasks.length ? 'var(--red)' : 'var(--text-3)' },
+                { lbl: 'En revisión',  val: review.length,       color: review.length ? 'var(--amber)' : 'var(--text-3)' },
+                { lbl: 'Próximas',     val: upcoming.length,     color: 'var(--text-2)' },
+              ].map(s => (
+                <div key={s.lbl} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontSize: 26, fontWeight: 700, color: s.color, fontFamily: 'JetBrains Mono, monospace', lineHeight: 1 }}>{s.val}</span>
+                  <span className="micro">{s.lbl}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Vencidas */}
           {overdueTasks.length > 0 && (
             <div className="card mb-16" style={{ borderColor: 'rgba(239,68,68,.3)' }}>

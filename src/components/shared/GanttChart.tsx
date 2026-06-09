@@ -321,6 +321,20 @@ export interface GanttChartProps {
 
 export function GanttChart({ tasks, projectId, projectName = '', projectDue, onTaskCreated }: GanttChartProps) {
   const { openTask } = useAppStore()
+  // Ancho del panel izquierdo, responsive: angosto en tablet/mobile para dar aire a la línea de tiempo
+  const [leftW, setLeftW] = useState(() => {
+    if (typeof window === 'undefined') return LEFT_W
+    const w = window.innerWidth
+    return w < 768 ? 140 : w < 1024 ? 200 : LEFT_W
+  })
+  useEffect(() => {
+    const update = () => {
+      const w = window.innerWidth
+      setLeftW(w < 768 ? 140 : w < 1024 ? 200 : LEFT_W)
+    }
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
   const [dw,     setDw]     = useState<ZoomLevel>(28)
   const [deps,   setDeps]   = useState<TaskDependency[]>([])
   const [selId,  setSelId]  = useState<string | null>(null)
@@ -717,7 +731,7 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
 
         {/* Left panel */}
-        <div style={{ width: LEFT_W, flexShrink: 0, borderRight: '1px solid #1E1E28', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ width: leftW, flexShrink: 0, borderRight: '1px solid #1E1E28', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {/* Left header */}
           <div style={{ height: HEADER_H, flexShrink: 0, display: 'flex', alignItems: 'flex-end', padding: '0 14px 9px', background: '#0E0E13', borderBottom: '1px solid #1E1E28' }}>
             <span style={{ fontSize: 11.5, color: '#8B8B92', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em' }}>Tarea</span>

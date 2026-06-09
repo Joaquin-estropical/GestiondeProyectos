@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Plus, GanttChart as GanttIcon } from 'lucide-react';
 import { DAYS_ES } from '@/lib/mock-data';
+import { statusColor } from '@/lib/visual';
 import { useAreas, useTasks, useMembers, useProjects } from '@/hooks/useSupabase';
 import { sortedMembers } from '@/lib/auth';
 import { Avatar } from '@/components/shared/Avatar';
@@ -76,13 +77,18 @@ function MonthGrid({ year, month, todayIso, sel, tasks, areaColor, onSelect, onN
                 </button>
               )}
             </div>
-            {evts.slice(0, 3).map(t => (
-              <div key={t.id} className="cal-event" style={{ background: areaColor(t.area) + '22' }} title={t.title}>
-                <span className="dot" style={{ background: areaColor(t.area) }}></span>
+            {evts.slice(0, 4).map(t => (
+              <div
+                key={t.id}
+                className="cal-event"
+                style={{ background: areaColor(t.area) + '22', borderLeft: `2px solid ${statusColor(t.status)}`, paddingLeft: 5 }}
+                title={`${t.title} · ${t.status}`}
+              >
+                <span className="dot" style={{ background: statusColor(t.status) }}></span>
                 {t.title}
               </div>
             ))}
-            {evts.length > 3 && <div className="micro" style={{ paddingLeft: 4, color: 'var(--text-3)' }}>+{evts.length - 3} más</div>}
+            {evts.length > 4 && <div className="micro" style={{ paddingLeft: 4, color: 'var(--text-3)' }}>+{evts.length - 4} más</div>}
           </div>
         );
       })}

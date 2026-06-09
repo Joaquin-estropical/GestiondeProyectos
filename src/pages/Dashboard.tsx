@@ -5,7 +5,9 @@ import { useAreas, useProjects, useTasks, useMembers } from '@/hooks/useSupabase
 import { getMember, daysFromToday, fmtDate, dueColor } from '@/lib/mock-data';
 import { Avatar } from '@/components/shared/Avatar';
 import { StatusPill, AreaPill } from '@/components/shared/Badges';
+import { Donut, Spark } from '@/components/shared/Charts';
 import { PageHead } from '@/components/shared/PageHead';
+import { taskAccent, statusColor } from '@/lib/visual';
 import { useAppStore } from '@/stores/app';
 import type { Task, TaskStatus, TaskPriority } from '@/types';
 
@@ -133,22 +135,24 @@ function AtRiskPanel({ tasks, members, onOpen }: {
           const isBlock = kind === 'block';
           const dueLbl = days < 0 ? `Venció ${fmtDate(t.due)}` : days === 0 ? 'Vence hoy' : `${days}d restantes`;
           const assigneeName = resolveName(t.assignee);
+          const accent = taskAccent(t);
           return (
             <div
               key={t.id}
               onClick={() => onOpen(t.id)}
               style={{
-                padding: '10px 18px',
+                padding: '10px 18px 10px 15px',
+                borderLeft: `3px solid ${accent.bar ?? 'transparent'}`,
                 borderBottom: i < items.length - 1 ? '1px solid var(--border)' : 'none',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 10,
-                background: isBlock ? 'rgba(239,68,68,.03)' : 'transparent',
+                background: accent.tint,
                 transition: 'background .1s',
               }}
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
-              onMouseLeave={e => (e.currentTarget.style.background = isBlock ? 'rgba(239,68,68,.03)' : 'transparent')}
+              onMouseLeave={e => (e.currentTarget.style.background = accent.tint)}
             >
               {isBlock
                 ? <CircleAlert size={14} color="var(--red)" style={{ flexShrink: 0 }} />
@@ -209,17 +213,40 @@ export default function Dashboard() {
   const filtered  = applyFilters(tasks, filters);
   const hasFilter = Object.values(filters).some(v => v !== '');
 
+  const STATUS_KEYS: TaskStatus[] = ['pend', 'curso', 'rev', 'block', 'done'];
   const areaLoad = areas.map(a => {
     const proj   = projects.filter(p => p.area === a.id);
     const atasks = tasks.filter(t => t.area === a.id);
     const open   = atasks.filter(t => t.status !== 'done').length;
+    // Distribución de estados para el mini-donut
+    const dist = STATUS_KEYS.map(s => ({
+      value: atasks.filter(t => t.status === s).length,
+      color: statusColor(s),
+      name:  s,
+    })).filter(d => d.value > 0);
+    // Responsables top (por cantidad de tareas abiertas en el área)
+    const counts = new Map<string, number>();
+    atasks.filter(t => t.status !== 'done' && t.assignee).forEach(t => counts.set(t.assignee, (counts.get(t.assignee) ?? 0) + 1));
+    const topAssignees = [...counts.entries()]
+      .sort((x, y) => y[1] - x[1]).slice(0, 3)
+      .map(([id]) => members.find(m => m.id === id) ?? getMember(id))
+      .filter((m): m is NonNullable<typeof m> => !!m);
     return {
       ...a,
       projects:  proj.length,
       openTasks: open,
       progress:  Math.round(proj.reduce((s, p) => s + p.progress, 0) / Math.max(proj.length, 1)),
+      dist,
+      topAssignees,
     };
   });
+
+  // Series de 7 días para los KPIs del equipo (tendencia). Cada punto = estado al
+  // final de ese día relativo a hoy (−6 … 0). Calculado de las fechas existentes.
+  const last7 = Array.from({ length: 7 }, (_, i) => i - 6); // [-6..0]
+  const doneSeries    = last7.map(off => tasks.filter(t => t.status === 'done' && daysFromToday(t.due) <= off).length);
+  const overdueSeries = last7.map(off => tasks.filter(t => t.status !== 'done' && daysFromToday(t.due) < off).length);
+  const trend = (s: number[]) => s[s.length - 1] - s[0];
 
   return (
     <>
@@ -252,11 +279,12 @@ export default function Dashboard() {
               const due    = daysFromToday(t.due);
               const dueLbl = due < 0 ? `Vencida · ${fmtDate(t.due)}` : due === 0 ? 'Hoy' : due === 1 ? 'Mañana' : fmtDate(t.due);
               const member = members.find(m => m.id === t.assignee) ?? getMember(t.assignee);
+              const accent = taskAccent(t);
               return (
                 <div
                   key={t.id}
                   onClick={() => openTask(t.id)}
-                  style={{ padding: '10px 18px', borderBottom: '1px solid var(--border)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}
+                  style={{ padding: '10px 18px 10px 15px', borderLeft: `3px solid ${accent.bar ?? 'transparent'}`, background: accent.tint, borderBottom: '1px solid var(--border)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}
                 >
                   <span className={`check ${t.status === 'done' ? 'done' : ''}`}></span>
                   <span style={{ flex: 1, fontSize: 13.5 }}>{t.title}</span>
@@ -331,11 +359,12 @@ export default function Dashboard() {
                 {myPending.map(t => {
                   const due    = daysFromToday(t.due);
                   const dueLbl = due < 0 ? `Vencida · ${fmtDate(t.due)}` : due === 0 ? 'Hoy' : due === 1 ? 'Mañana' : fmtDate(t.due);
+                  const accent = taskAccent(t);
                   return (
                     <div
                       key={t.id}
                       onClick={() => openTask(t.id)}
-                      style={{ padding: '10px 18px', borderBottom: '1px solid var(--border)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}
+                      style={{ padding: '10px 18px 10px 15px', borderLeft: `3px solid ${accent.bar ?? 'transparent'}`, background: accent.tint, borderBottom: '1px solid var(--border)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}
                     >
                       <span className="check"></span>
                       <span style={{ flex: 1, fontSize: 13.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</span>
@@ -375,14 +404,30 @@ export default function Dashboard() {
                     </span>
                     <span style={{ fontSize: 13, fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
                   </div>
-                  <div className="row between items-center mt-12">
-                    <span className="micro">{a.projects} proyectos</span>
-                    <span className="mono" style={{ fontSize: 12, color: 'var(--text-1)' }}>{a.progress}%</span>
+                  <div className="row items-center gap-12 mt-12">
+                    {a.dist.length > 0 ? (
+                      <Donut data={a.dist} size={46} stroke={7} center={a.openTasks} centerSize={13} />
+                    ) : (
+                      <div style={{ width: 46, height: 46, flexShrink: 0 }} />
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="row between items-center">
+                        <span className="micro">{a.projects} proy.</span>
+                        <span className="mono" style={{ fontSize: 12, color: 'var(--text-1)' }}>{a.progress}%</span>
+                      </div>
+                      <div className="progress mt-8">
+                        <div style={{ width: a.progress + '%', background: a.color }}></div>
+                      </div>
+                      <div className="row items-center between mt-8">
+                        <span className="mono" style={{ fontSize: 11, color: 'var(--text-3)' }}>{a.openTasks} abiertas</span>
+                        {a.topAssignees.length > 0 && (
+                          <span className="avatar-stack">
+                            {a.topAssignees.map(m => <Avatar key={m.id} name={m.name} size={18} title={m.name} />)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="progress mt-8">
-                    <div style={{ width: a.progress + '%', background: a.color }}></div>
-                  </div>
-                  <div className="mono mt-8" style={{ fontSize: 11, color: 'var(--text-3)' }}>{a.openTasks} tareas abiertas</div>
                 </div>
               ))}
             </div>
@@ -398,21 +443,39 @@ export default function Dashboard() {
             </div>
             <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
               {[
-                { label: 'Hoy del equipo', val: todayCount,     color: 'var(--text-2)' },
-                { label: 'Vencidas',        val: overdue.length, color: 'var(--red)'    },
-                { label: 'En riesgo (48h)', val: atRisk.length,  color: 'var(--amber)'  },
-                { label: 'Completadas',     val: doneCount,      color: 'var(--green)'  },
-              ].map((kpi, i) => (
-                <div
-                  key={i}
-                  className="card"
-                  onClick={() => navigate('/tareas?filter=' + ['today', 'overdue', 'at_risk', 'done'][i])}
-                  style={{ padding: '12px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                >
-                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{kpi.label}</span>
-                  <span style={{ fontSize: 20, fontWeight: 700, color: kpi.color, fontFamily: 'JetBrains Mono, monospace' }}>{kpi.val}</span>
-                </div>
-              ))}
+                { label: 'Hoy del equipo', val: todayCount,     color: 'var(--text-2)', spark: null,          trend: 0,                   good: 'down' as const },
+                { label: 'Vencidas',        val: overdue.length, color: 'var(--red)',   spark: overdueSeries, trend: trend(overdueSeries), good: 'down' as const },
+                { label: 'En riesgo (48h)', val: atRisk.length,  color: 'var(--amber)', spark: null,          trend: 0,                   good: 'down' as const },
+                { label: 'Completadas',     val: doneCount,      color: 'var(--green)', spark: doneSeries,    trend: trend(doneSeries),    good: 'up' as const   },
+              ].map((kpi, i) => {
+                // Color de la flecha: verde si la tendencia es "buena", rojo si es "mala"
+                const dir = kpi.trend === 0 ? null : kpi.trend > 0 ? 'up' : 'down';
+                const goodDir = dir && dir === kpi.good;
+                const arrowColor = !dir ? 'var(--text-3)' : goodDir ? 'var(--green)' : 'var(--red)';
+                return (
+                  <div
+                    key={i}
+                    className="card"
+                    onClick={() => navigate('/tareas?filter=' + ['today', 'overdue', 'at_risk', 'done'][i])}
+                    style={{ padding: '12px 14px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 6 }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{kpi.label}</span>
+                      <span style={{ fontSize: 20, fontWeight: 700, color: kpi.color, fontFamily: 'JetBrains Mono, monospace' }}>{kpi.val}</span>
+                    </div>
+                    {kpi.spark && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Spark data={kpi.spark} w={72} h={20} color={kpi.color} />
+                        {dir && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 1, fontSize: 11, color: arrowColor, fontFamily: 'JetBrains Mono, monospace' }}>
+                            {dir === 'up' ? '▲' : '▼'}{Math.abs(kpi.trend)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

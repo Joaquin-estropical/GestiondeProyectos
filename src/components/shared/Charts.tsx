@@ -5,9 +5,10 @@ interface DonutProps {
   size?: number
   stroke?: number
   center?: string | number
+  centerSize?: number
 }
 
-export function Donut({ data, size = 140, stroke = 18, center }: DonutProps) {
+export function Donut({ data, size = 140, stroke = 18, center, centerSize }: DonutProps) {
   const r = (size - stroke) / 2
   const c = 2 * Math.PI * r
   const total = data.reduce((s, d) => s + d.value, 0)
@@ -31,7 +32,7 @@ export function Donut({ data, size = 140, stroke = 18, center }: DonutProps) {
       })}
       {center != null && (
         <text x={size/2} y={size/2} textAnchor="middle" dominantBaseline="central"
-          fill="var(--text-1)" fontSize="22" fontFamily="JetBrains Mono" fontWeight="600">
+          fill="var(--text-1)" fontSize={centerSize ?? 22} fontFamily="JetBrains Mono" fontWeight="600">
           {center}
         </text>
       )}

@@ -455,7 +455,7 @@ kbd, .kbd { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; backgro
 /* ════════════ Calendar ════════════ */
 .cal-grid { display: grid; grid-template-columns: repeat(7,1fr); border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
 .cal-wkh  { padding: 8px 12px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-3); }
-.cal-cell { min-height: 0; padding: 8px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; background: var(--bg); cursor: pointer; transition: background 0.12s; overflow: hidden; }
+.cal-cell { min-height: 112px; padding: 8px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; background: var(--bg); cursor: pointer; transition: background 0.12s; overflow: hidden; }
 .cal-cell:hover    { background: var(--surface-1); }
 .cal-cell.muted    { background: #08080A; }
 .cal-cell.muted .num { color: var(--text-3); }
@@ -682,10 +682,15 @@ kbd, .kbd { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; backgro
 /* ════════════ Touch-friendly sizing ════════════ */
 @media (max-width: 1023px) {
   /* Larger touch targets on tablet + mobile */
-  .btn-sm { height: 32px; padding: 0 10px; }
-  .btn-icon.btn-sm { width: 32px; }
-  .tab { padding: 6px 12px; }
+  .btn-sm { height: 34px; padding: 0 12px; }
+  .btn-icon.btn-sm { width: 34px; }
+  .btn-md { height: 36px; }
+  .tab { padding: 7px 12px; }
   .sb-item { padding: 9px 10px; }
+  /* Inputs/selects más altos para tocar cómodo */
+  .input { height: 36px; }
+  /* Items de dropdown con más área tocable */
+  .dd-item { padding: 9px 12px; }
 }
 
 /* ════════════ Tablet responsive (768-1023px) ════════════ */
@@ -700,6 +705,21 @@ kbd, .kbd { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; backgro
   .filter-search { flex: 1 0 140px !important; }
   /* View tabs: hide text, show only icon on tablet */
   .view-tab-label { display: none; }
+  /* View tabs scroll horizontally without visible scrollbar */
+  .proj-tabs { overflow-x: auto; scrollbar-width: none; }
+  .proj-tabs::-webkit-scrollbar { display: none; }
+  /* Header actions wrap instead of overflowing */
+  .proj-header-row { flex-wrap: wrap; }
+
+  /* Kanban: columnas con ancho legible + scroll horizontal (en vez de aplastarse) */
+  .kanban { overflow-x: auto; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
+  .kan-col { flex: 0 0 280px; scroll-snap-align: start; }
+
+  /* Gantt: panel izquierdo más angosto para dar aire a la línea de tiempo */
+  .gantt-shell { grid-template-columns: 180px 1fr; }
+
+  /* Slide-over de detalle: no tapar toda la pantalla */
+  .slide-over { width: min(440px, 80vw); }
 }
 
 /* ════════════ Mobile responsive (<768px) ════════════ */
@@ -762,6 +782,20 @@ kbd, .kbd { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; backgro
   /* AreaView critical tasks table: horizontal scroll */
   .area-tasks-card { overflow-x: auto; }
   .area-tasks-card table { min-width: 480px; }
+
+  /* Kanban: una columna por pantalla, swipe horizontal entre estados */
+  .kanban { overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; padding: 12px 12px 24px; gap: 12px; }
+  .kan-col { flex: 0 0 86vw; scroll-snap-align: center; }
+  .kan-card { padding: 14px; }
+
+  /* Gantt: panel izquierdo mínimo */
+  .gantt-shell { grid-template-columns: 140px 1fr; }
+  .gantt-row, .gantt-left .gantt-row { padding: 0 8px; font-size: 12px; }
+
+  /* Campos de formulario a ancho completo dentro de modales */
+  .modal-body .input,
+  .modal-body select,
+  .modal-body textarea { width: 100%; }
 }
 
 /* ════════════ Safe area + scroll improvements ════════════ */
@@ -776,6 +810,12 @@ kbd, .kbd { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; backgro
 .modal-head { display: flex; align-items: center; gap: 12px; padding: 18px 20px 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
 .modal-foot { display: flex; gap: 10px; justify-content: flex-end; padding: 14px 20px 18px; border-top: 1px solid var(--border); flex-shrink: 0; }
+
+/* Modales responsive: conservan su ancho inline en desktop, full-width como bottom-sheet en mobile.
+   El !important vence al maxWidth inline (que de otro modo gana por especificidad). */
+@media (max-width: 767px) {
+  .modal { max-width: 100% !important; }
+}
 
 /* ════════════ Form helpers ════════════ */
 .form-group { display: flex; flex-direction: column; }
