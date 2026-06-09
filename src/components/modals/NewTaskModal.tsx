@@ -70,14 +70,19 @@ export function NewTaskModal() {
   const isEdificioArea = (aid: string) =>
     areas.find(a => a.id === aid)?.type === 'edificio'
 
-  // Get "Generales" project for a given area
-  const getGeneralesProject = (aid: string) =>
-    projects.find(p => p.area === aid && p.name === 'Generales')
+  // Get "Generales" project for a given area (and sub-area, en edificio).
+  // En edificio cada sub-área tiene su propio "Generales", así que se debe
+  // distinguir por subarea para no traer el de otra sub-área.
+  const getGeneralesProject = (aid: string, sid?: string) =>
+    projects.find(p =>
+      p.area === aid &&
+      p.name === 'Generales' &&
+      (isEdificioArea(aid) ? p.subarea === (sid ?? null) : true))
 
-  const resolveProject = (aid: string, pid: string) => {
+  const resolveProject = (aid: string, sid: string, pid: string) => {
     // Trust explicit pid even if not yet in local store (newly created project)
     if (pid) return pid
-    const gen = getGeneralesProject(aid)
+    const gen = getGeneralesProject(aid, sid)
     return gen?.id ?? ''
   }
 
@@ -101,21 +106,25 @@ export function NewTaskModal() {
     const pid  = newTaskProjectId ?? ''
     const proj = _projects.find(p => p.id === pid)
     const aid  = proj?.area ?? newTaskAreaId ?? _areas[0]?.id ?? ''
+    const isEdif = _areas.find(a => a.id === aid)?.type === 'edificio'
     setAreaId(aid)
 
     // Sub-area: only relevant for edificio. If the preselected project has a
     // subarea, use it; otherwise leave blank so the user picks one.
-    if (_areas.find(a => a.id === aid)?.type === 'edificio') {
-      setSubareaId(proj?.subarea ?? '')
-    } else {
-      setSubareaId('')
-    }
+    const sid = isEdif ? (proj?.subarea ?? '') : ''
+    setSubareaId(sid)
 
     if (pid) {
       setProjectId(pid)
+    } else if (isEdif && !sid) {
+      // Edificio sin sub-área elegida: no preseleccionar proyecto (forzar Área→Sub-área→Proyecto)
+      setProjectId('')
     } else {
-      const gen = _projects.find(p => p.area === aid && p.name === 'Generales')
-      setProjectId(gen?.id ?? _projects.filter(p => p.area === aid)[0]?.id ?? '')
+      const gen = _projects.find(p =>
+        p.area === aid && p.name === 'Generales' && (isEdif ? p.subarea === sid : true))
+      const firstInScope = _projects.filter(p =>
+        p.area === aid && (isEdif ? p.subarea === sid : true))[0]
+      setProjectId(gen?.id ?? firstInScope?.id ?? '')
     }
   // Only re-initialize when the modal opens or its pre-filled values change
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -123,27 +132,31 @@ export function NewTaskModal() {
 
   const handleAreaChange = (aid: string) => {
     setAreaId(aid)
-    // Reset subarea when area changes. If edificio with a single subarea, autoselect.
     if (isEdificioArea(aid)) {
+      // Reset subarea. Si hay una sola sub-área, autoseleccionarla y su Generales.
       const subs = subareas.filter(sa => sa.area === aid)
-      setSubareaId(subs.length === 1 ? subs[0].id : '')
+      const sid  = subs.length === 1 ? subs[0].id : ''
+      setSubareaId(sid)
+      if (sid) {
+        const gen = getGeneralesProject(aid, sid)
+        setProjectId(gen?.id ?? projects.filter(p => p.area === aid && p.subarea === sid)[0]?.id ?? '')
+      } else {
+        // Sin sub-área aún: no preseleccionar proyecto (forzar el orden jerárquico)
+        setProjectId('')
+      }
     } else {
       setSubareaId('')
+      const gen = getGeneralesProject(aid)
+      setProjectId(gen?.id ?? projects.filter(p => p.area === aid)[0]?.id ?? '')
     }
-    // Auto-select Generales for the new area, or first project
-    const gen = getGeneralesProject(aid)
-    setProjectId(gen?.id ?? projects.filter(p => p.area === aid)[0]?.id ?? '')
   }
 
   const handleSubareaChange = (sid: string) => {
     setSubareaId(sid)
-    // If the currently selected project doesn't belong to the new subarea
-    // (and isn't Generales), reset to Generales or empty.
-    const proj = projects.find(p => p.id === projectId)
-    if (proj && proj.subarea !== sid && proj.name !== 'Generales') {
-      const gen = getGeneralesProject(areaId)
-      setProjectId(gen?.id ?? '')
-    }
+    // Al cambiar de sub-área, seleccionar el Generales de ESA sub-área
+    // (o el primer proyecto de la sub-área).
+    const gen = getGeneralesProject(areaId, sid)
+    setProjectId(gen?.id ?? projects.filter(p => p.area === areaId && p.subarea === sid)[0]?.id ?? '')
   }
 
   const handleProjectChange = (pid: string) => {
@@ -160,7 +173,7 @@ export function NewTaskModal() {
     if (isEdificioArea(areaId) && !subareaId && subareas.filter(sa => sa.area === areaId).length > 0) {
       setError('Seleccioná una sub-área'); return
     }
-    const finalProjectId = resolveProject(areaId, projectId)
+    const finalProjectId = resolveProject(areaId, subareaId, projectId)
     if (!finalProjectId) { setError('Seleccioná un proyecto. Si el área no tiene proyectos, crea uno primero desde el área.'); return }
     if (!assignee) { setError('Seleccioná un responsable'); return }
     if (!due) { setError('La fecha límite es obligatoria'); return }
@@ -195,7 +208,7 @@ export function NewTaskModal() {
     if (isEdificioArea(areaId) && !subareaId && subareas.filter(sa => sa.area === areaId).length > 0) {
       setError('Seleccioná una sub-área'); return
     }
-    const finalProjectId = resolveProject(areaId, projectId)
+    const finalProjectId = resolveProject(areaId, subareaId, projectId)
     if (!finalProjectId) { setError('Seleccioná un proyecto. Si el área no tiene proyectos, crea uno primero desde el área.'); return }
     if (!assignee) { setError('Seleccioná un responsable'); return }
     if (!due) { setError('La fecha límite es obligatoria'); return }
@@ -223,17 +236,16 @@ export function NewTaskModal() {
 
   const needsSubArea = isEdificioArea(areaId)
   const areaSubAreas = subareas.filter(sa => sa.area === areaId)
-  // Edificio: filter projects by subarea (Generales always shown as fallback).
-  // Other areas: show all projects for the area.
-  const areaProjects = areaId
-    ? projects.filter(p => {
-        if (p.area !== areaId) return false
-        if (!needsSubArea) return true
-        if (!subareaId) return true
-        return p.subarea === subareaId || p.name === 'Generales'
-      })
-    : projects
-  const hasGenerales = !!getGeneralesProject(areaId)
+  // Edificio: mostrar SOLO los proyectos de la sub-área elegida (incluido su
+  // propio "Generales", que ya tiene esa subarea). Sin sub-área elegida no se
+  // listan proyectos → fuerza el orden Área → Sub-área → Proyecto.
+  // Otras áreas: todos los proyectos del área.
+  const areaProjects = !areaId
+    ? projects
+    : needsSubArea
+      ? (subareaId ? projects.filter(p => p.area === areaId && p.subarea === subareaId) : [])
+      : projects.filter(p => p.area === areaId)
+  const hasGenerales = !!getGeneralesProject(areaId, subareaId)
 
   return (
     <>
@@ -376,7 +388,11 @@ export function NewTaskModal() {
                 Proyecto <span style={{ color: 'var(--red)' }}>*</span>
               </label>
               <div style={{ flex: 1, background: 'var(--surface-1)', border: `1px solid ${areaId && areaProjects.length === 0 ? 'var(--amber)' : 'var(--border)'}`, borderRadius: 6, overflow: 'hidden' }}>
-                {areaId && areaProjects.length === 0 ? (
+                {areaId && needsSubArea && !subareaId ? (
+                  <div style={{ padding: '0 10px', height: 32, display: 'flex', alignItems: 'center', fontSize: 12, color: 'var(--text-3)' }}>
+                    Elegí una sub-área primero
+                  </div>
+                ) : areaId && areaProjects.length === 0 ? (
                   <div style={{ padding: '0 10px', height: 32, display: 'flex', alignItems: 'center', fontSize: 12, color: 'var(--amber)' }}>
                     Sin proyectos — creá uno primero
                   </div>

@@ -453,7 +453,7 @@ kbd, .kbd { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; backgro
 .gantt-today::after { content: 'HOY'; position: absolute; top: 8px; left: 6px; font-size: 10px; font-weight: 600; color: var(--teal); font-family: 'JetBrains Mono', monospace; }
 
 /* ════════════ Calendar ════════════ */
-.cal-grid { display: grid; grid-template-columns: repeat(7,1fr); border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
+.cal-grid { display: grid; grid-template-columns: repeat(7,1fr); grid-template-rows: auto repeat(6, 1fr); height: 100%; border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
 .cal-wkh  { padding: 8px 12px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-3); }
 .cal-cell { min-height: 112px; padding: 8px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; background: var(--bg); cursor: pointer; transition: background 0.12s; overflow: hidden; }
 .cal-cell:hover    { background: var(--surface-1); }
@@ -466,6 +466,22 @@ kbd, .kbd { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; backgro
 .cal-event .dot    { width: 6px; height: 6px; border-radius: 2px; flex: none; }
 .cal-cell .cal-add-btn { opacity: 0; transition: opacity .12s; }
 .cal-cell:hover .cal-add-btn { opacity: 1; }
+
+/* En tablet/mobile los paneles laterales del calendario, cuando se abren, se
+   superponen al calendario (overlay) en vez de comprimirlo. */
+@media (max-width: 1023px) {
+  .cal-shell { grid-template-columns: 1fr !important; position: relative; }
+  .cal-aside-filters.open, .cal-aside-day.open {
+    position: absolute; top: 0; bottom: 0; z-index: 30;
+    width: min(280px, 85vw);
+    background: var(--bg);
+    box-shadow: 0 0 0 9999px rgba(0,0,0,.45);
+  }
+  .cal-aside-filters.open { left: 0; }
+  .cal-aside-day.open     { right: 0; }
+  /* Colapsados no ocupan espacio */
+  .cal-aside-filters:not(.open) { display: none; }
+}
 
 /* ════════════ Bar chart ════════════ */
 .bar-row { display: grid; grid-template-columns: 140px 1fr 60px; gap: 12px; align-items: center; padding: 8px 0; font-size: 12.5px; }

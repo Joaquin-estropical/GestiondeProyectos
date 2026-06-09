@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Plus, GanttChart as GanttIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, GanttChart as GanttIcon, SlidersHorizontal, X } from 'lucide-react';
 import { DAYS_ES } from '@/lib/mock-data';
 import { statusColor } from '@/lib/visual';
 import { useAreas, useTasks, useMembers, useProjects } from '@/hooks/useSupabase';
@@ -457,6 +457,8 @@ export default function CalendarView() {
   const [weekStart,   setWeekStart]   = useState(() => startOfWeek(today));
   const [sel,         setSel]         = useState(todayIso);
   const [ganttGroup,  setGanttGroup]  = useState<GanttGroup>('project');
+  const [filtersOpen,  setFiltersOpen]  = useState(false); // sidebar de filtros colapsable
+  const [dayPanelOpen, setDayPanelOpen] = useState(false); // detalle del día: solo al seleccionar
 
   const { data: areas       = [] } = useAreas();
   const { data: tasks       = [] } = useTasks();
@@ -509,8 +511,15 @@ export default function CalendarView() {
     if (view === 'year') {
       const d = new Date(iso + 'T12:00:00');
       setYear(d.getFullYear()); setMonth(d.getMonth()); setView('month');
+    } else {
+      setDayPanelOpen(true); // abrir el detalle del día al seleccionar
     }
   };
+
+  // Nº de filtros activos (para el badge del botón "Filtros")
+  const activeFilterCount =
+    (filtAreas ? areas.length - activeAreas.length : 0) +
+    (filtPeople ? members.length - activePeople.length : 0);
   const handleNewTask = (iso: string) => { setSel(iso); openNewTask(undefined, iso); };
 
   const dayTasks = taskByDay[sel] || [];
@@ -549,19 +558,36 @@ export default function CalendarView() {
                 <button className="btn btn-secondary btn-sm" onClick={nextPeriod}><ChevronRight size={14} /></button>
               </>
             )}
+            <button
+              className={`btn btn-sm ${filtersOpen ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setFiltersOpen(v => !v)}
+              style={{ gap: 5 }}
+              title="Mostrar/ocultar filtros"
+            >
+              <SlidersHorizontal size={13} /> Filtros
+              {activeFilterCount > 0 && (
+                <span style={{ fontSize: 10, fontFamily: 'JetBrains Mono,monospace', background: 'var(--teal)', color: '#00302A', borderRadius: 999, padding: '0 5px', marginLeft: 2 }}>{activeFilterCount}</span>
+              )}
+            </button>
             <button className="btn btn-primary btn-sm" onClick={() => handleNewTask(sel)}><Plus size={13} /> Nueva tarea</button>
           </div>
         }
       />
 
-      <div style={{
+      <div className="cal-shell" style={{
         display: 'grid',
-        gridTemplateColumns: isGantt ? '200px 1fr' : view === 'year' ? '240px 1fr' : '240px 1fr 280px',
+        // Filtros colapsables (izq.) · calendario (1fr, ancho completo) · detalle del día (der., solo al seleccionar)
+        gridTemplateColumns: isGantt
+          ? `${filtersOpen ? '200px' : '0px'} 1fr`
+          : view === 'year'
+            ? `${filtersOpen ? '240px' : '0px'} 1fr`
+            : `${filtersOpen ? '240px' : '0px'} 1fr ${dayPanelOpen ? '300px' : '0px'}`,
         height: 'calc(100% - 89px)',
+        transition: 'grid-template-columns .2s ease',
       }}>
 
-        {/* Sidebar filtros */}
-        <aside style={{ borderRight: '1px solid var(--border)', padding: '16px 12px', overflowY: 'auto' }}>
+        {/* Sidebar filtros (colapsable) */}
+        <aside className={`cal-aside-filters${filtersOpen ? ' open' : ''}`} style={{ borderRight: filtersOpen ? '1px solid var(--border)' : 'none', padding: filtersOpen ? '16px 12px' : 0, overflow: filtersOpen ? 'auto' : 'hidden', minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <span className="micro">Áreas</span>
             <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '0 6px', height: 20 }}
@@ -672,16 +698,21 @@ export default function CalendarView() {
           />
         ) : (
           <>
-            <div style={{ overflowY: view === 'year' ? 'auto' : 'hidden', display: 'flex', flexDirection: 'column', padding: view === 'year' ? 16 : 0 }}>
+            <div style={{ overflowY: view === 'year' ? 'auto' : 'hidden', display: 'flex', flexDirection: 'column', padding: view === 'year' ? 16 : 0, minWidth: 0, height: '100%' }}>
               {view === 'month' && <MonthGrid year={year} month={month} todayIso={todayIso} sel={sel} tasks={filtered} areaColor={areaColor} onSelect={handleSelect} onNewTask={handleNewTask} />}
               {view === 'week'  && <WeekGrid  weekStart={weekStart} todayIso={todayIso} sel={sel} tasks={filtered} areaColor={areaColor} onSelect={handleSelect} onNewTask={handleNewTask} />}
               {view === 'year'  && <YearGrid  year={year} todayIso={todayIso} tasks={filtered} onSelect={handleSelect} />}
             </div>
 
-            {/* Detalle del día (solo en month/week) */}
-            {view !== 'year' && (
-              <aside style={{ borderLeft: '1px solid var(--border)', padding: '14px', overflowY: 'auto' }}>
-                <div className="micro mb-6">Detalle del día</div>
+            {/* Detalle del día — solo al seleccionar un día (month/week) */}
+            {view !== 'year' && dayPanelOpen && (
+              <aside className="cal-aside-day open" style={{ borderLeft: '1px solid var(--border)', padding: '14px', overflowY: 'auto', minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span className="micro">Detalle del día</span>
+                  <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setDayPanelOpen(false)} title="Cerrar">
+                    <X size={14} />
+                  </button>
+                </div>
                 <div style={{ fontSize: 16, fontWeight: 600, letterSpacing: '-.01em', marginBottom: 4 }}>
                   {sel ? new Date(sel + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }) : '—'}
                 </div>
