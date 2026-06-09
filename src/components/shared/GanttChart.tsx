@@ -179,8 +179,65 @@ function Tooltip({ gt, preds, x, y }: { gt: GanttTask; preds: GanttTask[]; x: nu
   )
 }
 
-// ─── SVG Arrows ───────────────────────────────────────────
-type Arr = { x1:number; y1:number; x2:number; y2:number; cx1:number; cx2:number; color:string; dashed:boolean; id:string }
+// ─── SVG Arrows (conectores ortogonales) ─────────────────
+// Estilo Gantt profesional: salida horizontal desde el borde de la barra
+// predecesora → giro vertical hasta la fila sucesora → entrada horizontal
+// a la barra sucesora. Sin diagonales, sin bezier que cruzan las barras.
+type Arr = { path: string; color: string; dashed: boolean; id: string }
+
+// Radio de las esquinas del conector (look suavizado pero ortogonal)
+const CR = 6
+
+function orthPath(x1: number, y1: number, x2: number, y2: number): string {
+  // x1,y1 = punto de salida (derecho/izquierdo de la barra pred)
+  // x2,y2 = punto de llegada (izquierdo/derecho de la barra succ)
+  const gap   = 10  // espacio mínimo horizontal antes/después del giro
+  const midX  = x1 + gap
+  const endX  = x2 - gap
+
+  if (Math.abs(y1 - y2) < 2) {
+    // Misma fila: línea recta
+    return `M${x1} ${y1} L${x2} ${y2}`
+  }
+
+  const dir = y2 > y1 ? 1 : -1  // 1 = hacia abajo, -1 = hacia arriba
+  const r   = Math.min(CR, Math.abs(y2 - y1) / 2, Math.abs(midX - x1))
+
+  if (midX <= endX) {
+    // Caso normal: x2 > x1 + gap  → salida derecha, entrada izquierda
+    const midY = (y1 + y2) / 2
+    const rV = Math.min(CR, Math.abs(midY - y1), Math.abs(midY - y2))
+    return [
+      `M${x1} ${y1}`,
+      `H${midX - r}`,
+      `Q${midX} ${y1} ${midX} ${y1 + dir * r}`,
+      `V${y2 - dir * rV}`,
+      `Q${midX} ${y2} ${midX + rV} ${y2}`,
+      `H${endX}`,
+      `Q${x2} ${y2} ${x2} ${y2}`,
+      `L${x2} ${y2}`,
+    ].join(' ')
+  }
+
+  // Caso "retroceso": x2 < x1 (el sucesor empieza antes que el fin del pred)
+  // Contornear hacia afuera: salir a la derecha, bajar, doblar hacia izq, entrar
+  const barH    = 32   // ~altura de barra (ROW_H - 14)
+  const exitY   = y1 + dir * (barH / 2 + 4)
+  const entryY  = y2 - dir * (barH / 2 + 4)
+  const rS = Math.min(CR, Math.abs(exitY  - y1), gap)
+  const rE = Math.min(CR, Math.abs(entryY - y2), gap)
+  return [
+    `M${x1} ${y1}`,
+    `H${x1 + gap - rS}`,
+    `Q${x1 + gap} ${y1} ${x1 + gap} ${exitY}`,
+    `V${entryY}`,
+    `Q${x1 + gap} ${y2} ${x1 + gap - rE} ${y2}`,  // acercarse al destino
+    // now head toward x2 from the left side
+    `H${x2 - gap + rE}`,
+    `Q${x2 - gap} ${y2} ${x2 - gap} ${y2}`,
+    `L${x2} ${y2}`,
+  ].join(' ')
+}
 
 function Arrows({ tasks, deps, dw, rh }: { tasks: GanttTask[]; deps: TaskDependency[]; dw: number; rh: number }) {
   const idx = useMemo(() => new Map(tasks.map((t, i) => [t.id, i])), [tasks])
@@ -189,10 +246,7 @@ function Arrows({ tasks, deps, dw, rh }: { tasks: GanttTask[]; deps: TaskDepende
     const pi = idx.get(d.predecessor_id), si = idx.get(d.successor_id)
     if (pi === undefined || si === undefined) return null
     const pred = tasks[pi], succ = tasks[si]
-    // Endpoint coords depend on dep type:
-    //   FS: pred.end  → succ.start
-    //   SS: pred.start → succ.start
-    //   FF: pred.end  → succ.end
+
     let x1: number, x2: number
     if (d.type === 'start_to_start') {
       x1 = pred.es * dw
@@ -201,29 +255,41 @@ function Arrows({ tasks, deps, dw, rh }: { tasks: GanttTask[]; deps: TaskDepende
       x1 = (pred.es + pred.duration) * dw
       x2 = (succ.es + succ.duration) * dw
     } else {
+      // finish_to_start (default)
       x1 = (pred.es + pred.duration) * dw
       x2 = succ.es * dw
     }
-    const y1 = pi * rh + rh / 2
-    const y2 = si * rh + rh / 2
+
+    const y1   = pi * rh + rh / 2
+    const y2   = si * rh + rh / 2
     const both = pred.critical && succ.critical
-    const color = both ? C.critical : '#484858'
-    const dx = Math.abs(x2 - x1)
-    return { x1, y1, x2, y2, cx1: x1 + Math.min(36, dx / 2), cx2: x2 - Math.min(36, dx / 2), color, dashed: !both, id: d.id }
+    const color = both ? C.critical : '#5A5A70'
+
+    return { path: orthPath(x1, y1, x2, y2), color, dashed: !both, id: d.id }
   }).filter((a): a is Arr => !!a)
 
   return (
     <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: tasks.length * rh, pointerEvents: 'none', overflow: 'visible' }}>
       <defs>
-        <marker id="mn" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0.5 L6,3.5 L0,6.5Z" fill="#484858" /></marker>
-        <marker id="mc" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0.5 L6,3.5 L0,6.5Z" fill={C.critical} /></marker>
+        {/* Flechas pequeñas y sutiles — solo ruido visual si son muy grandes */}
+        <marker id="mn" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+          <path d="M0,1 L5,3 L0,5Z" fill="#5A5A70" />
+        </marker>
+        <marker id="mc" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+          <path d="M0,1 L5,3 L0,5Z" fill={C.critical} />
+        </marker>
       </defs>
       {arrows.map(a => (
         <path key={a.id}
-          d={`M${a.x1} ${a.y1} C${a.cx1} ${a.y1},${a.cx2} ${a.y2},${a.x2} ${a.y2}`}
-          fill="none" stroke={a.color} strokeWidth={a.dashed ? 1.5 : 2}
-          strokeDasharray={a.dashed ? '6 4' : undefined}
-          markerEnd={a.dashed ? 'url(#mn)' : 'url(#mc)'} />
+          d={a.path}
+          fill="none"
+          stroke={a.color}
+          strokeWidth={a.dashed ? 1.5 : 2}
+          strokeDasharray={a.dashed ? '5 4' : undefined}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          markerEnd={a.dashed ? 'url(#mn)' : 'url(#mc)'}
+        />
       ))}
     </svg>
   )
@@ -913,14 +979,18 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
                   ) : (
                     /* Task bar */
                     <div style={{
-                      position: 'absolute', left: x, top: 7, height: ROW_H - 14, width: bw,
-                      borderRadius: 5, overflow: 'hidden', display: 'flex', alignItems: 'center',
-                      background: gt.noScope ? 'transparent' : gt.originalTask.status === 'done' ? `${c}CC` : `${c}22`,
-                      border: gt.noScope ? `1.5px dashed ${C.noScope}` : `1.5px solid ${c}`,
-                      opacity: gt.noScope ? 0.75 : 1,
+                      position: 'absolute', left: x, top: 8, height: ROW_H - 16, width: bw,
+                      borderRadius: 4, overflow: 'hidden', display: 'flex', alignItems: 'center',
+                      background: gt.noScope
+                        ? 'transparent'
+                        : gt.originalTask.status === 'done'
+                          ? `${c}99`
+                          : `${c}40`,
+                      border: gt.noScope ? `1.5px dashed ${C.noScope}` : `1.5px solid ${c}88`,
+                      opacity: gt.noScope ? 0.6 : 1,
                       pointerEvents: 'all', cursor: dragging ? 'col-resize' : 'pointer',
-                      boxShadow: selected ? `0 0 0 2px ${c}80, 0 4px 12px ${c}30` : dragging ? `0 0 0 2px ${c}50` : 'none',
-                      transition: 'box-shadow .1s',
+                      boxShadow: selected ? `0 0 0 2px ${c}80, 0 2px 8px ${c}40` : 'none',
+                      transition: 'box-shadow .1s, opacity .1s',
                     }}
                       onClick={() => { if (!drag) { setSelId(null); openTask(gt.id) } }}
                       onMouseEnter={e => { if (!drag) setTip({ gt, x: e.clientX, y: e.clientY }) }}
@@ -928,7 +998,7 @@ export function GanttChart({ tasks, projectId, projectName = '', projectDue, onT
                     >
                       {/* Progress fill */}
                       {gt.originalTask.progress > 0 && (
-                        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: pw, background: `${c}55`, borderRadius: '4px 0 0 4px', pointerEvents: 'none' }} />
+                        <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: pw, background: `${c}70`, borderRadius: '3px 0 0 3px', pointerEvents: 'none' }} />
                       )}
                       {/* Label */}
                       {bw > 32 && (
