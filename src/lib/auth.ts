@@ -126,19 +126,19 @@ export async function signIn(email: string, password: string): Promise<AppUser> 
   return user
 }
 
-// ── Cambio de contraseña (local) ────────────────────────────────────────────
+// ── Cambio de contraseña ─────────────────────────────────────────────────────
 export async function changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
   const user = allUsersWithPw().find(u => u.id === userId)
   if (!user) throw new Error('Usuario no encontrado')
   if (user.password !== currentPassword) throw new Error('La contraseña actual es incorrecta')
   if (!newPassword || newPassword.length < 4) throw new Error('La nueva contraseña debe tener al menos 4 caracteres')
+  // Supabase primero — si falla, el usuario lo sabe y no queda en estado inconsistente
+  const { error } = await supabase.from('user_settings')
+    .upsert({ user_id: userId, password: newPassword, updated_at: new Date().toISOString() })
+  if (error) throw new Error('No se pudo guardar en el servidor. Verificá tu conexión e intentá de nuevo.')
   const overrides = readJSON<Record<string, string>>(PWD_KEY, {})
   overrides[userId] = newPassword
   writeJSON(PWD_KEY, overrides)
-  try {
-    await supabase.from('user_settings')
-      .upsert({ user_id: userId, password: newPassword, updated_at: new Date().toISOString() })
-  } catch { /* offline — localStorage ya actualizado */ }
 }
 
 // ── Clave maestra de recuperación (local) ────────────────────────────────────
@@ -164,13 +164,12 @@ export async function resetPasswordWithMasterKey(
 ): Promise<void> {
   if (!verifyMasterKey(masterKey)) throw new Error('Clave maestra incorrecta')
   if (!newPassword || newPassword.length < 4) throw new Error('La nueva contraseña debe tener al menos 4 caracteres')
+  const { error: errReset } = await supabase.from('user_settings')
+    .upsert({ user_id: userId, password: newPassword, updated_at: new Date().toISOString() })
+  if (errReset) throw new Error('No se pudo guardar en el servidor. Verificá tu conexión e intentá de nuevo.')
   const overrides = readJSON<Record<string, string>>(PWD_KEY, {})
   overrides[userId] = newPassword
   writeJSON(PWD_KEY, overrides)
-  try {
-    await supabase.from('user_settings')
-      .upsert({ user_id: userId, password: newPassword, updated_at: new Date().toISOString() })
-  } catch { /* offline */ }
 }
 
 // ── Acceso a áreas (Supabase, con fallback a localStorage) ──────────────────

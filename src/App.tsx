@@ -103,6 +103,13 @@ function AppRoutes() {
     return () => window.removeEventListener('ot-auth-logout', handleLogout)
   }, [resetSession])
 
+  // Sync password from Supabase every 60s while logged in (picks up changes from other devices)
+  useEffect(() => {
+    if (!user) return
+    const interval = setInterval(() => { syncPasswordFromSupabase(user.id) }, 60_000)
+    return () => clearInterval(interval)
+  }, [user])
+
   // Load data once logged in
   useEffect(() => {
     if (!user) return
