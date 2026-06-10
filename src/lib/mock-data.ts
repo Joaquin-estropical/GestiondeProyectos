@@ -28,8 +28,8 @@ export const PROJECTS: Project[] = [
   { id: 'p8', name: 'Apertura Plaza',       area: 'plaza',   subarea: null, due: '2026-06-01', progress: 12, count: 8  },
 ]
 
-const T = (o: Omit<Task, 'description' | 'start_date' | 'end_date' | 'progress' | 'is_milestone' | 'sort_order' | 'tags' | 'helper'>): Task =>
-  ({ ...o, description: null, start_date: null, end_date: null, progress: 0, is_milestone: false, sort_order: 0, helper: null, tags: [] })
+const T = (o: Omit<Task, 'description' | 'start_date' | 'end_date' | 'progress' | 'is_milestone' | 'sort_order' | 'tags' | 'helper' | 'phase'>): Task =>
+  ({ ...o, description: null, start_date: null, end_date: null, progress: 0, is_milestone: false, sort_order: 0, helper: null, tags: [], phase: null })
 
 export const TASKS: Task[] = [
   T({ id: 't1',  code: 'OT-1847', title: 'Cotizar proveedores de iluminación LED',        project: 'p1', area: 'outlet', assignee: 'and', due: '2026-03-12', priority: 'alta', status: 'curso',  time: '02:14', comments: 4, subtasks: { done: 2, total: 5 } }),

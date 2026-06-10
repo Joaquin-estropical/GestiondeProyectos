@@ -74,6 +74,7 @@ export interface Task {
   is_milestone: boolean
   sort_order:   number
   tags:         string[]
+  phase:        string | null
 }
 
 export type DependencyType = 'finish_to_start' | 'start_to_start' | 'finish_to_finish'

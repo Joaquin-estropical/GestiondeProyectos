@@ -17,6 +17,7 @@ function normaliseTask(row: Record<string, unknown>): Task {
     progress:     (row.progress     as number)        ?? 0,
     is_milestone: (row.is_milestone as boolean)       ?? false,
     sort_order:   (row.sort_order   as number)        ?? 0,
+    phase:        (row.phase        as string | null) ?? null,
     helper,
     tags: cleanTags,
   } as Task
