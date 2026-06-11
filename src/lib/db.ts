@@ -93,7 +93,23 @@ export async function createSubArea(input: {
     .select()
     .single()
   if (error) throw new Error(`${error.message} | code:${error.code} | details:${error.details} | hint:${error.hint}`)
-  return data as SubArea
+  const subArea = data as SubArea
+
+  // Toda sub-área de edificio debe tener su propio proyecto "Generales"
+  const { error: projError } = await supabaseWriter
+    .from('projects')
+    .insert({
+      id:       'p-generales-' + subArea.id,
+      name:     'Generales',
+      area:     subArea.area,
+      subarea:  subArea.id,
+      due:      '2099-12-31',
+      progress: 0,
+      count:    0,
+    })
+  if (projError) throw new Error(`${projError.message} | code:${projError.code} | details:${projError.details} | hint:${projError.hint}`)
+
+  return subArea
 }
 
 export async function updateSubArea(
