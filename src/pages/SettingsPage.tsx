@@ -992,15 +992,15 @@ function MyAccountTab() {
 
 // ── Tab: Tutorial ────────────────────────────────────────
 const HIERARCHY_DIAGRAM = `graph TD
-    A[ÁREA<br/>type: edificio/sucursal/...] --> B{¿type = edificio?}
-    B -- Sí --> C[SUB-ÁREA<br/>Generales, Pisos, Azotea...]
-    C --> D[PROYECTO<br/>subarea = id sub-área]
-    D --> E[TAREA]
+    A[Área<br/>ej: Edificio, Sucursal, Outlet...] --> B{¿Es un Edificio?}
+    B -- Sí --> C[Sub-área<br/>ej: Generales, Pisos, Azotea]
+    C --> D[Proyecto<br/>dentro de la sub-área]
+    D --> E[Tarea]
     D -.->|regla| F["Cada sub-área SIEMPRE
 tiene un proyecto 'Generales'"]
 
-    B -- No --> G[PROYECTO<br/>subarea = null]
-    G --> H[TAREA]
+    B -- No --> G[Proyecto<br/>directo del área]
+    G --> H[Tarea]
 
     style A fill:#6366F1,color:#fff
     style C fill:#14B8A6,color:#fff
