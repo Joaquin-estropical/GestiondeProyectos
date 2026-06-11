@@ -12,6 +12,7 @@ import {
 } from '@/lib/auth';
 import { Avatar } from '@/components/shared/Avatar';
 import { PageHead } from '@/components/shared/PageHead';
+import { MermaidDiagram } from '@/components/shared/MermaidDiagram';
 import type { AreaType, TemplateTask } from '@/types';
 
 const AREA_TYPE_LABELS: Record<AreaType, string> = {
@@ -989,6 +990,73 @@ function MyAccountTab() {
   )
 }
 
+// ── Tab: Tutorial ────────────────────────────────────────
+const HIERARCHY_DIAGRAM = `graph TD
+    A[ÁREA<br/>type: edificio/sucursal/...] --> B{¿type = edificio?}
+    B -- Sí --> C[SUB-ÁREA<br/>Generales, Pisos, Azotea...]
+    C --> D[PROYECTO<br/>subarea = id sub-área]
+    D --> E[TAREA]
+    D -.->|regla| F["Cada sub-área SIEMPRE
+tiene un proyecto 'Generales'"]
+
+    B -- No --> G[PROYECTO<br/>subarea = null]
+    G --> H[TAREA]
+
+    style A fill:#6366F1,color:#fff
+    style C fill:#14B8A6,color:#fff
+    style D fill:#3B82F6,color:#fff
+    style G fill:#3B82F6,color:#fff
+    style E fill:#F59E0B,color:#fff
+    style H fill:#F59E0B,color:#fff
+    style F fill:#fef3c7,color:#000`
+
+function TutorialTab() {
+  return (
+    <div style={{ maxWidth: 760 }}>
+      <div className="card" style={{ padding: 18, marginBottom: 20 }}>
+        <div className="fw-6" style={{ marginBottom: 4 }}>Cómo se organiza la app</div>
+        <div className="f-xs text-2" style={{ marginBottom: 16 }}>
+          La información se ordena en cuatro niveles: Área → Sub-área → Proyecto → Tarea.
+        </div>
+        <MermaidDiagram chart={HIERARCHY_DIAGRAM} />
+      </div>
+
+      <div className="card" style={{ padding: 18, marginBottom: 20 }}>
+        <div className="fw-6" style={{ marginBottom: 8 }}>Área</div>
+        <div className="f-xs text-2">
+          Es el nivel más general (Sucursal, Outlet, Edificio, Bodega, General, Otros).
+          Solo las áreas de tipo <b>Edificio</b> tienen sub-áreas.
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: 18, marginBottom: 20 }}>
+        <div className="fw-6" style={{ marginBottom: 8 }}>Sub-área</div>
+        <div className="f-xs text-2">
+          Solo existen dentro de un área tipo Edificio (ej: Bovinsa, Huawei, Abbott, Tecnofarma).
+          Cada sub-área agrupa sus propios proyectos.
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: 18, marginBottom: 20 }}>
+        <div className="fw-6" style={{ marginBottom: 8 }}>Proyecto</div>
+        <div className="f-xs text-2">
+          Cuelga de un área (y, si es Edificio, también de una sub-área). Toda sub-área de
+          Edificio tiene siempre un proyecto llamado <b>"Generales"</b>, donde van las tareas
+          que no pertenecen a un proyecto específico.
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: 18 }}>
+        <div className="fw-6" style={{ marginBottom: 8 }}>Tarea</div>
+        <div className="f-xs text-2">
+          El nivel más específico. Siempre pertenece a un proyecto, con responsable, prioridad,
+          estado, fechas y subtareas.
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main ─────────────────────────────────────────────────
 export default function SettingsPage() {
   const [tab, setTab] = useState('areas');
@@ -1007,6 +1075,7 @@ export default function SettingsPage() {
     { id: 'members',   label: 'Miembros'   },
     ...(currentUser.is_admin ? [{ id: 'users', label: 'Usuarios' }] : []),
     { id: 'account',   label: 'Mi cuenta'  },
+    { id: 'tutorial',  label: 'Tutorial'   },
     { id: 'billing',   label: 'Facturación'},
   ];
 
@@ -1045,6 +1114,7 @@ export default function SettingsPage() {
         {tab === 'members'   && <MembersTab />}
         {tab === 'users'     && <UsersTab />}
         {tab === 'account'   && <MyAccountTab />}
+        {tab === 'tutorial'  && <TutorialTab />}
         {tab === 'billing'   && (
           <div className="empty" style={{ marginTop: 48 }}>
             <div className="ill">💳</div>
