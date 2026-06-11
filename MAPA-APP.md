@@ -3,7 +3,30 @@
 Este documento explica cómo se organiza la información en Tropical Tower Operations,
 desde el nivel más general (Área) hasta el más específico (Tarea).
 
-## Diagrama general
+## Diagrama gráfico
+
+```mermaid
+graph TD
+    A[ÁREA<br/>type: edificio/sucursal/...] --> B{¿type = edificio?}
+    B -- Sí --> C[SUB-ÁREA<br/>Generales, Pisos, Azotea...]
+    C --> D[PROYECTO<br/>subarea = id sub-área]
+    D --> E[TAREA]
+    D -.->|regla| F["Cada sub-área SIEMPRE
+tiene un proyecto 'Generales'"]
+
+    B -- No --> G[PROYECTO<br/>subarea = null]
+    G --> H[TAREA]
+
+    style A fill:#6366F1,color:#fff
+    style C fill:#14B8A6,color:#fff
+    style D fill:#3B82F6,color:#fff
+    style G fill:#3B82F6,color:#fff
+    style E fill:#F59E0B,color:#fff
+    style H fill:#F59E0B,color:#fff
+    style F fill:#fef3c7,color:#000
+```
+
+## Diagrama general (texto)
 
 ```
 ÁREA
