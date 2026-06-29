@@ -109,6 +109,17 @@ export async function deleteFormItem(id: string): Promise<void> {
   if (error) throw error
 }
 
+export async function reorderFormItems(
+  updates: Array<{ id: string; sort_order: number }>,
+): Promise<void> {
+  if (updates.length === 0) return
+  await Promise.all(
+    updates.map(u =>
+      supabaseWriter.from('project_form_items').update({ sort_order: u.sort_order }).eq('id', u.id),
+    ),
+  )
+}
+
 export async function bulkCreateFormItems(
   formId: string,
   items:  Array<{ title: string; category?: string | null; sort_order: number }>,

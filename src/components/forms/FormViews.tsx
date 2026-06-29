@@ -2,13 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import {
   ClipboardList, Plus, Check, X, ChevronLeft, AlertCircle,
-  CheckCircle2, XCircle, Clock, ChevronDown, ChevronRight,
+  CheckCircle2, XCircle, Clock, ChevronDown, ChevronRight, ChevronUp,
   Trash2, Loader2, Printer,
 } from 'lucide-react';
 import {
   createProjectForm,
-  fetchFormItems, updateFormItem,
-  bulkCreateFormItems, completeForm,
+  fetchFormItems, updateFormItem, createFormItem, deleteFormItem,
+  bulkCreateFormItems, completeForm, reorderFormItems,
 } from '@/lib/projectForms';
 import { fetchChecklistTemplates, fetchTemplateItems } from '@/lib/planillas';
 import { createTask } from '@/lib/db';
@@ -436,6 +436,34 @@ export function CreateFormView({ projectId, currentUserId, onDone, onCancel }: {
   );
 }
 
+// ── Botones de reordenar (subir/bajar) ────────────────────
+function ItemMoveButtons({ onUp, onDown, canUp, canDown }: {
+  onUp: () => void; onDown: () => void; canUp: boolean; canDown: boolean;
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0 }}>
+      <button
+        className="btn btn-ghost btn-sm btn-icon"
+        onClick={onUp}
+        disabled={!canUp}
+        style={{ width: 20, height: 16, color: 'var(--text-3)', opacity: canUp ? 1 : 0.3 }}
+        title="Subir"
+      >
+        <ChevronUp size={12} />
+      </button>
+      <button
+        className="btn btn-ghost btn-sm btn-icon"
+        onClick={onDown}
+        disabled={!canDown}
+        style={{ width: 20, height: 16, color: 'var(--text-3)', opacity: canDown ? 1 : 0.3 }}
+        title="Bajar"
+      >
+        <ChevronDown size={12} />
+      </button>
+    </div>
+  );
+}
+
 // ── RunFormView ───────────────────────────────────────────
 export function RunFormView({ form, projectId, projectArea, currentUserName, members, onBack, onDone }: {
   form:            ProjectForm;
@@ -452,6 +480,10 @@ export function RunFormView({ form, projectId, projectArea, currentUserName, mem
   const [saving,          setSaving]        = useState<Set<string>>(new Set());
   const [showTaskPanel,   setShowTaskPanel] = useState(false);
   const [completing,      setCompleting]    = useState(false);
+  const [newItemCat,      setNewItemCat]    = useState<string | null>(null);
+  const [newItemTitle,    setNewItemTitle]  = useState('');
+  const [addingCategory,  setAddingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
 
   useEffect(() => {
     fetchFormItems(form.id).then(data => {
@@ -494,6 +526,63 @@ export function RunFormView({ form, projectId, projectArea, currentUserName, mem
     setItems(prev => prev.map(i => i.id === item.id ? { ...i, observation: obs || null } : i));
   };
 
+  const handleAddItem = async (category: string) => {
+    const title = newItemTitle.trim();
+    if (!title) { setNewItemCat(null); return; }
+    const created = await createFormItem({
+      form_id:    form.id,
+      title,
+      category:   category || null,
+      sort_order: items.filter(i => (i.category ?? '') === category).length,
+    }).catch(console.error);
+    if (created) setItems(prev => [...prev, created]);
+    setNewItemTitle('');
+    setNewItemCat(null);
+  };
+
+  const handleRemoveItem = async (item: ProjectFormItem) => {
+    await deleteFormItem(item.id).catch(console.error);
+    setItems(prev => prev.filter(i => i.id !== item.id));
+  };
+
+  const handleAddCategory = async () => {
+    const cat = newCategoryName.trim();
+    if (!cat) { setAddingCategory(false); return; }
+    setAddingCategory(false);
+    setNewCategoryName('');
+    setNewItemCat(cat);
+  };
+
+  // Persiste un nuevo orden completo de ítems (sort_order secuencial 0..n) y actualiza el estado local.
+  const persistOrder = (ordered: ProjectFormItem[]) => {
+    setItems(ordered);
+    reorderFormItems(ordered.map((it, idx) => ({ id: it.id, sort_order: idx }))).catch(console.error);
+  };
+
+  const moveItem = (item: ProjectFormItem, dir: -1 | 1) => {
+    const cat = item.category ?? '';
+    const sameCat = items.filter(i => (i.category ?? '') === cat);
+    const idx = sameCat.findIndex(i => i.id === item.id);
+    const swapIdx = idx + dir;
+    if (swapIdx < 0 || swapIdx >= sameCat.length) return;
+    const a = sameCat[idx], b = sameCat[swapIdx];
+    const ai = items.findIndex(i => i.id === a.id);
+    const bi = items.findIndex(i => i.id === b.id);
+    const reordered = [...items];
+    [reordered[ai], reordered[bi]] = [reordered[bi], reordered[ai]];
+    persistOrder(reordered);
+  };
+
+  const moveCategory = (cat: string, dir: -1 | 1) => {
+    const catOrder = [...new Set(items.map(i => i.category ?? ''))];
+    const idx = catOrder.indexOf(cat);
+    const swapIdx = idx + dir;
+    if (swapIdx < 0 || swapIdx >= catOrder.length) return;
+    [catOrder[idx], catOrder[swapIdx]] = [catOrder[swapIdx], catOrder[idx]];
+    const reordered = catOrder.flatMap(c => items.filter(i => (i.category ?? '') === c));
+    persistOrder(reordered);
+  };
+
   // Ítems que disparan creación de tareas al finalizar:
   // relevamiento → "Requiere mantenimiento"; genérico → "Falla".
   const actionItems = relevamiento
@@ -515,8 +604,8 @@ export function RunFormView({ form, projectId, projectArea, currentUserName, mem
       : items.every(i => i.status !== 'pending')
   );
 
-  // Group by category
-  const categories = [...new Set(items.map(i => i.category ?? ''))];
+  // Group by category (incluye categorías recién creadas que aún no tienen ítems)
+  const categories = [...new Set([...items.map(i => i.category ?? ''), ...(newItemCat ? [newItemCat] : [])])];
   const grouped    = categories.map(cat => ({
     cat,
     items: items.filter(i => (i.category ?? '') === cat),
@@ -561,14 +650,34 @@ export function RunFormView({ form, projectId, projectArea, currentUserName, mem
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 32px 100px' }}>
         <ProgressBar items={items} relevamiento={relevamiento} />
 
-        {grouped.map(({ cat, items: catItems }) => (
+        {grouped.map(({ cat, items: catItems }, catIdx) => (
           <div key={cat} style={{ marginBottom: 20 }}>
             {cat && (
-              <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)', marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid var(--border)' }}>
-                {cat}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid var(--border)' }}>
+                <span style={{ flex: 1, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-3)' }}>
+                  {cat}
+                </span>
+                <button
+                  className="btn btn-ghost btn-sm btn-icon"
+                  onClick={() => moveCategory(cat, -1)}
+                  disabled={catIdx === 0}
+                  style={{ width: 22, height: 22, color: 'var(--text-3)', opacity: catIdx === 0 ? 0.35 : 1 }}
+                  title="Subir categoría"
+                >
+                  <ChevronUp size={13} />
+                </button>
+                <button
+                  className="btn btn-ghost btn-sm btn-icon"
+                  onClick={() => moveCategory(cat, 1)}
+                  disabled={catIdx === grouped.length - 1}
+                  style={{ width: 22, height: 22, color: 'var(--text-3)', opacity: catIdx === grouped.length - 1 ? 0.35 : 1 }}
+                  title="Bajar categoría"
+                >
+                  <ChevronDown size={13} />
+                </button>
               </div>
             )}
-            {catItems.map(item => {
+            {catItems.map((item, itemIdx) => {
               const isSaving    = saving.has(item.id);
               const isExpanded  = expandedObs.has(item.id);
 
@@ -609,6 +718,20 @@ export function RunFormView({ form, projectId, projectArea, currentUserName, mem
                           );
                         })}
                       </div>
+                      <ItemMoveButtons
+                        onUp={() => moveItem(item, -1)}
+                        onDown={() => moveItem(item, 1)}
+                        canUp={itemIdx > 0}
+                        canDown={itemIdx < catItems.length - 1}
+                      />
+                      <button
+                        className="btn btn-ghost btn-sm btn-icon"
+                        onClick={() => handleRemoveItem(item)}
+                        style={{ width: 24, height: 24, color: 'var(--text-3)', flexShrink: 0 }}
+                        title="Quitar ítem"
+                      >
+                        <Trash2 size={13} />
+                      </button>
                     </div>
                     {cond && cond !== 'na' && (
                       <div style={{ padding: '0 14px 12px' }}>
@@ -690,6 +813,20 @@ export function RunFormView({ form, projectId, projectArea, currentUserName, mem
                         {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                       </button>
                     )}
+                    <ItemMoveButtons
+                      onUp={() => moveItem(item, -1)}
+                      onDown={() => moveItem(item, 1)}
+                      canUp={itemIdx > 0}
+                      canDown={itemIdx < catItems.length - 1}
+                    />
+                    <button
+                      className="btn btn-ghost btn-sm btn-icon"
+                      onClick={() => handleRemoveItem(item)}
+                      style={{ width: 24, height: 24, color: 'var(--text-3)', flexShrink: 0 }}
+                      title="Quitar ítem"
+                    >
+                      <Trash2 size={13} />
+                    </button>
                   </div>
                   {/* Observation textarea */}
                   {item.status === 'fail' && isExpanded && (
@@ -713,8 +850,68 @@ export function RunFormView({ form, projectId, projectArea, currentUserName, mem
                 </div>
               );
             })}
+
+            {/* Agregar ítem a esta categoría */}
+            {newItemCat === cat ? (
+              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                <input
+                  autoFocus
+                  value={newItemTitle}
+                  onChange={e => setNewItemTitle(e.target.value)}
+                  placeholder="Nombre del ítem…"
+                  style={{
+                    flex: 1, background: 'var(--surface-2)', border: '1px solid var(--teal)',
+                    borderRadius: 6, padding: '8px 12px', fontSize: 13.5, color: 'var(--text-1)', outline: 'none',
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleAddItem(cat);
+                    if (e.key === 'Escape') { setNewItemCat(null); setNewItemTitle(''); }
+                  }}
+                />
+                <button className="btn btn-primary btn-sm" onClick={() => handleAddItem(cat)}>Agregar</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setNewItemCat(null); setNewItemTitle(''); }}>Cancelar</button>
+              </div>
+            ) : (
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ marginTop: 6, fontSize: 12, color: 'var(--text-3)' }}
+                onClick={() => { setNewItemCat(cat); setNewItemTitle(''); }}
+              >
+                <Plus size={12} /> Agregar ítem
+              </button>
+            )}
           </div>
         ))}
+
+        {/* Agregar categoría nueva */}
+        {addingCategory ? (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
+            <input
+              autoFocus
+              value={newCategoryName}
+              onChange={e => setNewCategoryName(e.target.value)}
+              placeholder="Nombre de la categoría…"
+              style={{
+                flex: '0 1 280px', background: 'var(--surface-2)', border: '1px solid var(--teal)',
+                borderRadius: 6, padding: '8px 12px', fontSize: 13.5, color: 'var(--text-1)', outline: 'none',
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleAddCategory();
+                if (e.key === 'Escape') { setAddingCategory(false); setNewCategoryName(''); }
+              }}
+            />
+            <button className="btn btn-primary btn-sm" onClick={handleAddCategory}>Crear</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setAddingCategory(false); setNewCategoryName(''); }}>Cancelar</button>
+          </div>
+        ) : (
+          <button
+            className="btn btn-ghost btn-sm"
+            style={{ marginBottom: 20, fontSize: 12, color: 'var(--text-3)' }}
+            onClick={() => setAddingCategory(true)}
+          >
+            <Plus size={12} /> Agregar categoría
+          </button>
+        )}
       </div>
 
       {/* Footer sticky */}
